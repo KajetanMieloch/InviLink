@@ -11,40 +11,39 @@
 </head>
 <body>
     <!-- Navbar -->
-<nav class="navbar navbar-expand-lg navbar-light bg-light">
-    <a class="navbar-brand" href="{% url 'event_list' %}">InviLink</a>
-    <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
-        <span class="navbar-toggler-icon"></span>
-    </button>
-    <div class="collapse navbar-collapse" id="navbarNav">
-        <ul class="navbar-nav ml-auto">
-            <li class="nav-item">
-                <a class="nav-link" href="{% url 'event_list' %}">Wydarzenia</a>
-            </li>
-            {% if user.is_authenticated %}
-            <li class="nav-item">
-                <a class="nav-link" href="{% url 'edit_profile' %}">Profil</a>
-            </li>
-            <li class="nav-item">
-                <span class="navbar-text mr-3">
-                    Witaj, {% if user.userprofile.nickname %}{{ user.userprofile.nickname }}{% else %}{{ user.username }}{% endif %}!
-                </span>
-            </li>
+    <nav class="navbar navbar-expand-lg navbar-light bg-light">
+        <a class="navbar-brand" href="{% url 'event_list' %}">InviLink</a>
+        <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+        <div class="collapse navbar-collapse" id="navbarNav">
+            <ul class="navbar-nav ml-auto">
                 <li class="nav-item">
-                    <form method="post" action="{% url 'logout' %}" style="display:inline;">
-                        {% csrf_token %}
-                        <button type="submit" class="btn btn-link nav-link">Wyloguj</button>
-                    </form>
+                    <a class="nav-link" href="{% url 'event_list' %}">Wydarzenia</a>
                 </li>
-            {% else %}
-                <li class="nav-item">
-                    <button class="btn btn-primary nav-link" onclick="connectPhantom()">Zaloguj z Phantom</button>
-                </li>
-            {% endif %}
-        </ul>
-    </div>
-</nav>
-
+                {% if user.is_authenticated %}
+                    <li class="nav-item">
+                        <a class="nav-link" href="{% url 'edit_profile' %}">Profil</a>
+                    </li>
+                    <li class="nav-item">
+                        <span class="navbar-text mr-3">
+                            Witaj, {% if user.userprofile.nickname %}{{ user.userprofile.nickname }}{% else %}{{ user.username }}{% endif %}!
+                        </span>
+                    </li>
+                    <li class="nav-item">
+                        <form method="post" action="{% url 'logout' %}" style="display:inline;">
+                            {% csrf_token %}
+                            <button type="submit" class="btn btn-link nav-link">Wyloguj</button>
+                        </form>
+                    </li>
+                {% else %}
+                    <li class="nav-item">
+                        <button class="btn btn-primary nav-link" onclick="connectPhantom()">Zaloguj z Phantom</button>
+                    </li>
+                {% endif %}
+            </ul>
+        </div>
+    </nav>
 
     <div class="container mt-4">
         {% block content %}{% endblock %}

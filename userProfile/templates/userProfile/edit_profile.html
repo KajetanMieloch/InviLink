@@ -7,6 +7,7 @@
       {% csrf_token %}
       {{ form.as_p }}
       <button type="submit" class="btn btn-primary">Save Changes</button>
+      <button type="submit" name="remove_nickname" value="1" class="btn btn-danger">Remove Nickname</button>
     </form>
   </div>
 {% endblock %}
