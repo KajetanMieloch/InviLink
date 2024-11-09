@@ -1,0 +1,15 @@
+# Ignore Python files
+*.pyc
+__pycache__/
+
+# Virtual environment
+env/
+
+# Django migrations
+*/migrations/
+
+# Database
+*.sqlite3
+
+# Other
+.DS_Store
