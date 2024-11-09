@@ -1,0 +1,17 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Events</title>
+    {% load static %}
+    <link rel="stylesheet" type="text/css" href="{% static 'css/styles.css' %}">
+</head>
+<body>
+    <h1>Upcoming Events</h1>
+    <ul>
+        {% for event in events %}
+            <li>{{ event.title }} - {{ event.date }} at {{ event.location }}</li>
+        {% endfor %}
+    </ul>
+</body>
+</html>
