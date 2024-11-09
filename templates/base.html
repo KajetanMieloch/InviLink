@@ -26,16 +26,20 @@
                         <span class="navbar-text mr-3">Witaj, {{ user.username }}!</span>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" href="{% url 'logout' %}">Wyloguj</a>
+                        <form method="post" action="{% url 'logout' %}" style="display:inline;">
+                            {% csrf_token %}
+                            <button type="submit" class="btn btn-link nav-link" style="display: inline; padding: 0;">Wyloguj</button>
+                        </form>
                     </li>
                 {% else %}
                     <li class="nav-item">
-                        <a class="nav-link" href="{% url 'login' %}">Zaloguj</a>
+                        <button class="btn btn-primary nav-link" onclick="connectPhantom()">Zaloguj z Phantom</button>
                     </li>
                 {% endif %}
             </ul>
         </div>
     </nav>
+    
 
     <div class="container mt-4">
         {% block content %}{% endblock %}
@@ -43,5 +47,37 @@
 
     <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@4.5.2/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://unpkg.com/@solana/web3.js@latest/lib/index.iife.min.js"></script>
+    <script>
+        async function connectPhantom() {
+            // Sprawdzenie, czy Phantom jest dostępny
+            if (window.solana && window.solana.isPhantom) {
+                try {
+                    // Połączenie z portfelem Phantom
+                    const resp = await window.solana.connect();
+                    const publicKey = resp.publicKey.toString();
+                    console.log("Connected with public key:", publicKey);
+
+                    // Wyślij klucz publiczny do backendu Django
+                    fetch("{% url 'phantom_login' %}", {
+                        method: "POST",
+                        headers: {
+                            "Content-Type": "application/json",
+                            "X-CSRFToken": "{{ csrf_token }}"
+                        },
+                        body: JSON.stringify({ publicKey: publicKey })
+                    }).then(response => {
+                        if (response.ok) {
+                            location.reload();  // Odśwież stronę po zalogowaniu
+                        }
+                    });
+                } catch (error) {
+                    console.error("Failed to connect Phantom Wallet:", error);
+                }
+            } else {
+                alert("Please install Phantom Wallet to continue.");
+            }
+        }
+    </script>
 </body>
 </html>
