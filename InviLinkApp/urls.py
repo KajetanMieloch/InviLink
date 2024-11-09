@@ -14,6 +14,7 @@ urlpatterns = [
 
     # Główna strona aplikacji przekierowuje na listę wydarzeń
     path('', include('events.urls')), 
+    path('userProfile/', include('userProfile.urls')),  # Ścieżki do aplikacji userProfile
 
     # Ścieżki logowania i wylogowania
     path('login/', auth_views.LoginView.as_view(template_name='registration/login.html'), name='login'),
