@@ -1,17 +1,20 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <title>Events</title>
-    {% load static %}
-    <link rel="stylesheet" type="text/css" href="{% static 'css/styles.css' %}">
-</head>
-<body>
-    <h1>Upcoming Events</h1>
-    <ul>
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container events-container">
+    <h1 class="text-center mb-4">Upcoming Events</h1>
+    <div class="row">
         {% for event in events %}
-            <li>{{ event.title }} - {{ event.date }} at {{ event.location }}</li>
+            <div class="col-md-6 col-lg-4">
+                <div class="event-card">
+                    <div class="event-title">{{ event.title }}</div>
+                    <div class="event-details">
+                        <p class="event-date">{{ event.date }}</p>
+                        <p>Location: {{ event.location }}</p>
+                    </div>
+                </div>
+            </div>
         {% endfor %}
-    </ul>
-</body>
-</html>
+    </div>
+</div>
+{% endblock %}
