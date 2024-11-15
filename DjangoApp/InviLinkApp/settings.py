@@ -49,7 +49,9 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'blockchain_methods',
-    'events',  # Ensure this is listed only once
+
+    # my apps
+    'events',
     'tickets',
     'userProfile',
 ]

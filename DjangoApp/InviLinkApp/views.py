@@ -4,6 +4,7 @@ from django.views.decorators.csrf import csrf_exempt
 from django.contrib.auth import login
 from django.contrib.auth.models import User
 
+
 @csrf_exempt
 def phantom_login(request):
     if request.method == "POST":
