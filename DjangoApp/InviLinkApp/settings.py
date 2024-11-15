@@ -48,12 +48,13 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-
-    # my apps
-    'events',
+    'blockchain_methods',
+    'events',  # Ensure this is listed only once
     'tickets',
     'userProfile',
 ]
+
+
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
