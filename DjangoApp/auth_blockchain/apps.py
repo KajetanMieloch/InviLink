@@ -1,5 +1,6 @@
 from django.apps import AppConfig
 
-class BlockchainMethodsConfig(AppConfig):
+
+class AuthBlockchainConfig(AppConfig):
     default_auto_field = 'django.db.models.BigAutoField'
-    name = 'blockchain_methods'
+    name = 'auth_blockchain'

@@ -17,6 +17,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 
 # STATIC FILES
 STATIC_URL = '/static/'
+STATICFILES_DIRS = [BASE_DIR / "static"]  # Katalog ze statycznymi plikami
 
 # MEDIA FILES
 MEDIA_URL = '/media/'
@@ -35,7 +36,7 @@ SECRET_KEY = 'django-insecure-q#(7#+6_3*snmv)kdq9%w8e7sy7bt0@hp@q(f6y5+cvghp!0qc
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ['192.168.1.211', '127.0.0.1', 'localhost']
 
 LOGOUT_REDIRECT_URL = '/events/'
 
@@ -48,7 +49,7 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-    'blockchain_methods',
+    'auth_blockchain',
 
     # my apps
     'events',
@@ -66,6 +67,7 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'django.contrib.sessions.middleware.SessionMiddleware',
 ]
 
 ROOT_URLCONF = 'InviLinkApp.urls'
