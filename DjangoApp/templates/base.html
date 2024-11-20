@@ -35,7 +35,7 @@
                             {% csrf_token %}
                             <button type="submit" class="btn btn-link nav-link">Wyloguj</button>
                         </form>
-                    </li>                  
+                    </li>
                 {% else %}
                     <li class="nav-item">
                         <button class="btn btn-primary nav-link" onclick="connectPhantom()">Zaloguj z Phantom</button>
@@ -49,43 +49,71 @@
         {% block content %}{% endblock %}
     </div>
 
+    <!-- Scripts -->
     <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@4.5.2/dist/js/bootstrap.bundle.min.js"></script>
-    <script src="https://unpkg.com/@solana/web3.js@latest/lib/index.iife.min.js"></script>
     <script>
+        // Funkcja do logowania przez Phantom Wallet
         function connectPhantom() {
-            if (window.solana && window.solana.isPhantom) {
-                // Desktop Phantom Wallet (wtyczka)
-                window.solana.connect()
-                    .then((resp) => {
-                        const publicKey = resp.publicKey.toString();
-                        console.log("Connected with public key:", publicKey);
+          if (window.solana && window.solana.isPhantom) {
+        // Desktop Phantom Wallet (API)
+        window.solana.connect()
+            .then((resp) => {
+                const publicKey = resp.publicKey.toString();
+                console.log("Connected with public key:", publicKey);
 
-                        // Wysyłanie do backendu
-                        fetch("{% url 'phantom_login' %}", {
-                            method: "POST",
-                            headers: {
-                                "Content-Type": "application/json",
-                                "X-CSRFToken": "{{ csrf_token }}"
-                            },
-                            body: JSON.stringify({ publicKey: publicKey })
-                        }).then(response => {
-                            if (response.ok) {
-                                location.reload(); // Odśwież stronę
-                            }
-                        });
-                    })
-                    .catch((err) => console.error("Phantom connection failed:", err));
-            } else if (/Mobi|Android/i.test(navigator.userAgent)) {
-                // Mobile (deep link)
-                const redirectLink = 'https://yourwebsite.com/phantom/callback';
-                const deepLink = `https://phantom.app/ul/?action=connect&redirect_link=${encodeURIComponent(redirectLink)}`;
-                window.location.href = deepLink;
-            } else {
-                alert("Phantom Wallet is required. Please install it on your device.");
+                fetch("{% url 'phantom_login' %}", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                        "X-CSRFToken": "{{ csrf_token }}"
+                    },
+                    body: JSON.stringify({ publicKey: publicKey })
+                }).then(response => {
+                    if (response.ok) {
+                        location.reload();
+                    }
+                });
+            })
+            .catch((err) => console.error("Phantom connection failed:", err));
+
+
+
+        } else if (/Mobi|Android/i.test(navigator.userAgent)) {
+            const dappEncryptionPublicKey = '{{ dapp_encryption_public_key }}';
+            const appUrl = 'http://192.168.1.211:8000';
+            const redirectLink = 'http://192.168.1.211:8000/auth/phantom/callback';
+
+            const deepLink = `https://phantom.app/ul/v1/connect?app_url=${encodeURIComponent(appUrl)}&dapp_encryption_public_key=${dappEncryptionPublicKey}&redirect_link=${encodeURIComponent(redirectLink)}&cluster=devnet`;
+
+            window.location.href = deepLink;
+
+        } else {
+        alert("Phantom Wallet is required. Please install it on your device.");
             }
         }
+        // // Obsługa odpowiedzi z Phantom Wallet po przekierowaniu
+        // document.addEventListener("DOMContentLoaded", function () {
+        //     const urlParams = new URLSearchParams(window.location.search);
+        //     const publicKey = urlParams.get("public_key");
+        //     const session = urlParams.get("session");
 
+        //     if (publicKey && session) {
+        //         // Wyślij dane do backendu
+        //         fetch("{% url 'phantom_login' %}", {
+        //             method: "POST",
+        //             headers: {
+        //                 "Content-Type": "application/json",
+        //                 "X-CSRFToken": "{{ csrf_token }}"
+        //             },
+        //             body: JSON.stringify({ publicKey: publicKey, session: session })
+        //         }).then(response => {
+        //             if (response.ok) {
+        //                 location.reload(); // Odśwież stronę
+        //             }
+        //         });
+        //     }
+        // });
     </script>
 </body>
 </html>

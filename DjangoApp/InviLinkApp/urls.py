@@ -21,6 +21,7 @@ urlpatterns = [
     path('logout/', auth_views.LogoutView.as_view(), name='logout'),
     
     # Ścieżka logowania przez MetaMask
+    path('', include('auth_blockchain.urls')),
     path('phantom_login/', views.phantom_login, name='phantom_login'),
     path('auth/', include('auth_blockchain.urls')),
 ] + static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)
