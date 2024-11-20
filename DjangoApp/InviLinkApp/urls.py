@@ -6,21 +6,15 @@ from django.contrib.auth import views as auth_views
 from . import views
 
 urlpatterns = [
-    # Ścieżka do panelu administracyjnego Django
     path('admin/', admin.site.urls),
-
-    # Ścieżka do wydarzeń (appka events)
     path('events/', include('events.urls')),
 
-    # Główna strona aplikacji przekierowuje na listę wydarzeń
     path('', include('events.urls')), 
-    path('userProfile/', include('userProfile.urls')),  # Ścieżki do aplikacji userProfile
+    path('userProfile/', include('userProfile.urls')),
 
-    # Ścieżki logowania i wylogowania
     path('login/', auth_views.LoginView.as_view(template_name='registration/login.html'), name='login'),
     path('logout/', auth_views.LogoutView.as_view(), name='logout'),
     
-    # Ścieżka logowania przez MetaMask
     path('', include('auth_blockchain.urls')),
     path('phantom_login/', views.phantom_login, name='phantom_login'),
     path('auth/', include('auth_blockchain.urls')),
