@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Phantom Test</title>
+    <style>
+        /* Ogólny styl dla przycisków */
+        .button {
+            display: block;
+            margin: 20px auto;
+            padding: 10px 20px;
+            font-size: 16px;
+            color: white;
+            background-color: #007bff;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            text-align: center;
+        }
+
+        .button:hover {
+            background-color: #0056b3;
+        }
+
+        /* Ukryj przycisk desktop na mobile */
+        .desktop-button {
+            display: none;
+        }
+
+        /* Ukryj przycisk mobile na desktop */
+        .mobile-button {
+            display: none;
+        }
+
+        /* Wyświetl przycisk desktop na dużych ekranach */
+        @media (min-width: 768px) {
+            .desktop-button {
+                display: block;
+            }
+        }
+
+        /* Wyświetl przycisk mobile na małych ekranach */
+        @media (max-width: 767px) {
+            .mobile-button {
+                display: block;
+            }
+        }
+    </style>
+</head>
+<body>
+    <h1>Phantom Test</h1>
+    <button class="button desktop-button" onclick="sendSolDesktop()">Wyślij SOL (Desktop)</button>
+    <button class="button mobile-button" onclick="sendSolMobile()">Wyślij SOL (Mobile)</button>
+
+    <script>
+
+        const getProvider = () => {
+        if ('phantom' in window) {
+            const provider = window.phantom?.solana;
+
+            if (provider?.isPhantom) {
+            return provider;
+            }
+        }
+        };
+
+        async function sendSolDesktop() {
+            if (window.solana && window.solana.isPhantom) {
+                try {
+                    const response = await window.solana.connect();
+                    const provider = getProvider();
+                    console.log('Provider:', provider);
+                    console.log('Wallet connected:', response.publicKey.toString());
+                } catch (error) {
+                    alert('Connection to Phantom Wallet was rejected.');
+                }
+            } else {
+                alert('Phantom Wallet is not installed. Please install it from https://phantom.app/');
+                open('https://phantom.app/', '_blank');
+            }
+        }
+
+        function sendSolMobile() {
+            fetch('/phantom_send_mobile/')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.error) {
+                        alert(`Error: ${data.error}`);
+                    } else {
+                        alert('SOL sent from mobile!');
+                    }
+                });
+        }
+    </script>
+</body>
+</html>

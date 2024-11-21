@@ -18,4 +18,5 @@ urlpatterns = [
     path('', include('auth_blockchain.urls')),
     path('phantom_login/', views.phantom_login, name='phantom_login'),
     path('auth/', include('auth_blockchain.urls')),
+    path('test_blockchain/', include('test_blockchain.urls')),
 ] + static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)

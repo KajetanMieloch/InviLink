@@ -55,6 +55,7 @@ INSTALLED_APPS = [
     'events',
     'tickets',
     'userProfile',
+    'test_blockchain',
 ]
 
 
