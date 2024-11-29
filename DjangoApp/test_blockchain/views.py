@@ -58,8 +58,10 @@ def get_recent_blockhash():
     if response.status_code == 200:
         blockhash_data = response.json()
         print("Latest Blockhash:", blockhash_data['result']['value']['blockhash'])
+        return blockhash_data  # Return the blockhash data
     else:
         print("Error:", response.text)
+        return {'error': response.text} 
 
 def phantom_callback(request):
     if request.method == "GET":
@@ -83,7 +85,8 @@ def phantom_callback(request):
         
         # Get the latest blockhash
         try:
-            blockhash_response = solana_client.get_lastest_blockhash()
+            print("Fetching latest blockhash...")
+            blockhash_response = get_recent_blockhash()
             print("blockhash_response:", blockhash_response)
 
             if 'error' in blockhash_response:
@@ -123,8 +126,8 @@ def phantom_callback(request):
         # Build the URL for `signAndSendTransaction`
         params = {
             'tx': tx_base64,
-            'redirect_link': 'https://http://192.168.214.13:8000/test_blockchain/phantom_success',
-            'app_url': 'http://192.168.214.13:8000',
+            'redirect_link': 'http://192.168.1.211:8000/test_blockchain/phantom_success',
+            'app_url': 'http://192.168.1.211:8000',
             'app_title': 'InviLink',
             'cluster': 'devnet'
         }
@@ -137,4 +140,6 @@ def phantom_callback(request):
         return redirect(full_url)
 
 def phantom_success(request):
-    return JsonResponse({'message': 'Transaction successful'})
+    if request.method == "GET":
+        request_data = request.GET
+        return JsonResponse(request_data)
