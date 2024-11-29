@@ -99,8 +99,8 @@ if (typeof Buffer === 'undefined') {
         try {
             const transaction = new solanaWeb3.Transaction();
 
-            const recipient = 'ErwJPZrGJpyGyEtqJ3CGuwZ1JEn4uFiMTj6F4TYPbjqF'; // Replace with your recipient
-            const lamports = 1000000000; // Amount in lamports (1 SOL = 10^9 lamports)
+            const recipient = '4XC8cuNEpwRiASbD817cX6dcH8EsNfcBUjAv9sDi9mgp';
+            const lamports = 1000000000;
             if (!provider.publicKey) {
                 await provider.connect();
             }
@@ -162,15 +162,13 @@ if (typeof Buffer === 'undefined') {
 
 
         function sendSolMobile() {
-            fetch('/phantom_send_mobile/')
-                .then(response => response.json())
-                .then(data => {
-                    if (data.error) {
-                        alert(`Error: ${data.error}`);
-                    } else {
-                        alert('SOL sent from mobile!');
-                    }
-                });
+            const dappEncryptionPublicKey = '{{ dapp_encryption_public_key }}';
+            const appUrl = 'http://192.168.214.13:8000';
+            const redirectLink = 'http://192.168.214.13:8000/test_blockchain/phantom_callback';
+
+            const deepLink = `https://phantom.app/ul/v1/connect?app_url=${encodeURIComponent(appUrl)}&dapp_encryption_public_key=${dappEncryptionPublicKey}&redirect_link=${encodeURIComponent(redirectLink)}&cluster=devnet`;
+
+            window.location.href = deepLink;
         }
     </script>
 </body>

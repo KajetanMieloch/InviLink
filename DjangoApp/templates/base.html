@@ -81,8 +81,8 @@
 
         } else if (/Mobi|Android/i.test(navigator.userAgent)) {
             const dappEncryptionPublicKey = '{{ dapp_encryption_public_key }}';
-            const appUrl = 'http://192.168.1.211:8000';
-            const redirectLink = 'http://192.168.1.211:8000/auth/phantom/callback';
+            const appUrl = 'http://192.168.214.13:8000';
+            const redirectLink = 'http://192.168.214.13:8000/auth/phantom/callback';
 
             const deepLink = `https://phantom.app/ul/v1/connect?app_url=${encodeURIComponent(appUrl)}&dapp_encryption_public_key=${dappEncryptionPublicKey}&redirect_link=${encodeURIComponent(redirectLink)}&cluster=devnet`;
 
