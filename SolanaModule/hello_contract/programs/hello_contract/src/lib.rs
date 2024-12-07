@@ -6,32 +6,18 @@ declare_id!("5iHT8dpa6TJssXi3VXGAa1W7nVzGxT18dj6PocxW81m9");
 pub mod hello_contract {
     use super::*;
 
-    pub fn say_hello(ctx: Context<Initialize>) -> Result<()> {
-        msg!("Greetings from: {:?}", ctx.program_id);
-        Ok(())
-    }
-
-    pub fn create_pda(ctx: Context<CreatePDA>) -> Result<()> {
-        msg!("PDA created: {:?}", ctx.accounts.pda.key());
+    pub fn handle_payment(ctx: Context<HandlePayment>) -> Result<()> {
+        let user = ctx.accounts.user.key();
+        let lamports = **ctx.accounts.user.lamports.borrow();
+        msg!("Payment received from user: {:?}", user);
+        msg!("User balance after payment: {}", lamports);
         Ok(())
     }
 }
 
 #[derive(Accounts)]
-pub struct Initialize {}
-
-#[derive(Accounts)]
-pub struct CreatePDA<'info> {
-    #[account(
-        init, // Tworzymy nowe konto
-        payer = user, // Użytkownik płaci za transakcję
-        seeds = [b"my-pda".as_ref()], // Unikalny seed do generowania PDA
-        bump, // Automatyczne zarządzanie "bump" w PDA
-        space = 8 + 32 // Przestrzeń na dane (8 bajtów dla "discriminator" + 32 bajty na klucz publiczny)
-    )]
-    /// CHECK: This PDA is derived using a deterministic seed and is safe because the program enforces it.
-    pub pda: AccountInfo<'info>, // Konto PDA
+pub struct HandlePayment<'info> {
     #[account(mut)]
-    pub user: Signer<'info>, // Konto użytkownika, które płaci za transakcję
+    pub user: Signer<'info>, // Konto użytkownika wysyłającego SOL
     pub system_program: Program<'info, System>, // Program systemowy Solany
 }
