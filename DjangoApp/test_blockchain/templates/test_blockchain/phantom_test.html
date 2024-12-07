@@ -56,6 +56,8 @@
 
     <script>
 
+
+
 if (typeof Buffer === 'undefined') {
         window.Buffer = {
             from: (str, encoding) => {
@@ -100,7 +102,7 @@ if (typeof Buffer === 'undefined') {
             const transaction = new solanaWeb3.Transaction();
 
             const recipient = '4XC8cuNEpwRiASbD817cX6dcH8EsNfcBUjAv9sDi9mgp';
-            const lamports = 1000000000;
+            const lamports = 1000;
             if (!provider.publicKey) {
                 await provider.connect();
             }
@@ -161,15 +163,15 @@ if (typeof Buffer === 'undefined') {
     }
 
 
-        function sendSolMobile() {
-            const dappEncryptionPublicKey = '{{ dapp_encryption_public_key }}';
-            const appUrl = 'http://192.168.1.211:8000';
-            const redirectLink = 'http://192.168.1.211:8000/test_blockchain/phantom_callback';
+        // function sendSolMobile() {
+        //     const dappEncryptionPublicKey = '{{ dapp_encryption_public_key }}';
+        //     const appUrl = 'http://192.168.1.211:8000';
+        //     const redirectLink = 'http://192.168.1.211:8000/test_blockchain/phantom_callback';
 
-            const deepLink = `https://phantom.app/ul/v1/connect?app_url=${encodeURIComponent(appUrl)}&dapp_encryption_public_key=${dappEncryptionPublicKey}&redirect_link=${encodeURIComponent(redirectLink)}&cluster=devnet`;
+        //     const deepLink = `https://phantom.app/ul/v1/connect?app_url=${encodeURIComponent(appUrl)}&dapp_encryption_public_key=${dappEncryptionPublicKey}&redirect_link=${encodeURIComponent(redirectLink)}&cluster=devnet`;
 
-            window.location.href = deepLink;
-        }
+        //     window.location.href = deepLink;
+        // }
     </script>
 </body>
 </html>
