@@ -8,52 +8,32 @@ import logging
 from nacl.public import PrivateKey as NaClPrivateKey, PublicKey as NaClPublicKey, Box
 from django.http import JsonResponse
 from django.shortcuts import render, redirect
-from solana.publickey import PublicKey as SolanaPublicKey
 from solana.rpc.api import Client
-from solana.system_program import TransferParams, transfer
 from solana.transaction import Transaction
+from solders.pubkey import Pubkey
+from solders.signature import Signature
+from base58 import b58decode
 
 # Configure logging
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
-# Initialize Solana client for Devnet
-solana_client = Client("https://api.devnet.solana.com")
+
 
 def phantom_test(request):
     return render(request, 'test_blockchain/phantom_test.html')
 
 
-from django.http import JsonResponse
-from solana.rpc.api import Client
-from solana.publickey import PublicKey
-import base64
-
-def get_blockchain_data(request):
-    # Ustawienia połączenia z blockchainem
+def get_blockchain_data(request, signature):
     network_url = "https://api.devnet.solana.com"
     client = Client(network_url)
 
-    # Publiczny klucz konta, z którego odczytujemy dane
-    account_public_key = PublicKey("5iHT8dpa6TJssXi3VXGAa1W7nVzGxT18dj6PocxW81m9")
+    transaction_signature = signature
 
-    try:
-        # Pobranie danych z konta
-        response = client.get_account_info(account_public_key)
+    # Fetch the transaction details using the updated method
+    response = client.get_transaction(transaction_signature, encoding="jsonParsed")
 
-        if response["result"]["value"] is None:
-            return JsonResponse({"error": "Account not found"}, status=404)
-
-        # Dane w formacie Base64 (musimy je zdekodować)
-        raw_data = response["result"]["value"]["data"][0]
-        decoded_data = base64.b64decode(raw_data).decode("utf-8")  # Przykład: dane jako tekst
-
-        return JsonResponse({"blockchain_data": decoded_data})
-
-    except Exception as e:
-        return JsonResponse({"error": str(e)}, status=500)
-
-
+    return JsonResponse(response)
 
 # def decrypt_data(request, phantom_encryption_public_key, nonce_base58, encrypted_data_base58):
 #     logger.debug("Starting decryption process.")

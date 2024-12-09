@@ -52,6 +52,7 @@
     <h1>Phantom Test</h1>
     <button class="button desktop-button" onclick="callSmartContractDesktop()">Wyślij SOL (Desktop)</button>
     <button class="button mobile-button" onclick="sendSolMobile()">Wyślij SOL (Mobile)</button>
+    <p id="blockchainData"></p>
     <script src="https://cdn.jsdelivr.net/npm/@solana/web3.js@latest/lib/index.iife.min.js"> </script>
 
     <script>
@@ -74,6 +75,16 @@ if (typeof Buffer === 'undefined') {
         },
         alloc: (size) => new Uint8Array(size), // Obsługa Buffer.alloc
     };
+}
+
+
+async function fetchBlockchainData(signature) {
+
+        console.log("signature", signature);
+        const response = await fetch(`http://127.0.0.1:8000/test_blockchain/blockchain-data/${signature}`);
+        const data = await response.json();
+        console.log("data", data);
+        document.getElementById('blockchainData').innerText = JSON.stringify(data, null, 2);
 }
 
 const getProvider = () => {
@@ -162,6 +173,7 @@ async function callSmartContract() {
         }
 
         alert('Transaction successful!');
+        fetchBlockchainData(signature);
     } catch (error) {
         console.error('Transaction failed:', error);
         alert(`Transaction failed: ${error.message}`);
@@ -195,22 +207,7 @@ async function callSmartContractDesktop() {
         //     window.location.href = deepLink;
         // }
 
-        async function fetchBlockchainData() {
-            try {
-                const response = await fetch('/blockchain-data/');
-                if (!response.ok) {
-                    throw new Error('Failed to fetch blockchain data');
-                }
-                const data = await response.json();
-                document.getElementById('blockchainData').innerText = JSON.stringify(data.blockchain_data);
-            } catch (error) {
-                console.error('Error:', error);
-                document.getElementById('blockchainData').innerText = 'Error fetching blockchain data';
-            }
-        }
 
-        // Wywołaj funkcję po załadowaniu strony
-        fetchBlockchainData();
 
 
     </script>
