@@ -24,6 +24,34 @@ def phantom_test(request):
     return render(request, 'test_blockchain/phantom_test.html')
 
 
+from django.http import JsonResponse
+from solana.rpc.api import Client
+from solana.publickey import PublicKey
+import base64
+
+def get_blockchain_data(request):
+    # Ustawienia połączenia z blockchainem
+    network_url = "https://api.devnet.solana.com"
+    client = Client(network_url)
+
+    # Publiczny klucz konta, z którego odczytujemy dane
+    account_public_key = PublicKey("5iHT8dpa6TJssXi3VXGAa1W7nVzGxT18dj6PocxW81m9")
+
+    try:
+        # Pobranie danych z konta
+        response = client.get_account_info(account_public_key)
+
+        if response["result"]["value"] is None:
+            return JsonResponse({"error": "Account not found"}, status=404)
+
+        # Dane w formacie Base64 (musimy je zdekodować)
+        raw_data = response["result"]["value"]["data"][0]
+        decoded_data = base64.b64decode(raw_data).decode("utf-8")  # Przykład: dane jako tekst
+
+        return JsonResponse({"blockchain_data": decoded_data})
+
+    except Exception as e:
+        return JsonResponse({"error": str(e)}, status=500)
 
 
 

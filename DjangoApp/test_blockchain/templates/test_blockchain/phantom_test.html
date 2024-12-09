@@ -194,6 +194,25 @@ async function callSmartContractDesktop() {
 
         //     window.location.href = deepLink;
         // }
+
+        async function fetchBlockchainData() {
+            try {
+                const response = await fetch('/blockchain-data/');
+                if (!response.ok) {
+                    throw new Error('Failed to fetch blockchain data');
+                }
+                const data = await response.json();
+                document.getElementById('blockchainData').innerText = JSON.stringify(data.blockchain_data);
+            } catch (error) {
+                console.error('Error:', error);
+                document.getElementById('blockchainData').innerText = 'Error fetching blockchain data';
+            }
+        }
+
+        // Wywołaj funkcję po załadowaniu strony
+        fetchBlockchainData();
+
+
     </script>
 </body>
 </html>
