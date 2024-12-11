@@ -173,6 +173,8 @@ async function callSmartContract() {
         }
 
         alert('Transaction successful!');
+        //Wait 4 seconds for the transaction to be confirmed
+        await new Promise(resolve => setTimeout(resolve, 4000));
         fetchBlockchainData(signature);
     } catch (error) {
         console.error('Transaction failed:', error);
