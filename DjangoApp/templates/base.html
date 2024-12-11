@@ -82,13 +82,28 @@
         } else if (/Mobi|Android/i.test(navigator.userAgent)) {
 
             
-            // const dappEncryptionPublicKey = '{{ dapp_encryption_public_key }}';
-            // const appUrl = 'http://192.168.141.13:8000';
-            // const redirectLink = 'http://192.168.141.13:8000/auth/phantom/callback';
+            window.solana.connect()
+            .then((resp) => {
+                const publicKey = resp.publicKey.toString();
+                console.log("Connected with public key:", publicKey);
 
-            // const deepLink = `https://phantom.app/ul/v1/connect?app_url=${encodeURIComponent(appUrl)}&dapp_encryption_public_key=${dappEncryptionPublicKey}&redirect_link=${encodeURIComponent(redirectLink)}&cluster=devnet`;
+                fetch("{% url 'phantom_login' %}", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                        "X-CSRFToken": "{{ csrf_token }}"
+                    },
+                    body: JSON.stringify({ publicKey: publicKey })
+                }).then(response => {
+                    if (response.ok) {
+                        location.reload();
+                    }
+                });
+            })
+            .catch((err) => console.error("Phantom connection failed:", err));
 
-            // window.location.href = deepLink;
+
+
 
         } else {
         alert("Phantom Wallet is required. Please install it on your device.");
