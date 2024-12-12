@@ -52,7 +52,10 @@
     <h1>Phantom Test</h1>
     <button class="button desktop-button" onclick="callSmartContractDesktop()">Wyślij SOL (Desktop)</button>
     <button class="button mobile-button" onclick="callSmartContractDesktop()">Wyślij SOL (Mobile)</button>
-    <p id="blockchainData"></p>
+    <h1>Fetch Blockchain Data</h1>
+    <input type="text" id="transactionSignature" placeholder="Enter Transaction Signature">
+    <button onclick="fetchBlockchainData()">Fetch</button>
+    <pre id="blockchainData"></pre>
     <script src="https://cdn.jsdelivr.net/npm/@solana/web3.js@latest/lib/index.iife.min.js"> </script>
 
     <script>
@@ -78,14 +81,50 @@ if (typeof Buffer === 'undefined') {
 }
 
 
-async function fetchBlockchainData(signature) {
+async function fetchBlockchainData() {
+            const signature = document.getElementById('transactionSignature').value.trim();
+            if (!signature) {
+                alert("Please enter a transaction signature");
+                return;
+            }
 
-        console.log("signature", signature);
-        const response = await fetch(`http://127.0.0.1:8000/test_blockchain/blockchain-data/${signature}`);
-        const data = await response.json();
-        console.log("data", data);
-        document.getElementById('blockchainData').innerText = JSON.stringify(data, null, 2);
-}
+            const networkUrl = "https://api.devnet.solana.com";
+
+            const payload = {
+                jsonrpc: "2.0",
+                id: 1,
+                method: "getTransaction",
+                params: [
+                    signature,
+                    {
+                        encoding: "jsonParsed"
+                    }
+                ]
+            };
+
+            try {
+                console.log("Fetching data for signature:", signature);
+
+                const response = await fetch(networkUrl, {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json"
+                    },
+                    body: JSON.stringify(payload)
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP error! Status: ${response.status}`);
+                }
+
+                const data = await response.json();
+                console.log("Blockchain Data:", data);
+                document.getElementById('blockchainData').innerText = JSON.stringify(data, null, 2);
+            } catch (error) {
+                console.error("Error fetching blockchain data:", error);
+                document.getElementById('blockchainData').innerText = `Error: ${error.message}`;
+            }
+        }
 
 const getProvider = () => {
     if ('phantom' in window) {
@@ -195,23 +234,6 @@ async function callSmartContractDesktop() {
         open('https://phantom.app/', '_blank');
     }
 }
-
-
-
-
-        // function sendSolMobile() {
-        //     const dappEncryptionPublicKey = '{{ dapp_encryption_public_key }}';
-        //     const appUrl = 'http://192.168.1.211:8000';
-        //     const redirectLink = 'http://192.168.1.211:8000/test_blockchain/phantom_callback';
-
-        //     const deepLink = `https://phantom.app/ul/v1/connect?app_url=${encodeURIComponent(appUrl)}&dapp_encryption_public_key=${dappEncryptionPublicKey}&redirect_link=${encodeURIComponent(redirectLink)}&cluster=devnet`;
-
-        //     window.location.href = deepLink;
-        // }
-
-
-
-
     </script>
 </body>
 </html>
