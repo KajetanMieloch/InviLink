@@ -36,7 +36,11 @@ SECRET_KEY = 'django-insecure-q#(7#+6_3*snmv)kdq9%w8e7sy7bt0@hp@q(f6y5+cvghp!0qc
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = ['192.168.1.211', '127.0.0.1', 'localhost', '192.168.82.13', '192.168.214.13', '192.168.141.13', "*"]
+ALLOWED_HOSTS = ["*"]
+
+CSRF_TRUSTED_ORIGINS = [
+    "https://invilink.toadres.pl"
+]
 
 LOGOUT_REDIRECT_URL = '/events/'
 

@@ -5,7 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Phantom Test</title>
     <style>
-        /* Ogólny styl dla przycisków */
         .button {
             display: block;
             margin: 20px auto;
@@ -22,69 +21,37 @@
         .button:hover {
             background-color: #0056b3;
         }
-
-        /* Ukryj przycisk desktop na mobile */
-        .desktop-button {
-            display: none;
-        }
-
-        /* Ukryj przycisk mobile na desktop */
-        .mobile-button {
-            display: none;
-        }
-
-        /* Wyświetl przycisk desktop na dużych ekranach */
-        @media (min-width: 768px) {
-            .desktop-button {
-                display: block;
-            }
-        }
-
-        /* Wyświetl przycisk mobile na małych ekranach */
-        @media (max-width: 767px) {
-            .mobile-button {
-                display: block;
-            }
-        }
     </style>
 </head>
 <body>
     <h1>Phantom Test</h1>
-    <button class="button desktop-button" onclick="callSmartContractDesktop()">Wyślij SOL (Desktop)</button>
-    <button class="button mobile-button" onclick="callSmartContractDesktop()">Wyślij SOL (Mobile)</button>
+    <button class="button" onclick="callSmartContract()">Wyślij SOL</button>
     <h1>Fetch Blockchain Data</h1>
     <input type="text" id="transactionSignature" placeholder="Enter Transaction Signature">
     <button onclick="fetchBlockchainData()">Fetch</button>
     <pre id="blockchainData"></pre>
-    <script src="https://cdn.jsdelivr.net/npm/@solana/web3.js@latest/lib/index.iife.min.js"> </script>
+    <script src="https://cdn.jsdelivr.net/npm/@solana/web3.js@latest/lib/index.iife.min.js"></script>
 
     <script>
-
-
-
-if (typeof Buffer === 'undefined') {
-    window.Buffer = {
-        from: (str, encoding) => {
-            if (encoding === 'base64') {
-                return Uint8Array.from(atob(str), c => c.charCodeAt(0));
-            } else if (encoding === 'hex') {
-                const bytes = [];
-                for (let i = 0; i < str.length; i += 2) {
-                    bytes.push(parseInt(str.substr(i, 2), 16));
+        // Funkcja sprawdzająca obecność Phantom Wallet
+        const getProvider = () => {
+            if ('phantom' in window && window.phantom.solana) {
+                const provider = window.phantom.solana;
+                if (provider.isPhantom) {
+                    return provider;
                 }
-                return Uint8Array.from(bytes);
             }
-            throw new Error('Unsupported encoding: ' + encoding);
-        },
-        alloc: (size) => new Uint8Array(size), // Obsługa Buffer.alloc
-    };
-}
+            alert("Phantom Wallet is required. Redirecting to Phantom Browser...");
+            const currentUrl = encodeURIComponent(window.location.href);
+            const phantomDeeplink = `phantom://browser?url=${currentUrl}`;
+            window.location.href = phantomDeeplink;
+            return null;
+        };
 
-
-async function fetchBlockchainData() {
-            const signature = document.getElementById('transactionSignature').value.trim();
+        // Funkcja fetchowania danych z blockchaina
+        async function fetchBlockchainData(signature) {
             if (!signature) {
-                alert("Please enter a transaction signature");
+                alert("Please enter a transaction signature.");
                 return;
             }
 
@@ -96,9 +63,7 @@ async function fetchBlockchainData() {
                 method: "getTransaction",
                 params: [
                     signature,
-                    {
-                        encoding: "jsonParsed"
-                    }
+                    { encoding: "jsonParsed" }
                 ]
             };
 
@@ -107,9 +72,7 @@ async function fetchBlockchainData() {
 
                 const response = await fetch(networkUrl, {
                     method: "POST",
-                    headers: {
-                        "Content-Type": "application/json"
-                    },
+                    headers: { "Content-Type": "application/json" },
                     body: JSON.stringify(payload)
                 });
 
@@ -126,114 +89,71 @@ async function fetchBlockchainData() {
             }
         }
 
-const getProvider = () => {
-    if ('phantom' in window) {
-        const provider = window.phantom?.solana;
+        // Funkcja wywołania smart kontraktu
+        async function callSmartContract() {
+            const provider = getProvider();
+            if (!provider) return;
 
-        if (provider?.isPhantom) {
-            return provider;
+            const network = 'https://api.devnet.solana.com';
+            const connection = new solanaWeb3.Connection(network);
+
+            try {
+                const transaction = new solanaWeb3.Transaction();
+
+                // Twój Program ID
+                const programId = new solanaWeb3.PublicKey("5iHT8dpa6TJssXi3VXGAa1W7nVzGxT18dj6PocxW81m9");
+
+                if (!provider.publicKey) {
+                    await provider.connect();
+                }
+
+                const senderPublicKey = provider.publicKey;
+
+                // Pobierz ostatni blockhash
+                const { blockhash } = await connection.getLatestBlockhash();
+
+                // Ustawienia transakcji
+                transaction.recentBlockhash = blockhash;
+                transaction.feePayer = senderPublicKey;
+
+                const instruction = new solanaWeb3.TransactionInstruction({
+                    keys: [
+                        { pubkey: senderPublicKey, isSigner: true, isWritable: true },
+                        { pubkey: solanaWeb3.SystemProgram.programId, isSigner: false, isWritable: false }
+                    ],
+                    programId: programId,
+                    data: new Uint8Array([46, 139, 65, 78, 244, 171, 123, 238]) // Przykładowe dane
+                });
+
+                transaction.add(instruction);
+
+                console.log("Transaction object:", transaction);
+
+                // Symulacja
+                const simulation = await connection.simulateTransaction(transaction);
+                if (simulation.value.err) {
+                    throw new Error('Transaction simulation failed. Check logs for details.');
+                }
+
+                // Podpisz i wyślij transakcję
+                const { signature } = await provider.signAndSendTransaction(transaction);
+                console.log('Transaction signature:', signature);
+
+                // Potwierdzenie
+                const confirmation = await connection.confirmTransaction(signature);
+                if (confirmation.value.err) {
+                    throw new Error('Transaction confirmation failed.');
+                }
+
+                alert('Transaction successful!');
+
+                // Automatyczne fetchowanie po 5 sekundach
+                setTimeout(() => fetchBlockchainData(signature), 5000);
+            } catch (error) {
+                console.error("Transaction failed:", error);
+                alert(`Transaction failed: ${error.message}`);
+            }
         }
-    }
-    alert('Phantom Wallet is not installed. Please install it from https://phantom.app/');
-    open('https://phantom.app/', '_blank');
-    return null;
-};
-
-async function callSmartContract() {
-    const provider = getProvider();
-    if (!provider) {
-        console.error("Provider not found. Make sure Phantom Wallet is connected.");
-        return;
-    }
-
-    const network = 'https://api.devnet.solana.com';
-    const connection = new solanaWeb3.Connection(network);
-
-    try {
-        const transaction = new solanaWeb3.Transaction();
-
-        // Twój Program ID
-        const programId = new solanaWeb3.PublicKey("5iHT8dpa6TJssXi3VXGAa1W7nVzGxT18dj6PocxW81m9");
-
-        if (!provider.publicKey) {
-            await provider.connect();
-        }
-
-        const senderPublicKey = provider.publicKey;
-
-        // Pobierz ostatni blockhash
-        const { blockhash } = await connection.getLatestBlockhash();
-
-        // Ustaw fee payer i blockhash
-        transaction.recentBlockhash = blockhash;
-        transaction.feePayer = senderPublicKey;
-
-        // 8-bajtowy identyfikator instrukcji (discriminator z IDL)
-        const instructionIdentifier = new Uint8Array([46, 139, 65, 78, 244, 171, 123, 238]);
-
-        // Dodaj instrukcję wywołującą smart contract
-        const instruction = new solanaWeb3.TransactionInstruction({
-            keys: [
-                {
-                    pubkey: senderPublicKey, // Użytkownik
-                    isSigner: true,
-                    isWritable: true,
-                },
-                {
-                    pubkey: solanaWeb3.SystemProgram.programId, // Program systemowy
-                    isSigner: false,
-                    isWritable: false,
-                },
-            ],
-            programId: programId,
-            data: instructionIdentifier, // 8-bajtowy identyfikator instrukcji
-        });
-
-        transaction.add(instruction);
-
-        console.log("Transaction object:", transaction);
-
-        // Symulacja transakcji
-        const simulation = await connection.simulateTransaction(transaction);
-        console.log('Simulation logs:', simulation.value.logs);
-
-        if (simulation.value.err) {
-            throw new Error('Transaction simulation failed. Check logs for details.');
-        }
-
-        // Podpisz i wyślij transakcję
-        const { signature } = await provider.signAndSendTransaction(transaction);
-        console.log('Transaction signature:', signature);
-
-        // Potwierdź transakcję
-        const confirmation = await connection.confirmTransaction(signature);
-        if (confirmation.value.err) {
-            throw new Error('Transaction confirmation failed.');
-        }
-
-        alert('Transaction successful!');
-        //Wait 4 seconds for the transaction to be confirmed
-        await new Promise(resolve => setTimeout(resolve, 4000));
-        fetchBlockchainData(signature);
-    } catch (error) {
-        console.error('Transaction failed:', error);
-        alert(`Transaction failed: ${error.message}`);
-    }
-}
-
-
-async function callSmartContractDesktop() {
-    if (window.solana && window.solana.isPhantom) {
-        try {
-            await callSmartContract();
-        } catch (error) {
-            alert('Connection to Phantom Wallet was rejected.');
-        }
-    } else {
-        alert('Phantom Wallet is not installed. Please install it from https://phantom.app/');
-        open('https://phantom.app/', '_blank');
-    }
-}
     </script>
 </body>
 </html>

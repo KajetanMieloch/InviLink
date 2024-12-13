@@ -53,62 +53,64 @@
     <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@4.5.2/dist/js/bootstrap.bundle.min.js"></script>
     <script>
-        // Funkcja do logowania przez Phantom Wallet
-        function connectPhantom() {
-          if (window.solana && window.solana.isPhantom) {
-        // Desktop Phantom Wallet (API)
-        window.solana.connect()
-            .then((resp) => {
-                const publicKey = resp.publicKey.toString();
-                console.log("Connected with public key:", publicKey);
-
-                fetch("{% url 'phantom_login' %}", {
-                    method: "POST",
-                    headers: {
-                        "Content-Type": "application/json",
-                        "X-CSRFToken": "{{ csrf_token }}"
-                    },
-                    body: JSON.stringify({ publicKey: publicKey })
-                }).then(response => {
-                    if (response.ok) {
-                        location.reload();
-                    }
-                });
-            })
-            .catch((err) => console.error("Phantom connection failed:", err));
-
-
-
-        } else if (/Mobi|Android/i.test(navigator.userAgent)) {
-
-            
+    // Funkcja do logowania przez Phantom Wallet
+    function connectPhantom() {
+        if (window.solana && window.solana.isPhantom) {
+            // Desktop Phantom Wallet (API)
             window.solana.connect()
-            .then((resp) => {
-                const publicKey = resp.publicKey.toString();
-                console.log("Connected with public key:", publicKey);
+                .then((resp) => {
+                    const publicKey = resp.publicKey.toString();
+                    console.log("Connected with public key:", publicKey);
 
-                fetch("{% url 'phantom_login' %}", {
-                    method: "POST",
-                    headers: {
-                        "Content-Type": "application/json",
-                        "X-CSRFToken": "{{ csrf_token }}"
-                    },
-                    body: JSON.stringify({ publicKey: publicKey })
-                }).then(response => {
-                    if (response.ok) {
-                        location.reload();
-                    }
-                });
-            })
-            .catch((err) => console.error("Phantom connection failed:", err));
+                    fetch("{% url 'phantom_login' %}", {
+                        method: "POST",
+                        headers: {
+                            "Content-Type": "application/json",
+                            "X-CSRFToken": "{{ csrf_token }}"
+                        },
+                        body: JSON.stringify({ publicKey: publicKey })
+                    }).then(response => {
+                        if (response.ok) {
+                            location.reload();
+                        }
+                    });
+                })
+                .catch((err) => console.error("Phantom connection failed:", err));
+        } else if (/Mobi|Android/i.test(navigator.userAgent)) {
+            // Mobile device logic
+            if (window.solana) {
+                window.solana.connect()
+                    .then((resp) => {
+                        const publicKey = resp.publicKey.toString();
+                        console.log("Connected with public key:", publicKey);
 
-
-
-
-        } else {
-        alert("Phantom Wallet is required. Please install it on your device.");
+                        fetch("{% url 'phantom_login' %}", {
+                            method: "POST",
+                            headers: {
+                                "Content-Type": "application/json",
+                                "X-CSRFToken": "{{ csrf_token }}"
+                            },
+                            body: JSON.stringify({ publicKey: publicKey })
+                        }).then(response => {
+                            if (response.ok) {
+                                location.reload();
+                            }
+                        });
+                    })
+                    .catch((err) => console.error("Phantom connection failed:", err));
+            } else {
+                // Przekierowanie do aplikacji Phantom na urządzeniu mobilnym
+                const currentUrl = encodeURIComponent(window.location.href);
+                const phantomDeeplink = `phantom://browser?url=${currentUrl}`;
+                alert("Phantom Wallet is not installed. Redirecting to Phantom Browser...");
+                window.location.href = phantomDeeplink;
             }
+        } else {
+            // Desktop bez Phantom Wallet
+            alert("Phantom Wallet is required. Please install it.");
+            window.location.href = "https://phantom.app/"; // Przekierowanie do strony instalacyjnej
         }
-    </script>
+    }
+</script>
 </body>
 </html>
