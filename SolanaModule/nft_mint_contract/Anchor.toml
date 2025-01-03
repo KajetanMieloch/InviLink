@@ -12,7 +12,7 @@ nft_mint_contract = "Hh9NSEH8cZv8Vhq5PhN88CKBndPQnDCzc513V9B1xeZH"
 url = "https://api.apr.dev"
 
 [provider]
-cluster = "Localnet"
+cluster = "https://api.devnet.solana.com"
 wallet = "~/.config/solana/id.json"
 
 [scripts]
