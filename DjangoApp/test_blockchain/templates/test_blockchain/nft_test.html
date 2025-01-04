@@ -5,12 +5,9 @@
   </head>
   <body>
     <button onclick="mintTokenManual()">Mint Token (manual approach)</button>
-
-    <!-- Load Solana Web3 (UMD) -->
     <script src="https://unpkg.com/@solana/web3.js@latest/lib/index.iife.js"></script>
     
     <script>
-      // 1) A utility to detect & return Phantom provider (like your snippet)
       function getProvider() {
         if ("phantom" in window && window.phantom.solana) {
           const provider = window.phantom.solana;
@@ -41,7 +38,7 @@
         const connection = new solanaWeb3.Connection(solanaWeb3.clusterApiUrl("devnet"));
 
         // The Anchor program ID from declare_id!
-        const programId = new solanaWeb3.PublicKey("Hh9NSEH8cZv8Vhq5PhN88CKBndPQnDCzc513V9B1xeZH");
+        const programId = new solanaWeb3.PublicKey("FEJSabV32RFGaVfgFt6kor74kEbYFkCaXSznEZi8zQPy");
 
         // The 8-byte discriminator for the "mint_token" instruction
         // (From your IDL or Anchor logs: [172, 137, 183, 14, 207, 110, 234, 56])
@@ -49,10 +46,8 @@
 
         // The `amount` argument (u64 in Anchor, little-endian).
         // If we want to mint 1 token, that's BN(1).toArray("le", 8) => [1, 0, 0, 0, 0, 0, 0, 0]
-        // Instead of importing BN, we can do a quick manual approach for "1":
         const amountEncoded = new Uint8Array([1, 0, 0, 0, 0, 0, 0, 0]); // 1 in 64-bit little-endian
 
-        // So final data is [discriminator(8 bytes), amount(8 bytes)]
         const data = new Uint8Array([
           ...mintTokenDiscriminator,
           ...amountEncoded
