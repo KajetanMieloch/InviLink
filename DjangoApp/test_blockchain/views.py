@@ -11,3 +11,6 @@ from selenium.webdriver.chrome.options import Options
 def phantom_test(request):
     return render(request, 'test_blockchain/phantom_test.html')
 
+def nft_test(request):
+    return render(request, 'test_blockchain/nft_test.html')
+
