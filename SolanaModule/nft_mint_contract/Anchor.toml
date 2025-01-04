@@ -6,7 +6,7 @@ resolution = true
 skip-lint = false
 
 [programs.localnet]
-nft_mint_contract = "Hh9NSEH8cZv8Vhq5PhN88CKBndPQnDCzc513V9B1xeZH"
+nft_mint_contract = "FEJSabV32RFGaVfgFt6kor74kEbYFkCaXSznEZi8zQPy"
 
 [registry]
 url = "https://api.apr.dev"
