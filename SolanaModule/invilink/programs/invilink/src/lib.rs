@@ -1,6 +1,6 @@
 use anchor_lang::prelude::*;
 
-declare_id!("DFjEJhNS8wMAvV3gFbVf2JiCkbsXBt9uuZBP2ZMotXey");
+declare_id!("DqZf5dE14GCM541qRBNipykFFHDMe2DKxshWk2Q4McMU");
 
 const MASTER_ACCOUNT: Pubkey = pubkey!("4Wg5ZqjS3AktHzq34hK1T55aFNKSjBpmJ3PyRChpPNDh");
 const FEE_PERCENTAGE: u64 = 5; // 5% opłaty manipulacyjnej
@@ -13,6 +13,12 @@ pub mod invilink {
         let fee_pool = &mut ctx.accounts.fee_pool;
         fee_pool.owner = MASTER_ACCOUNT;
         fee_pool.total_fees = 0;
+        Ok(())
+    }
+
+    pub fn initialize_organizers_pool(ctx: Context<InitializeOrganizersPool>) -> Result<()> {
+        let organizers_pool = &mut ctx.accounts.organizers_pool;
+        organizers_pool.organizers = Vec::new();
         Ok(())
     }
 
@@ -216,6 +222,16 @@ pub struct Initialize<'info> {
     pub payer: Signer<'info>,
     pub system_program: Program<'info, System>,
 }
+
+#[derive(Accounts)]
+pub struct InitializeOrganizersPool<'info> {
+    #[account(init, payer = payer, space = 8 + (32 * 5000), seeds = [b"organizers_pool"], bump)]
+    pub organizers_pool: Account<'info, OrganizersPool>,
+    #[account(mut)]
+    pub payer: Signer<'info>,
+    pub system_program: Program<'info, System>,
+}
+
 
 #[account]
 pub struct FeePool {
