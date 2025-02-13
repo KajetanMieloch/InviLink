@@ -1,6 +1,6 @@
 use anchor_lang::prelude::*;
 
-declare_id!("98cFPPr2S2UjSthTxmjNsPei9Ty6vFcsLkyWLsTz4CTY");
+declare_id!("DFjEJhNS8wMAvV3gFbVf2JiCkbsXBt9uuZBP2ZMotXey");
 
 const MASTER_ACCOUNT: Pubkey = pubkey!("GVdESJP64iXWr2RnAJLNqr2iLydXfT48xDS9EVGhkFQ");
 const FEE_PERCENTAGE: u64 = 5; // 5% opłaty manipulacyjnej
@@ -256,7 +256,7 @@ pub struct EventNFT {
 
 #[derive(Accounts)]
 pub struct CreateEvent<'info> {
-    #[account(init, payer = organizer, space = 8 + 64 + 32 + 64 + 8 + 8 + 1)]
+    #[account(init, payer = organizer, space = 300)]
     pub event: Account<'info, EventNFT>,
     #[account(mut)]
     pub organizers_pool: Account<'info, OrganizersPool>,
@@ -275,7 +275,7 @@ pub struct SeatingMap {
 
 #[derive(Accounts)]
 pub struct InitializeSeating<'info> {
-    #[account(init, payer = organizer, space = 8 + 64 + 2 + 2 + 500)]
+    #[account(init, payer = organizer, space = 8 + 64 + 2 + 2 + 2000)]
     pub seating_map: Account<'info, SeatingMap>,
     #[account(mut)]
     pub organizer: Signer<'info>,
@@ -308,7 +308,7 @@ pub struct TicketNFT {
 
 #[derive(Accounts)]
 pub struct MintTicket<'info> {
-    #[account(init, payer = buyer, space = 8 + 64 + 64 + 32 + 2 + 2 + 1)]
+    #[account(init, payer = buyer, space = 200)]
     pub ticket: Account<'info, TicketNFT>,
     #[account(mut)]
     pub event: Account<'info, EventNFT>,
