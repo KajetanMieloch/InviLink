@@ -2,7 +2,7 @@ use anchor_lang::prelude::*;
 
 declare_id!("DFjEJhNS8wMAvV3gFbVf2JiCkbsXBt9uuZBP2ZMotXey");
 
-const MASTER_ACCOUNT: Pubkey = pubkey!("GVdESJP64iXWr2RnAJLNqr2iLydXfT48xDS9EVGhkFQ");
+const MASTER_ACCOUNT: Pubkey = pubkey!("4Wg5ZqjS3AktHzq34hK1T55aFNKSjBpmJ3PyRChpPNDh");
 const FEE_PERCENTAGE: u64 = 5; // 5% opłaty manipulacyjnej
 
 #[program]
