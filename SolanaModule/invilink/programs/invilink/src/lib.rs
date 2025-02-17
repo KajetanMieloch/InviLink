@@ -225,7 +225,7 @@ pub struct Initialize<'info> {
 
 #[derive(Accounts)]
 pub struct InitializeOrganizersPool<'info> {
-    #[account(init, payer = payer, space = 8 + (32 * 5000), seeds = [b"organizers_pool"], bump)]
+    #[account(init, payer = payer, space = 8 + (32 * 100), seeds = [b"organizers_pool"], bump)]
     pub organizers_pool: Account<'info, OrganizersPool>,
     #[account(mut)]
     pub payer: Signer<'info>,

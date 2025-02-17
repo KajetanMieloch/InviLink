@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+  <meta charset="UTF-8">
+  <title>Lista Organizatorów</title>
+  <script src="https://cdn.jsdelivr.net/npm/@solana/web3.js@latest/lib/index.iife.min.js"></script>
+  <style>
+    body { font-family: Arial, sans-serif; text-align: center; }
+    table { width: 80%; margin: 20px auto; border-collapse: collapse; }
+    th, td { border: 1px solid black; padding: 10px; text-align: center; }
+    button { margin: 10px; padding: 10px; font-size: 16px; cursor: pointer; }
+    #log { margin: 20px auto; padding: 10px; border: 1px solid #ccc; width: 80%; white-space: pre-wrap; text-align: left; }
+  </style>
+</head>
+<body>
+  <h1>Lista Organizatorów</h1>
+  <button onclick="fetchOrganizers()">Odśwież listę</button>
+  <table>
+    <thead>
+      <tr>
+        <th>#</th>
+        <th>Adres Organizatora</th>
+        <th>Akcja</th>
+      </tr>
+    </thead>
+    <tbody id="organizersList">
+      <tr><td colspan="3">Brak danych</td></tr>
+    </tbody>
+  </table>
+  <div id="log"></div>
+
+  <script>
+    const PROGRAM_ID = new solanaWeb3.PublicKey("DqZf5dE14GCM541qRBNipykFFHDMe2DKxshWk2Q4McMU");
+
+    function logMessage(message) {
+      const logEl = document.getElementById("log");
+      logEl.textContent += message + "\n";
+      console.log(message);
+    }
+
+    async function fetchOrganizers() {
+      logMessage("🔹 Pobieranie listy organizatorów...");
+
+      if (!window.phantom || !window.phantom.solana) {
+        alert("❌ Phantom Wallet jest wymagany!");
+        return;
+      }
+
+      const provider = window.phantom.solana;
+      if (!provider.isConnected) {
+        await provider.connect();
+      }
+
+      const walletPublicKey = provider.publicKey;
+      logMessage("✅ Twój klucz publiczny: " + walletPublicKey.toBase58());
+
+      const connection = new solanaWeb3.Connection("https://api.devnet.solana.com", "confirmed");
+
+      // Obliczanie PDA organizers_pool
+      const [organizersPoolPDA] = await solanaWeb3.PublicKey.findProgramAddress(
+        [new TextEncoder().encode("organizers_pool")], 
+        PROGRAM_ID
+      );
+
+      logMessage("📌 Organizers Pool PDA: " + organizersPoolPDA.toBase58());
+
+      try {
+        const accountInfo = await connection.getAccountInfo(organizersPoolPDA);
+        if (!accountInfo) {
+          throw new Error("Brak danych o organizatorach!");
+        }
+
+        // Odczytujemy organizatorów (każdy ma 32 bajty)
+        const organizersList = [];
+        for (let i = 8; i < accountInfo.data.length; i += 32) {
+          const pubkeyBytes = accountInfo.data.slice(i, i + 32);
+          const organizerPubkey = new solanaWeb3.PublicKey(pubkeyBytes);
+          organizersList.push(organizerPubkey.toBase58());
+        }
+
+        logMessage("✅ Organizatorzy pobrani: " + JSON.stringify(organizersList));
+
+        renderOrganizersList(organizersList);
+      } catch (err) {
+        logMessage("❌ Błąd: " + err.message);
+        alert("❌ Błąd: " + err.message);
+      }
+    }
+
+    function renderOrganizersList(organizers) {
+      const tbody = document.getElementById("organizersList");
+      tbody.innerHTML = "";
+
+      if (organizers.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="3">Brak organizatorów</td></tr>`;
+        return;
+      }
+
+      organizers.forEach((organizer, index) => {
+        const row = document.createElement("tr");
+
+        row.innerHTML = `
+          <td>${index + 1}</td>
+          <td>${organizer}</td>
+          <td><button onclick="removeOrganizer('${organizer}')">Usuń</button></td>
+        `;
+
+        tbody.appendChild(row);
+      });
+    }
+
+    async function removeOrganizer(organizerAddress) {
+      logMessage(`🔹 Usuwanie organizatora: ${organizerAddress}...`);
+
+      if (!window.phantom || !window.phantom.solana) {
+        alert("❌ Phantom Wallet jest wymagany!");
+        return;
+      }
+
+      const provider = window.phantom.solana;
+      if (!provider.isConnected) {
+        await provider.connect();
+      }
+
+      const walletPublicKey = provider.publicKey;
+      logMessage("✅ Twój klucz publiczny: " + walletPublicKey.toBase58());
+
+      const connection = new solanaWeb3.Connection("https://api.devnet.solana.com", "confirmed");
+
+      // Obliczanie PDA organizers_pool
+      const [organizersPoolPDA] = await solanaWeb3.PublicKey.findProgramAddress(
+        [new TextEncoder().encode("organizers_pool")], 
+        PROGRAM_ID
+      );
+
+      logMessage("📌 Organizers Pool PDA: " + organizersPoolPDA.toBase58());
+
+      // Discriminator dla funkcji `remove_organizer`
+      const discriminator = new Uint8Array([201, 33, 144, 18, 75, 230, 188, 207]); // Discriminator z IDL
+
+      function pubkeyToUint8Array(pubkey) {
+        return new Uint8Array(new solanaWeb3.PublicKey(pubkey).toBytes());
+      }
+
+      const organizerBytes = pubkeyToUint8Array(organizerAddress);
+
+      const instructionData = new Uint8Array([...discriminator, ...organizerBytes]);
+
+      const transactionInstruction = new solanaWeb3.TransactionInstruction({
+        keys: [
+          { pubkey: organizersPoolPDA, isSigner: false, isWritable: true },
+          { pubkey: walletPublicKey, isSigner: true, isWritable: true }
+        ],
+        programId: PROGRAM_ID,
+        data: instructionData
+      });
+
+      try {
+        let transaction = new solanaWeb3.Transaction().add(transactionInstruction);
+        transaction.feePayer = walletPublicKey;
+        const { blockhash } = await connection.getLatestBlockhash();
+        transaction.recentBlockhash = blockhash;
+
+        const signedTransaction = await provider.signTransaction(transaction);
+        const txSignature = await connection.sendRawTransaction(signedTransaction.serialize());
+        logMessage("📨 Transakcja wysłana, signature: " + txSignature);
+
+        const confirmation = await connection.confirmTransaction(txSignature, "confirmed");
+        if (confirmation.value.err) {
+          throw new Error("❌ Transakcja nie powiodła się: " + JSON.stringify(confirmation.value.err));
+        }
+
+        logMessage("✅ Organizator usunięty! Tx Sig: " + txSignature);
+        alert("✅ Organizator usunięty! Tx Sig: " + txSignature);
+
+        fetchOrganizers(); // Odśwież listę
+      } catch (err) {
+        logMessage("❌ Błąd: " + err.message);
+        alert("❌ Błąd: " + err.message);
+      }
+    }
+  </script>
+</body>
+</html>
