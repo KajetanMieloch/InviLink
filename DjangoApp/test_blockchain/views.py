@@ -14,3 +14,15 @@ def phantom_test(request):
 def nft_test(request):
     return render(request, 'test_blockchain/nft_test.html')
 
+def nft_mint(request):
+    return render(request, 'test_blockchain/nft_mint.html')
+
+def init_org_pool(request):
+    return render(request, 'test_blockchain/init_org_pool.html')
+
+def add_org(request):
+    return render(request, 'test_blockchain/add_org.html')
+
+def remove_org(request):
+    return render(request, 'test_blockchain/remove_org.html')
+

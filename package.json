@@ -1,5 +1,30 @@
 {
   "dependencies": {
-    "@solana/spl-token": "^0.4.9"
+    "@project-serum/anchor": "^0.26.0",
+    "@solana/spl-token": "^0.4.9",
+    "@solana/web3.js": "^1.98.0",
+    "dotenv-webpack": "^8.1.0",
+    "process": "^0.11.10"
+  },
+  "name": "invilink",
+  "version": "1.0.0",
+  "description": "**InviLink** is a web3.0 platform for selling and managing event tickets using blockchain technology. This engineering project aims to create a web3.0 platform that facilitates the sale and trade of tickets for concerts and various events, leveraging blockchain technology. This approach ensures that users have full control over their tickets, making transactions more transparent and secure. The target audience includes event organizers—especially smaller companies and private individuals—who prioritize user privacy, as well as participants who value the security and convenience of managing tickets online.",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "@babel/core": "^7.26.8",
+    "@babel/preset-env": "^7.26.8",
+    "assert": "^2.1.0",
+    "babel-loader": "^9.2.1",
+    "buffer": "^6.0.3",
+    "crypto-browserify": "^3.12.1",
+    "stream-browserify": "^3.0.0",
+    "webpack": "^5.98.0",
+    "webpack-cli": "^6.0.1"
   }
 }

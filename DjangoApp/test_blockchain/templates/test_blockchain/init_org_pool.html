@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+  <meta charset="UTF-8">
+  <title>Inicjalizacja Organizers Pool</title>
+  <!-- Importujemy bibliotekę Solana Web3.js -->
+  <script src="https://cdn.jsdelivr.net/npm/@solana/web3.js@latest/lib/index.iife.min.js"></script>
+  <style>
+    body { font-family: Arial, sans-serif; text-align: center; }
+    button { margin: 10px; padding: 10px; font-size: 16px; }
+    #log { margin: 20px auto; padding: 10px; border: 1px solid #ccc; width: 80%; white-space: pre-wrap; text-align: left; }
+  </style>
+</head>
+<body>
+  <h1>Inicjalizacja Organizers Pool</h1>
+  <button onclick="initializeOrganizersPool()">Zainicjalizuj Organizers Pool</button>
+  <div id="log"></div>
+
+  <script>
+    // Funkcja do logowania wiadomości na stronie
+    function logMessage(message) {
+      const logEl = document.getElementById("log");
+      logEl.textContent += message + "\n";
+      console.log(message);
+    }
+
+    async function initializeOrganizersPool() {
+      logMessage("Rozpoczynam inicjalizację organizers pool...");
+
+      //Sprawdzenie, czy Phantom Wallet jest dostępny
+      if (!window.phantom || !window.phantom.solana) {
+        alert("Phantom Wallet jest wymagany!");
+        return;
+      }
+
+      const provider = window.phantom.solana;
+      if (!provider.isConnected) {
+        await provider.connect();
+      }
+
+      //Pobranie klucza publicznego użytkownika
+      const walletPublicKey = provider.publicKey;
+      logMessage("Twój klucz publiczny: " + walletPublicKey.toBase58());
+
+      //Połączenie z Solana Devnet
+      const connection = new solanaWeb3.Connection("https://api.devnet.solana.com", "confirmed");
+
+      //ID twojego programu Anchor
+      const PROGRAM_ID = new solanaWeb3.PublicKey("DqZf5dE14GCM541qRBNipykFFHDMe2DKxshWk2Q4McMU");
+
+      //Obliczanie PDA (Program Derived Address) dla `organizers_pool`
+      const [organizersPoolPDA] = await solanaWeb3.PublicKey.findProgramAddress(
+          [new TextEncoder().encode("organizers_pool")],  // Seed zgodny z Anchor.toml
+          PROGRAM_ID
+      );
+
+      logMessage("Organizers Pool PDA: " + organizersPoolPDA.toBase58());
+
+      //Discriminator dla funkcji `initialize_organizers_pool`
+      const discriminator = new Uint8Array([213, 153, 51, 23, 150, 192, 71, 166]);
+
+      //Tworzenie instrukcji transakcji
+      const transactionInstruction = new solanaWeb3.TransactionInstruction({
+          keys: [
+              { pubkey: organizersPoolPDA, isSigner: false, isWritable: true },  // Konto PDA
+              { pubkey: walletPublicKey, isSigner: true, isWritable: true },     // Payer
+              { pubkey: solanaWeb3.SystemProgram.programId, isSigner: false, isWritable: false }  // System Program
+          ],
+          programId: PROGRAM_ID,
+          data: discriminator // Przesyłamy tylko 8 bajtów z discriminatora funkcji
+      });
+
+      try {
+          //Tworzenie transakcji i podpisywanie jej w Phantom
+          let transaction = new solanaWeb3.Transaction().add(transactionInstruction);
+          transaction.feePayer = walletPublicKey;
+          const { blockhash } = await connection.getLatestBlockhash();
+          transaction.recentBlockhash = blockhash;
+
+          //Podpisanie transakcji przez użytkownika
+          const signedTransaction = await provider.signTransaction(transaction);
+
+          //Wysłanie transakcji do blockchaina Solana
+          const txSignature = await connection.sendRawTransaction(signedTransaction.serialize());
+          logMessage("Transakcja wysłana, signature: " + txSignature);
+
+          //Potwierdzenie transakcji
+          const confirmation = await connection.confirmTransaction(txSignature, "confirmed");
+          if (confirmation.value.err) {
+              throw new Error("Transakcja nie powiodła się: " + JSON.stringify(confirmation.value.err));
+          }
+
+          logMessage("Organizers Pool został zainicjalizowany! Tx Sig: " + txSignature);
+          alert("Organizers Pool został zainicjalizowany! Tx Sig: " + txSignature);
+      } catch (err) {
+          logMessage("Błąd: " + err.message);
+          alert("Błąd: " + err.message);
+      }
+    }
+  </script>
+</body>
+</html>
