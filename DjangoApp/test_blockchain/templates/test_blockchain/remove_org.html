@@ -39,10 +39,10 @@
     }
 
     async function fetchOrganizers() {
-      logMessage("🔹 Pobieranie listy organizatorów...");
+      logMessage("Pobieranie listy organizatorów...");
 
       if (!window.phantom || !window.phantom.solana) {
-        alert("❌ Phantom Wallet jest wymagany!");
+        alert("Phantom Wallet jest wymagany!");
         return;
       }
 
@@ -52,7 +52,7 @@
       }
 
       const walletPublicKey = provider.publicKey;
-      logMessage("✅ Twój klucz publiczny: " + walletPublicKey.toBase58());
+      logMessage("Twój klucz publiczny: " + walletPublicKey.toBase58());
 
       const connection = new solanaWeb3.Connection("https://api.devnet.solana.com", "confirmed");
 
@@ -62,7 +62,7 @@
         PROGRAM_ID
       );
 
-      logMessage("📌 Organizers Pool PDA: " + organizersPoolPDA.toBase58());
+      logMessage("Organizers Pool PDA: " + organizersPoolPDA.toBase58());
 
       try {
         const accountInfo = await connection.getAccountInfo(organizersPoolPDA);
@@ -70,20 +70,34 @@
           throw new Error("Brak danych o organizatorach!");
         }
 
-        // Odczytujemy organizatorów (każdy ma 32 bajty)
+        // Logowanie zawartości konta
+        console.log("Raw account data:", accountInfo.data);
+
+        // Odczytujemy liczbę organizatorów (przesunięcie o 8 bajtów z powodu discriminatora)
+        const organizersCount = new DataView(accountInfo.data.buffer).getUint32(8, true);
+        logMessage("Liczba organizatorów: " + organizersCount);
+
+        // Lista organizatorów
         const organizersList = [];
-        for (let i = 8; i < accountInfo.data.length; i += 32) {
+        const nullPubkey = new solanaWeb3.PublicKey("11111111111111111111111111111111"); // Pusty adres Solana
+
+        // Odczytujemy tylko rzeczywiste adresy
+        for (let i = 12, count = 0; count < organizersCount; i += 32, count++) {
           const pubkeyBytes = accountInfo.data.slice(i, i + 32);
           const organizerPubkey = new solanaWeb3.PublicKey(pubkeyBytes);
-          organizersList.push(organizerPubkey.toBase58());
+
+          // Sprawdzamy, czy adres nie jest pusty (śmieciowy)
+          if (!organizerPubkey.equals(nullPubkey)) {
+            organizersList.push(organizerPubkey.toBase58());
+          }
         }
 
-        logMessage("✅ Organizatorzy pobrani: " + JSON.stringify(organizersList));
+        logMessage("Organizatorzy pobrani: " + JSON.stringify(organizersList));
 
         renderOrganizersList(organizersList);
       } catch (err) {
-        logMessage("❌ Błąd: " + err.message);
-        alert("❌ Błąd: " + err.message);
+        logMessage("Błąd: " + err.message);
+        alert("Błąd: " + err.message);
       }
     }
 
@@ -110,10 +124,10 @@
     }
 
     async function removeOrganizer(organizerAddress) {
-      logMessage(`🔹 Usuwanie organizatora: ${organizerAddress}...`);
+      logMessage("Usuwanie organizatora: " + organizerAddress + "...");
 
       if (!window.phantom || !window.phantom.solana) {
-        alert("❌ Phantom Wallet jest wymagany!");
+        alert("Phantom Wallet jest wymagany!");
         return;
       }
 
@@ -123,7 +137,7 @@
       }
 
       const walletPublicKey = provider.publicKey;
-      logMessage("✅ Twój klucz publiczny: " + walletPublicKey.toBase58());
+      logMessage("Twój klucz publiczny: " + walletPublicKey.toBase58());
 
       const connection = new solanaWeb3.Connection("https://api.devnet.solana.com", "confirmed");
 
@@ -133,10 +147,10 @@
         PROGRAM_ID
       );
 
-      logMessage("📌 Organizers Pool PDA: " + organizersPoolPDA.toBase58());
+      logMessage("Organizers Pool PDA: " + organizersPoolPDA.toBase58());
 
       // Discriminator dla funkcji `remove_organizer`
-      const discriminator = new Uint8Array([201, 33, 144, 18, 75, 230, 188, 207]); // Discriminator z IDL
+      const discriminator = new Uint8Array([64, 187, 72, 87, 252, 241, 195, 60]); // Discriminator z IDL
 
       function pubkeyToUint8Array(pubkey) {
         return new Uint8Array(new solanaWeb3.PublicKey(pubkey).toBytes());
@@ -163,20 +177,20 @@
 
         const signedTransaction = await provider.signTransaction(transaction);
         const txSignature = await connection.sendRawTransaction(signedTransaction.serialize());
-        logMessage("📨 Transakcja wysłana, signature: " + txSignature);
+        logMessage("Transakcja wysłana, signature: " + txSignature);
 
         const confirmation = await connection.confirmTransaction(txSignature, "confirmed");
         if (confirmation.value.err) {
-          throw new Error("❌ Transakcja nie powiodła się: " + JSON.stringify(confirmation.value.err));
+          throw new Error("Transakcja nie powiodła się: " + JSON.stringify(confirmation.value.err));
         }
 
-        logMessage("✅ Organizator usunięty! Tx Sig: " + txSignature);
-        alert("✅ Organizator usunięty! Tx Sig: " + txSignature);
+        logMessage("Organizator usunięty! Tx Sig: " + txSignature);
+        alert("Organizator usunięty! Tx Sig: " + txSignature);
 
         fetchOrganizers(); // Odśwież listę
       } catch (err) {
-        logMessage("❌ Błąd: " + err.message);
-        alert("❌ Błąd: " + err.message);
+        logMessage("Błąd: " + err.message);
+        alert("Błąd: " + err.message);
       }
     }
   </script>
