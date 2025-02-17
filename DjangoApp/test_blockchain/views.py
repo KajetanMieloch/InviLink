@@ -26,3 +26,6 @@ def add_org(request):
 def remove_org(request):
     return render(request, 'test_blockchain/remove_org.html')
 
+def create_event(request):
+    return render(request, 'test_blockchain/create_event.html')
+

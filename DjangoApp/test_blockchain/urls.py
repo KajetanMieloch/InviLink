@@ -8,4 +8,5 @@ urlpatterns = [
     path('init_org_pool/', views.init_org_pool, name='init_org_pool'),
     path('add_org/', views.add_org, name='add_org'),
     path('remove_org/', views.remove_org, name='remove_org'),
+    path('create_event/', views.create_event, name='create_event'),
 ]
