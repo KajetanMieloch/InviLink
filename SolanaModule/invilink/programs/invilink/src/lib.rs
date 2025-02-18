@@ -324,7 +324,7 @@ pub struct InitializeOrganizersPool<'info> {
 
 #[derive(Accounts)]
 pub struct InitializeEventRegistry<'info> {
-    #[account(init, payer = payer, space = 32012, seeds = [b"event_registry"], bump)]
+    #[account(init, payer = payer, space = 8192, seeds = [b"event_registry"], bump)]
     pub registry: Account<'info, EventRegistry>,
     #[account(mut)]
     pub payer: Signer<'info>,
