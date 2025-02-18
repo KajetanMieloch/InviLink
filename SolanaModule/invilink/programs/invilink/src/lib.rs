@@ -1,5 +1,6 @@
 use anchor_lang::prelude::*;
 
+
 declare_id!("9puQE2ab3LJY9HUFTUe9YfB2yWjTZ56Fx5FxoNHgvThv");
 
 // Stałe globalne
@@ -300,28 +301,27 @@ pub mod invilink {
 
         Ok(())
     }
+
+
+    // ----------------- Funkcje pomocnicze -----------------
+
+    pub fn close_target_account(ctx: Context<CloseTargetAccount>) -> Result<()> {
+        require!(
+            ctx.accounts.authority.key() == MASTER_ACCOUNT,
+            ErrorCode::Unauthorized
+        );
+    
+        let closable = &mut ctx.accounts.closable_account;
+        let authority = &mut ctx.accounts.authority;
+    
+        // Przekazanie wszystkich lamportów z zamykanego konta do `authority`
+        **authority.to_account_info().lamports.borrow_mut() += closable.lamports();
+        **closable.to_account_info().lamports.borrow_mut() = 0;
+    
+        Ok(())
+    }   
+
 }
-
-// ----------------- Funkcje pomocnicze -----------------
-
-pub fn close_target_account(ctx: Context<CloseTargetAccount>) -> Result<()> {
-    // Sprawdzenie, czy osoba zamykająca konto jest MASTER_ACCOUNT
-    require!(
-        ctx.accounts.authority.key() == MASTER_ACCOUNT,
-        ErrorCode::Unauthorized
-    );
-
-    let closable = &mut ctx.accounts.closable_account;
-    let authority = &mut ctx.accounts.authority;
-
-    // Przelew lamportów z konta do zamknięcia na konto MASTER_ACCOUNT
-    **authority.to_account_info().lamports.borrow_mut() += closable.lamports();
-    **closable.to_account_info().lamports.borrow_mut() = 0;
-
-    // Możesz opcjonalnie wyzerować dane, ale nie jest to konieczne
-    Ok(())
-}
-
 
 // ================= KONTEKSTY (Accounts) =================
 
@@ -563,9 +563,9 @@ pub struct SeatingSectionInput {
 pub struct CloseTargetAccount<'info> {
     /// CHECK: To konto musi być MASTER_ACCOUNT. Sprawdzamy to ręcznie w kodzie.
     #[account(signer)]
-    pub authority: AccountInfo<'info>,
+    pub authority: Signer<'info>,
 
-    /// CHECK: Konto, które ma zostać zamknięte (dowolne konto pod kontrolą Twojego programu)
+    /// CHECK: Konto, które ma zostać zamknięte (dowolne konto pod kontrolą programu)
     #[account(mut)]
     pub closable_account: AccountInfo<'info>,
 }
