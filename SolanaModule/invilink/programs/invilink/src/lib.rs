@@ -302,6 +302,27 @@ pub mod invilink {
     }
 }
 
+// ----------------- Funkcje pomocnicze -----------------
+
+pub fn close_target_account(ctx: Context<CloseTargetAccount>) -> Result<()> {
+    // Sprawdzenie, czy osoba zamykająca konto jest MASTER_ACCOUNT
+    require!(
+        ctx.accounts.authority.key() == MASTER_ACCOUNT,
+        ErrorCode::Unauthorized
+    );
+
+    let closable = &mut ctx.accounts.closable_account;
+    let authority = &mut ctx.accounts.authority;
+
+    // Przelew lamportów z konta do zamknięcia na konto MASTER_ACCOUNT
+    **authority.to_account_info().lamports.borrow_mut() += closable.lamports();
+    **closable.to_account_info().lamports.borrow_mut() = 0;
+
+    // Możesz opcjonalnie wyzerować dane, ale nie jest to konieczne
+    Ok(())
+}
+
+
 // ================= KONTEKSTY (Accounts) =================
 
 #[derive(Accounts)]
@@ -324,7 +345,8 @@ pub struct InitializeOrganizersPool<'info> {
 
 #[derive(Accounts)]
 pub struct InitializeEventRegistry<'info> {
-    #[account(init, payer = payer, space = 8192, seeds = [b"event_registry"], bump)]
+    //1000 eventów
+    #[account(init, payer = payer, space = 8 + 4 + (1000 * 32), seeds = [b"event_registry"], bump)]
     pub registry: Account<'info, EventRegistry>,
     #[account(mut)]
     pub payer: Signer<'info>,
@@ -534,6 +556,18 @@ pub struct SeatingSectionInput {
     pub section_type: u8,
     pub rows: u8,
     pub seats_per_row: u8,
+}
+
+// ================= FUNKCJE POMOCNICZE =================
+#[derive(Accounts)]
+pub struct CloseTargetAccount<'info> {
+    /// CHECK: To konto musi być MASTER_ACCOUNT. Sprawdzamy to ręcznie w kodzie.
+    #[account(signer)]
+    pub authority: AccountInfo<'info>,
+
+    /// CHECK: Konto, które ma zostać zamknięte (dowolne konto pod kontrolą Twojego programu)
+    #[account(mut)]
+    pub closable_account: AccountInfo<'info>,
 }
 
 // ================= ERROR CODE =================
