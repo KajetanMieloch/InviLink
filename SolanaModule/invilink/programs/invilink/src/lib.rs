@@ -1,6 +1,6 @@
 use anchor_lang::prelude::*;
 
-declare_id!("35kDpALc3cEUUWeWGZkHnThjs2R3zCNq4b4FXZ1eqZFM");
+declare_id!("9puQE2ab3LJY9HUFTUe9YfB2yWjTZ56Fx5FxoNHgvThv");
 
 // Stałe globalne
 const MASTER_ACCOUNT: Pubkey = pubkey!("4Wg5ZqjS3AktHzq34hK1T55aFNKSjBpmJ3PyRChpPNDh");
@@ -182,7 +182,7 @@ pub mod invilink {
     ) -> Result<()> {
         let ticket = &mut ctx.accounts.ticket;
         let event = &mut ctx.accounts.event;
-        // Sprawdź, czy event_id przekazany w argumencie odpowiada eventowi.
+        //Czy event_id przekazany w argumencie odpowiada eventowi.
         require!(event.event_id == event_id, ErrorCode::InvalidTicket);
         
         // Jeśli event wymaga rezerwacji miejsc (numerowane lub mieszane)
