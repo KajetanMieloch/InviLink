@@ -11,7 +11,7 @@ invilink = "35kDpALc3cEUUWeWGZkHnThjs2R3zCNq4b4FXZ1eqZFM"
 url = "https://api.apr.dev"
 
 [provider]
-cluster = "localnet"
+cluster = "devnet"
 wallet = "/home/alternator/.config/solana/id.json"
 
 [scripts]

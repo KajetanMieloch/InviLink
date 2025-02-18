@@ -6,10 +6,11 @@ declare_id!("35kDpALc3cEUUWeWGZkHnThjs2R3zCNq4b4FXZ1eqZFM");
 const MASTER_ACCOUNT: Pubkey = pubkey!("4Wg5ZqjS3AktHzq34hK1T55aFNKSjBpmJ3PyRChpPNDh");
 const FEE_PERCENTAGE: u64 = 5; // 5% opłaty manipulacyjnej
 
-// PROGRAM
 #[program]
 pub mod invilink {
     use super::*;
+
+    // ---------------- Inicjalizacja ----------------
 
     pub fn initialize(ctx: Context<Initialize>) -> Result<()> {
         let fee_pool = &mut ctx.accounts.fee_pool;
@@ -30,6 +31,8 @@ pub mod invilink {
         Ok(())
     }
 
+    // ---------------- Zarządzanie organizatorami ----------------
+
     pub fn add_organizer(ctx: Context<AddOrganizer>, new_organizer: Pubkey) -> Result<()> {
         let organizers = &mut ctx.accounts.organizers_pool;
         require!(ctx.accounts.signer.key() == MASTER_ACCOUNT, ErrorCode::Unauthorized);
@@ -47,7 +50,8 @@ pub mod invilink {
         Ok(())
     }
 
-    // Tworzenie eventu
+    // ---------------- Zarządzanie eventami ----------------
+
     pub fn create_event(
         ctx: Context<CreateEvent>,
         event_id: String,
@@ -69,12 +73,10 @@ pub mod invilink {
         event.sold_tickets = 0;
         event.seating_type = seating_type;
         event.active = true;
-        // Dodaj event do rejestru eventów
         ctx.accounts.registry.events.push(event.key());
         Ok(())
     }
 
-    // Aktualizacja eventu – tylko twórca może modyfikować
     pub fn update_event(
         ctx: Context<UpdateEvent>,
         new_name: Option<String>,
@@ -101,7 +103,6 @@ pub mod invilink {
         Ok(())
     }
 
-    // Usunięcie eventu – oznaczenie jako nieaktywnego
     pub fn delete_event(ctx: Context<DeleteEvent>) -> Result<()> {
         let event = &mut ctx.accounts.event;
         require!(event.organizer == *ctx.accounts.organizer.key, ErrorCode::Unauthorized);
@@ -109,49 +110,47 @@ pub mod invilink {
         Ok(())
     }
 
-    // Konfiguracja seating – wielosekcyjny SeatingMap
+    // ---------------- Konfiguracja miejsc (seating) ----------------
 
-    // Definicja: SeatingSection jest częścią SeatingMap
-    // Inicjalizacja seating map przyjmująca wektor sekcji
-    // pub fn initialize_seating(
-    //     ctx: Context<InitializeSeating>,
-    //     event_id: String,
-    //     sections: Vec<SeatingSectionInput>,
-    // ) -> Result<()> {
-    //     let seating_map = &mut ctx.accounts.seating_map;
-    //     seating_map.event_id = event_id;
-    //     // Dla każdej sekcji, tworzymy strukturę SeatingSection i ustawiamy seat_status na wektor zer
-    //     let mut secs = Vec::new();
-    //     for section in sections.into_iter() {
-    //         let total = (section.rows as usize) * (section.seats_per_row as usize);
-    //         let seat_status = vec![0; total]; // 0 = wolne
-    //         let new_section = SeatingSection {
-    //             section_type: section.section_type,
-    //             rows: section.rows,
-    //             seats_per_row: section.seats_per_row,
-    //             seat_status,
-    //         };
-    //         secs.push(new_section);
-    //     }
-    //     seating_map.sections = secs;
-    //     Ok(())
-    // }
+    pub fn initialize_seating(
+        ctx: Context<InitializeSeating>,
+        event_id: String,
+    ) -> Result<()> {
+        let seating_map = &mut ctx.accounts.seating_map;
+        seating_map.event_id = event_id;
+        seating_map.sections = Vec::new();
+        Ok(())
+    }
 
-    // Aktualizacja seating map – tylko gdy żadne bilety nie zostały sprzedane
-    pub fn update_seating(
-        ctx: Context<UpdateSeating>,
+    pub fn initialize_seating_section(
+        ctx: Context<InitializeSeatingSection>,
         section_index: u8,
+        section_type: u8,
+        rows: u8,
+        seats_per_row: u8,
+    ) -> Result<()> {
+        let seating_map = &mut ctx.accounts.seating_map;
+        let section_account = &mut ctx.accounts.seating_section;
+    
+        section_account.event_id = seating_map.event_id.clone();
+        section_account.section_index = section_index;
+        section_account.section_type = section_type;
+        section_account.rows = rows;
+        section_account.seats_per_row = seats_per_row;
+        section_account.seat_status = vec![0; (rows as usize) * (seats_per_row as usize)];
+    
+        seating_map.sections.push(section_account.key());
+    
+        Ok(())
+    }
+
+    pub fn update_seating_section(
+        ctx: Context<UpdateSeatingSection>,
         new_rows: Option<u8>,
         new_seats_per_row: Option<u8>,
         new_section_type: Option<u8>,
     ) -> Result<()> {
-        let event = &ctx.accounts.event;
-        require!(event.organizer == *ctx.accounts.organizer.key, ErrorCode::Unauthorized);
-        require!(event.active, ErrorCode::EventNotActive);
-        require!(event.sold_tickets == 0, ErrorCode::CannotUpdateSeatingAfterSales);
-        let seating_map = &mut ctx.accounts.seating_map;
-        require!((section_index as usize) < seating_map.sections.len(), ErrorCode::InvalidSeating);
-        let section = &mut seating_map.sections[section_index as usize];
+        let section = &mut ctx.accounts.seating_section;
         if let Some(new_type) = new_section_type {
             section.section_type = new_type;
         }
@@ -163,68 +162,64 @@ pub mod invilink {
             require!(seats > 0, ErrorCode::InvalidSeating);
             section.seats_per_row = seats;
         }
-        // Przypisujemy nowy wektor statusów
         let total = (section.rows as usize) * (section.seats_per_row as usize);
         section.seat_status = vec![0; total];
         Ok(())
     }
+    
+    // ---------------- Mintowanie biletu ----------------
+    
+    // Funkcja mint_ticket tworzy nowe konto biletu (TicketNFT).
+    // Dla eventów z seatingiem (typ 1 lub 2) wymaga podania konta SeatingSectionAccount,
+    // aby zarezerwować miejsce (oznaczając je jako sprzedane).
+    pub fn mint_ticket(
+        ctx: Context<MintTicket>,
+        ticket_id: String,
+        event_id: String,
+        section_index: Option<u8>,
+        row: Option<u8>,
+        seat: Option<u8>,
+    ) -> Result<()> {
+        let ticket = &mut ctx.accounts.ticket;
+        let event = &mut ctx.accounts.event;
+        // Sprawdź, czy event_id przekazany w argumencie odpowiada eventowi.
+        require!(event.event_id == event_id, ErrorCode::InvalidTicket);
+        
+        // Jeśli event wymaga rezerwacji miejsc (numerowane lub mieszane)
+        if event.seating_type == 1 || event.seating_type == 2 {
+            let seating_section = ctx.accounts.seating_section.as_mut().ok_or(ErrorCode::InvalidSeating)?;
+            require!(seating_section.event_id == event.event_id, ErrorCode::InvalidSeating);
+            if let Some(sec_index) = section_index {
+                require!(seating_section.section_index == sec_index, ErrorCode::InvalidSeating);
+            }
+            if seating_section.section_type == 1 {
+                // Dla sekcji numerowanych wymagamy podania konkretnego rzędu i miejsca.
+                let row_val = row.ok_or(ErrorCode::InvalidSeating)?;
+                let seat_val = seat.ok_or(ErrorCode::InvalidSeating)?;
+                let index = (row_val as usize) * (seating_section.seats_per_row as usize) + (seat_val as usize);
+                require!(index < seating_section.seat_status.len(), ErrorCode::InvalidSeating);
+                require!(seating_section.seat_status[index] == 0, ErrorCode::SeatAlreadyTaken);
+                seating_section.seat_status[index] = 2; // oznacz jako sprzedane
+            } else {
+                // Dla sekcji stojących – znajdź pierwszy wolny element.
+                let pos = seating_section.seat_status.iter().position(|&s| s == 0).ok_or(ErrorCode::SeatNotReserved)?;
+                seating_section.seat_status[pos] = 2;
+            }
+        }
+        // Ustaw dane biletu.
+        ticket.ticket_id = ticket_id;
+        ticket.event_id = event_id;
+        ticket.owner = *ctx.accounts.buyer.key;
+        ticket.row = row;
+        ticket.seat = seat;
+        ticket.used = false;
+        // Zwiększ liczbę sprzedanych biletów.
+        event.sold_tickets = event.sold_tickets.checked_add(1).ok_or(ErrorCode::InvalidTicket)?;
+        Ok(())
+    }
 
-    // // Mintowanie biletu
-    // pub fn mint_ticket(
-    //     ctx: Context<MintTicket>,
-    //     ticket_id: String,
-    //     event_id: String,
-    //     section_index: Option<u8>, // Dla eventów numerowanych/mieszanych – określa, z której sekcji pochodzi rezerwacja
-    //     row: Option<u8>,
-    //     seat: Option<u8>,
-    // ) -> Result<()> {
-    //     let ticket = &mut ctx.accounts.ticket;
-    //     let event = &ctx.accounts.event;
+    // ---------------- Operacje biletowe ----------------
 
-    //     // Jeśli event wymaga rezerwacji miejsc (numerowane lub mieszane)
-    //     if event.seating_type == 1 || event.seating_type == 2 {
-    //         // seating_map musi być obecny
-    //         let seating_map = ctx.accounts.seating_map.as_mut().unwrap();
-    //         // Wymagamy podania section_index
-    //         let sec_idx = section_index.ok_or(ErrorCode::InvalidSeating)?;
-    //         require!((sec_idx as usize) < seating_map.sections.len(), ErrorCode::InvalidSeating);
-    //         let section = &mut seating_map.sections[sec_idx as usize];
-    //         // Jeśli sekcja jest numerowana, wymagamy podania row i seat
-    //         if section.section_type == 1 {
-    //             let row_val = row.ok_or(ErrorCode::InvalidSeating)?;
-    //             let seat_val = seat.ok_or(ErrorCode::InvalidSeating)?;
-    //             let index = (row_val as usize) * (section.seats_per_row as usize) + (seat_val as usize);
-    //             require!(index < section.seat_status.len(), ErrorCode::InvalidSeating);
-    //             require!(section.seat_status[index] == 1, ErrorCode::SeatNotReserved);
-    //             section.seat_status[index] = 2; // Oznacz jako sprzedane
-    //         } else if section.section_type == 0 {
-    //             // Dla sekcji stojących – opcjonalnie można dodać logikę rezerwacji
-    //             // W tej wersji zakładamy, że rezerwacja nie jest potrzebna (bez numeracji)
-    //             // Można opcjonalnie sprawdzić, czy są wolne miejsca
-    //             let available = section.seat_status.iter().filter(|&&status| status == 0).count();
-    //             require!(available > 0, ErrorCode::SeatNotReserved);
-    //             // Znajdź pierwszy wolny i oznacz jako sprzedany
-    //             if let Some(index) = section.seat_status.iter().position(|&s| s == 0) {
-    //                 section.seat_status[index] = 2;
-    //             }
-    //         }
-    //     }
-    //     // Ustaw dane biletu
-    //     ticket.ticket_id = ticket_id;
-    //     ticket.event_id = event_id;
-    //     ticket.owner = *ctx.accounts.buyer.key;
-    //     ticket.row = row;
-    //     ticket.seat = seat;
-    //     ticket.used = false;
-
-    //     // Aktualizacja liczby sprzedanych biletów w evencie
-    //     let event_mut = &mut ctx.accounts.event;
-    //     event_mut.sold_tickets = event_mut.sold_tickets.checked_add(1).unwrap();
-
-    //     Ok(())
-    // }
-
-    // Pozostałe funkcje (sell_ticket, transfer_ticket, validate_ticket, mark_ticket_used, withdraw_fees)
     pub fn sell_ticket(ctx: Context<SellTicket>, sale_price: u64) -> Result<()> {
         let ticket = &mut ctx.accounts.ticket;
         require!(ticket.owner == *ctx.accounts.seller.key, ErrorCode::Unauthorized);
@@ -307,10 +302,11 @@ pub mod invilink {
     }
 }
 
-// KONTEKSTY (Accounts)
+// ================= KONTEKSTY (Accounts) =================
+
 #[derive(Accounts)]
 pub struct Initialize<'info> {
-    #[account(init, payer = payer, space = 8 + 32 + 8)]
+    #[account(init, payer = payer, space = 48)]
     pub fee_pool: Account<'info, FeePool>,
     #[account(mut)]
     pub payer: Signer<'info>,
@@ -319,23 +315,22 @@ pub struct Initialize<'info> {
 
 #[derive(Accounts)]
 pub struct InitializeOrganizersPool<'info> {
-    #[account(init, payer = payer, space = 8 + (32 * 100), seeds = [b"organizers_pool"], bump)]
+    #[account(init, payer = payer, space = 3212, seeds = [b"organizers_pool"], bump)]
     pub organizers_pool: Account<'info, OrganizersPool>,
     #[account(mut)]
     pub payer: Signer<'info>,
     pub system_program: Program<'info, System>,
 }
-//TUTAJ SKONCZYLEM
+
 #[derive(Accounts)]
 pub struct InitializeEventRegistry<'info> {
-    #[account(init, payer = payer, space = 8 + (32 * 10000))]
+    #[account(init, payer = payer, space = 32012)]
     pub registry: Account<'info, EventRegistry>,
     #[account(mut)]
     pub payer: Signer<'info>,
     pub system_program: Program<'info, System>,
 }
 
-// Add/Remove Organizer
 #[derive(Accounts)]
 pub struct AddOrganizer<'info> {
     #[account(mut)]
@@ -352,7 +347,6 @@ pub struct RemoveOrganizer<'info> {
     pub signer: Signer<'info>,
 }
 
-// Create/Update/Delete Event
 #[derive(Accounts)]
 pub struct CreateEvent<'info> {
     #[account(init, payer = organizer, space = 350)]
@@ -382,56 +376,51 @@ pub struct DeleteEvent<'info> {
     pub organizer: Signer<'info>,
 }
 
-// // Seating (multi-section)
-// #[derive(Accounts)]
-// pub struct InitializeSeating<'info> {
-//     #[account(init, payer = organizer, space = 8 + 64 + 4 + (4 + 100 * (4 + 4 + 100)))]
-//     pub seating_map: Account<'info, SeatingMap>,
-//     #[account(mut)]
-//     pub organizer: Signer<'info>,
-//     pub system_program: Program<'info, System>,
-// }
+#[derive(Accounts)]
+pub struct InitializeSeating<'info> {
+    #[account(init, payer = organizer, space = 3280)]
+    pub seating_map: Account<'info, SeatingMap>,
+    #[account(mut)]
+    pub organizer: Signer<'info>,
+    pub system_program: Program<'info, System>,
+}
 
 #[derive(Accounts)]
-pub struct UpdateSeating<'info> {
-    #[account(mut)]
-    pub event: Account<'info, EventNFT>,
+pub struct InitializeSeatingSection<'info> {
     #[account(mut)]
     pub seating_map: Account<'info, SeatingMap>,
+    #[account(init, payer = organizer, space = 10084)]
+    pub seating_section: Account<'info, SeatingSectionAccount>,
+    #[account(mut)]
+    pub organizer: Signer<'info>,
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+pub struct UpdateSeatingSection<'info> {
+    #[account(mut)]
+    pub seating_map: Account<'info, SeatingMap>,
+    #[account(mut)]
+    pub seating_section: Account<'info, SeatingSectionAccount>,
     #[account(signer)]
     pub organizer: Signer<'info>,
 }
 
 #[derive(Accounts)]
-pub struct ReserveSeat<'info> {
+pub struct MintTicket<'info> {
+    // Inicjujemy nowe konto biletu – alokujemy 200 bajtów.
+    #[account(init, payer = buyer, space = 200)]
+    pub ticket: Account<'info, TicketNFT>,
     #[account(mut)]
-    pub seating_map: Account<'info, SeatingMap>,
+    pub event: Account<'info, EventNFT>,
+    // Dla eventów z rezerwacją miejsc (numerowanych/mieszanych)
     #[account(mut)]
-    pub user: Signer<'info>,
+    pub seating_section: Option<Account<'info, SeatingSectionAccount>>,
+    #[account(mut)]
+    pub buyer: Signer<'info>,
+    pub system_program: Program<'info, System>,
 }
 
-#[derive(Accounts)]
-pub struct ReleaseSeats<'info> {
-    #[account(mut)]
-    pub seating_map: Account<'info, SeatingMap>,
-}
-
-// Mint Ticket – opcjonalnie seating_map (dla eventów numerowanych/mieszanych)
-// #[derive(Accounts)]
-// pub struct MintTicket<'info> {
-//     #[account(init, payer = buyer, space = 200)]
-//     pub ticket: Account<'info, TicketNFT>,
-//     #[account(mut)]
-//     pub event: Account<'info, EventNFT>,
-//     // Seating map jest opcjonalny, jeśli event wymaga rezerwacji miejsc
-//     #[account(mut)]
-//     pub seating_map: Option<Account<'info, SeatingMap>>,
-//     #[account(mut)]
-//     pub buyer: Signer<'info>,
-//     pub system_program: Program<'info, System>,
-// }
-
-// Pozostałe funkcje biletowe
 #[derive(Accounts)]
 pub struct SellTicket<'info> {
     #[account(mut)]
@@ -476,8 +465,8 @@ pub struct WithdrawFees<'info> {
     pub owner: Signer<'info>,
 }
 
+// ================= STRUKTURY KONTA =================
 
-// STRUKTURY KONTA
 #[account]
 pub struct FeePool {
     pub owner: Pubkey,
@@ -506,7 +495,6 @@ pub struct EventNFT {
     pub active: bool,
 }
 
-// Nowa struktura dla sekcji miejsc – używana w SeatingMap
 #[derive(AnchorSerialize, AnchorDeserialize, Clone)]
 pub struct SeatingSection {
     pub section_type: u8,  // 0 = stojące, 1 = siedzące
@@ -518,7 +506,17 @@ pub struct SeatingSection {
 #[account]
 pub struct SeatingMap {
     pub event_id: String, 
-    pub sections: Vec<SeatingSection>,
+    pub sections: Vec<Pubkey>,
+}
+
+#[account]
+pub struct SeatingSectionAccount {
+    pub event_id: String,
+    pub section_index: u8, 
+    pub section_type: u8,  // 0 = stojące, 1 = siedzące
+    pub rows: u8,
+    pub seats_per_row: u8,
+    pub seat_status: Vec<u8>,
 }
 
 #[account]
@@ -531,15 +529,15 @@ pub struct TicketNFT {
     pub used: bool,
 }
 
-// Struktura wejściowa dla inicjalizacji sekcji – ułatwia przekazanie danych
 #[derive(AnchorSerialize, AnchorDeserialize, Clone)]
 pub struct SeatingSectionInput {
-    pub section_type: u8, // 0 = stojące, 1 = siedzące
+    pub section_type: u8,
     pub rows: u8,
     pub seats_per_row: u8,
 }
-  
-// ERROR CODE
+
+// ================= ERROR CODE =================
+
 #[error_code]
 pub enum ErrorCode {
     #[msg("Unauthorized operation.")]
