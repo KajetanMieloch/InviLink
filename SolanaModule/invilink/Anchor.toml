@@ -5,7 +5,7 @@ resolution = true
 skip-lint = false
 
 [programs.localnet]
-invilink = "DxRDuknmyMNHHN8vd6LKGoAwpqSc5k92sFHTDz8bDvey"
+invilink = "FcvFm8s5E99PTH956k4hYkYkwZkXqNdK8DLMJgYr5Wkh"
 
 [registry]
 url = "https://api.apr.dev"

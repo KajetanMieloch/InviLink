@@ -1,7 +1,7 @@
 use anchor_lang::prelude::*;
 
 
-declare_id!("DxRDuknmyMNHHN8vd6LKGoAwpqSc5k92sFHTDz8bDvey");
+declare_id!("FcvFm8s5E99PTH956k4hYkYkwZkXqNdK8DLMJgYr5Wkh");
 
 // Stałe globalne
 const MASTER_ACCOUNT: Pubkey = pubkey!("4Wg5ZqjS3AktHzq34hK1T55aFNKSjBpmJ3PyRChpPNDh");
@@ -81,7 +81,7 @@ pub mod invilink {
     
         // Sprawdzamy, czy nie przekroczono maksymalnej liczby eventów
         let count = registry.event_count as usize;
-        require!(count < 1000, ErrorCode::RegistryFull);
+        require!(count < 10, ErrorCode::RegistryFull);
         registry.events[count] = event.key();
         registry.event_count += 1;
     
@@ -114,12 +114,34 @@ pub mod invilink {
         Ok(())
     }
 
-    pub fn delete_event(ctx: Context<DeleteEvent>) -> Result<()> {
+    pub fn deactivate_event(ctx: Context<DeactivateEvent>) -> Result<()> {
         let event = &mut ctx.accounts.event;
         require!(event.organizer == *ctx.accounts.organizer.key, ErrorCode::Unauthorized);
+        // Tylko dezaktywujemy event
         event.active = false;
         Ok(())
     }
+    
+    pub fn delete_event(ctx: Context<DeleteEvent>) -> Result<()> {
+        let event = &mut ctx.accounts.event;
+        let registry = &mut ctx.accounts.registry;
+        require!(event.organizer == *ctx.accounts.organizer.key, ErrorCode::Unauthorized);
+        // Usuwamy event z rejestru: szukamy jego pozycji w tablicy
+        let pos = registry
+          .events
+          .iter()
+          .position(|&x| x == event.key())
+          .ok_or(ErrorCode::InvalidTicket)?; // lub inny odpowiedni error code
+        // Przesuwamy elementy, aby nadpisać usuwany element
+        for i in pos..((registry.event_count as usize) - 1) {
+            registry.events[i] = registry.events[i + 1];
+        }
+        // Ustawiamy ostatni element jako domyślny i dekrementujemy licznik
+        let count = registry.event_count as usize;
+        registry.events[count - 1] = Pubkey::default();
+        registry.event_count -= 1;
+        Ok(())
+    }   
 
     // ---------------- Konfiguracja miejsc (seating) ----------------
 
@@ -400,11 +422,23 @@ pub struct UpdateEvent<'info> {
 }
 
 #[derive(Accounts)]
-pub struct DeleteEvent<'info> {
+pub struct DeactivateEvent<'info> {
     #[account(mut)]
     pub event: Account<'info, EventNFT>,
     #[account(signer)]
-    pub organizer: Signer<'info>,
+    /// CHECK: Konto organizatora jest walidowane poprzez porównanie klucza z polem event.organizer.
+    pub organizer: AccountInfo<'info>,
+}
+
+#[derive(Accounts)]
+pub struct DeleteEvent<'info> {
+    #[account(mut)]
+    pub event: Account<'info, EventNFT>,
+    #[account(mut)]
+    pub registry: Account<'info, EventRegistry>,
+    #[account(signer)]
+    /// CHECK: Konto organizatora jest walidowane poprzez porównanie klucza z polem event.organizer.
+    pub organizer: AccountInfo<'info>,
 }
 
 #[derive(Accounts)]
