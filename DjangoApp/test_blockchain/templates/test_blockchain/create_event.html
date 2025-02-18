@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+  <meta charset="UTF-8">
+  <title>Stwórz Event - InviLink</title>
+  <script src="https://cdn.jsdelivr.net/npm/@solana/web3.js@latest/lib/index.iife.min.js"></script>
+  <style>
+    body { font-family: Arial, sans-serif; text-align: center; padding: 20px; }
+    input, select, button { display: block; margin: 10px auto; padding: 10px; font-size: 16px; }
+    #log { margin: 20px auto; padding: 10px; border: 1px solid #ccc; width: 80%; white-space: pre-wrap; text-align: left; }
+  </style>
+</head>
+<body>
+  <h1>Stwórz Event</h1>
+  
+  <label>ID Eventu: <input id="eventId" type="text" placeholder="np. event123"></label>
+  <label>Nazwa Eventu: <input id="eventName" type="text" placeholder="np. Koncert Rockowy"></label>
+  <label>Cena biletu (SOL): <input id="ticketPrice" type="number" placeholder="np. 0.1"></label>
+  <label>Dostępne bilety: <input id="availableTickets" type="number" placeholder="np. 100"></label>
+  <label>Rodzaj miejsc:
+    <select id="seatingType">
+      <option value="0">Open-space</option>
+      <option value="1">Numerowane</option>
+      <option value="2">Mieszane</option>
+    </select>
+  </label>
+  
+  <button onclick="createNewEvent()">Stwórz Event</button>
+  <div id="log"></div>
+
+  <script>
+    function logMessage(message) {
+      const logEl = document.getElementById("log");
+      logEl.textContent += message + "\n";
+      console.log(message);
+    }
+
+    async function createNewEvent() {
+      logMessage("Tworzenie eventu...");
+
+      if (!window.phantom || !window.phantom.solana) {
+        alert("Phantom Wallet jest wymagany!");
+        return;
+      }
+
+      const provider = window.phantom.solana;
+      if (!provider.isConnected) {
+        await provider.connect();
+      }
+
+      const walletPublicKey = provider.publicKey;
+      logMessage("Twój klucz publiczny: " + walletPublicKey.toBase58());
+
+      const connection = new solanaWeb3.Connection("https://api.devnet.solana.com", "confirmed");
+      const PROGRAM_ID = new solanaWeb3.PublicKey("9puQE2ab3LJY9HUFTUe9YfB2yWjTZ56Fx5FxoNHgvThv");
+
+      // Pobranie wartości z formularza
+      const eventId = document.getElementById("eventId").value;
+      const eventName = document.getElementById("eventName").value;
+      const ticketPriceSol = parseFloat(document.getElementById("ticketPrice").value);
+      const availableTickets = parseInt(document.getElementById("availableTickets").value);
+      const seatingType = parseInt(document.getElementById("seatingType").value);
+
+      if (!eventId || !eventName || isNaN(ticketPriceSol) || isNaN(availableTickets)) {
+        alert("Wszystkie pola muszą być wypełnione!");
+        return;
+      }
+
+      const ticketPrice = ticketPriceSol * solanaWeb3.LAMPORTS_PER_SOL; // Konwersja SOL -> lamporty
+
+      // Obliczenie PDA eventu
+      const [eventPDA] = await solanaWeb3.PublicKey.findProgramAddress(
+          [new TextEncoder().encode(eventId)], 
+          PROGRAM_ID
+      );
+
+      // Obliczenie PDA dla registry
+      const [registryPDA] = await solanaWeb3.PublicKey.findProgramAddress(
+          [new TextEncoder().encode("event_registry")], 
+          PROGRAM_ID
+      );
+
+      // Obliczenie PDA dla organizers_pool
+      const [organizersPoolPDA] = await solanaWeb3.PublicKey.findProgramAddress(
+          [new TextEncoder().encode("organizers_pool")], 
+          PROGRAM_ID
+      );
+
+      logMessage("Event PDA: " + eventPDA.toBase58());
+
+      // Discriminator funkcji `create_event`
+      const discriminator = new Uint8Array([49, 219, 29, 203, 22, 98, 100, 87]);
+
+      // Tworzenie bufferów dla argumentów (event_id, name, ticket_price, available_tickets, seating_type)
+      const encoder = new TextEncoder();
+      const eventIdBuffer = encoder.encode(eventId);
+      const eventNameBuffer = encoder.encode(eventName);
+      const ticketPriceBuffer = new Uint8Array(new BigInt64Array([BigInt(ticketPrice)]).buffer);
+      const availableTicketsBuffer = new Uint8Array(new BigInt64Array([BigInt(availableTickets)]).buffer);
+      const seatingTypeBuffer = new Uint8Array([seatingType]);
+
+      // Łączenie wszystkich danych w jedną tablicę bajtów
+      const instructionData = new Uint8Array([
+          ...discriminator,
+          ...eventIdBuffer,
+          ...new Array(32 - eventIdBuffer.length).fill(0), // Wyrównanie do 32 bajtów
+          ...eventNameBuffer,
+          ...new Array(32 - eventNameBuffer.length).fill(0), // Wyrównanie do 32 bajtów
+          ...ticketPriceBuffer,
+          ...availableTicketsBuffer,
+          ...seatingTypeBuffer
+      ]);
+
+      // Tworzenie instrukcji
+      const transactionInstruction = new solanaWeb3.TransactionInstruction({
+          keys: [
+              { pubkey: eventPDA, isSigner: false, isWritable: true },
+              { pubkey: organizersPoolPDA, isSigner: false, isWritable: true },
+              { pubkey: registryPDA, isSigner: false, isWritable: true },
+              { pubkey: walletPublicKey, isSigner: true, isWritable: true },
+              { pubkey: solanaWeb3.SystemProgram.programId, isSigner: false, isWritable: false }
+          ],
+          programId: PROGRAM_ID,
+          data: instructionData
+      });
+
+      try {
+          let transaction = new solanaWeb3.Transaction().add(transactionInstruction);
+          transaction.feePayer = walletPublicKey;
+          const { blockhash } = await connection.getLatestBlockhash();
+          transaction.recentBlockhash = blockhash;
+
+          const signedTransaction = await provider.signTransaction(transaction);
+          const txSignature = await connection.sendRawTransaction(signedTransaction.serialize());
+
+          logMessage("Transakcja wysłana, signature: " + txSignature);
+
+          await connection.confirmTransaction(txSignature, "confirmed");
+          logMessage("Event został utworzony! Tx Sig: " + txSignature);
+          alert("Event został utworzony! Tx Sig: " + txSignature);
+      } catch (err) {
+          logMessage("Błąd: " + err.message);
+          alert("Błąd: " + err.message);
+      }
+    }
+  </script>
+</body>
+</html>

@@ -10,4 +10,5 @@ urlpatterns = [
     path('remove_org/', views.remove_org, name='remove_org'),
     path('create_event/', views.create_event, name='create_event'),
     path('init_event_reg/', views.init_event_reg, name='init_event_reg'),
+    path('close_account/', views.close_account, name='close_account'),
 ]
