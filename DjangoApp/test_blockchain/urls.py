@@ -9,4 +9,5 @@ urlpatterns = [
     path('add_org/', views.add_org, name='add_org'),
     path('remove_org/', views.remove_org, name='remove_org'),
     path('create_event/', views.create_event, name='create_event'),
+    path('init_event_reg/', views.init_event_reg, name='init_event_reg'),
 ]
