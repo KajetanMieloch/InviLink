@@ -1,7 +1,6 @@
 use anchor_lang::prelude::*;
 
-
-declare_id!("FcvFm8s5E99PTH956k4hYkYkwZkXqNdK8DLMJgYr5Wkh");
+declare_id!("BeK6S5TgUTHEkW8tmsC55mxmjDTTHd3c1QULKtEtjWpY");
 
 // Stałe globalne
 const MASTER_ACCOUNT: Pubkey = pubkey!("4Wg5ZqjS3AktHzq34hK1T55aFNKSjBpmJ3PyRChpPNDh");
@@ -76,8 +75,8 @@ pub mod invilink {
         event.ticket_price = ticket_price;
         event.available_tickets = available_tickets;
         event.sold_tickets = 0;
-        event.seating_type = seating_type;
-        event.active = true;
+        // Domyślnie event jest nieaktywny – można go edytować przed aktywacją
+        event.active = false;
     
         // Sprawdzamy, czy nie przekroczono maksymalnej liczby eventów
         let count = registry.event_count as usize;
@@ -88,6 +87,7 @@ pub mod invilink {
         Ok(())
     }
 
+    // Modyfikacja eventu dozwolona tylko, gdy event nie jest aktywny
     pub fn update_event(
         ctx: Context<UpdateEvent>,
         new_name: Option<String>,
@@ -97,7 +97,8 @@ pub mod invilink {
     ) -> Result<()> {
         let event = &mut ctx.accounts.event;
         require!(event.organizer == *ctx.accounts.organizer.key, ErrorCode::Unauthorized);
-        require!(event.active, ErrorCode::EventNotActive);
+        // Aktualizacja jest dozwolona tylko, gdy event jest nieaktywny
+        require!(!event.active, ErrorCode::EventIsActive);
         if let Some(name) = new_name {
             event.name = name;
         }
@@ -114,10 +115,21 @@ pub mod invilink {
         Ok(())
     }
 
+    // Funkcja aktywująca event – po jej wywołaniu bilety można kupić
+    pub fn activate_event(ctx: Context<ActivateEvent>) -> Result<()> {
+        let event = &mut ctx.accounts.event;
+        require!(event.organizer == *ctx.accounts.organizer.key, ErrorCode::Unauthorized);
+        // Można aktywować event tylko, gdy jest on nieaktywny
+        require!(!event.active, ErrorCode::EventIsActive);
+        event.active = true;
+        Ok(())
+    }
+
     pub fn deactivate_event(ctx: Context<DeactivateEvent>) -> Result<()> {
         let event = &mut ctx.accounts.event;
         require!(event.organizer == *ctx.accounts.organizer.key, ErrorCode::Unauthorized);
-        // Tylko dezaktywujemy event
+        // Upewniamy się, że event jest już aktywny, aby móc go dezaktywować
+        require!(event.active, ErrorCode::EventNotActive);
         event.active = false;
         Ok(())
     }
@@ -131,7 +143,7 @@ pub mod invilink {
           .events
           .iter()
           .position(|&x| x == event.key())
-          .ok_or(ErrorCode::InvalidTicket)?; // lub inny odpowiedni error code
+          .ok_or(ErrorCode::InvalidTicket)?;
         // Przesuwamy elementy, aby nadpisać usuwany element
         for i in pos..((registry.event_count as usize) - 1) {
             registry.events[i] = registry.events[i + 1];
@@ -215,7 +227,7 @@ pub mod invilink {
     ) -> Result<()> {
         let ticket = &mut ctx.accounts.ticket;
         let event = &mut ctx.accounts.event;
-        //Czy event_id przekazany w argumencie odpowiada eventowi.
+        // Czy event_id przekazany w argumencie odpowiada eventowi.
         require!(event.event_id == event_id, ErrorCode::InvalidTicket);
         
         // Jeśli event wymaga rezerwacji miejsc (numerowane lub mieszane)
@@ -334,7 +346,6 @@ pub mod invilink {
         Ok(())
     }
 
-
     // ----------------- Funkcje pomocnicze -----------------
 
     pub fn close_target_account(ctx: Context<CloseTargetAccount>) -> Result<()> {
@@ -346,13 +357,11 @@ pub mod invilink {
         let closable = &mut ctx.accounts.closable_account;
         let authority = &mut ctx.accounts.authority;
     
-        // Przekazanie wszystkich lamportów z zamykanego konta do `authority`
         **authority.to_account_info().lamports.borrow_mut() += closable.lamports();
         **closable.to_account_info().lamports.borrow_mut() = 0;
     
         Ok(())
-    }   
-
+    }
 }
 
 // ================= KONTEKSTY (Accounts) =================
@@ -422,6 +431,15 @@ pub struct UpdateEvent<'info> {
 }
 
 #[derive(Accounts)]
+pub struct ActivateEvent<'info> {
+    #[account(mut)]
+    pub event: Account<'info, EventNFT>,
+    #[account(signer)]
+    /// CHECK: Konto organizatora jest walidowane poprzez porównanie klucza z polem event.organizer.
+    pub organizer: AccountInfo<'info>,
+}
+
+#[derive(Accounts)]
 pub struct DeactivateEvent<'info> {
     #[account(mut)]
     pub event: Account<'info, EventNFT>,
@@ -473,12 +491,10 @@ pub struct UpdateSeatingSection<'info> {
 
 #[derive(Accounts)]
 pub struct MintTicket<'info> {
-    // Inicjujemy nowe konto biletu – alokujemy 200 bajtów.
     #[account(init, payer = buyer, space = 200)]
     pub ticket: Account<'info, TicketNFT>,
     #[account(mut)]
     pub event: Account<'info, EventNFT>,
-    // Dla eventów z rezerwacją miejsc (numerowanych/mieszanych)
     #[account(mut)]
     pub seating_section: Option<Account<'info, SeatingSectionAccount>>,
     #[account(mut)]
@@ -642,6 +658,8 @@ pub enum ErrorCode {
     SeatAlreadyTaken,
     #[msg("Event is not active.")]
     EventNotActive,
+    #[msg("Event is active and cannot be updated.")]
+    EventIsActive,
     #[msg("New available tickets cannot be less than the number of sold tickets.")]
     InvalidTicketQuantity,
     #[msg("Cannot update seating configuration after tickets have been sold.")]
