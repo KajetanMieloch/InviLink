@@ -1,7 +1,7 @@
 use anchor_lang::prelude::*;
 
 
-declare_id!("9puQE2ab3LJY9HUFTUe9YfB2yWjTZ56Fx5FxoNHgvThv");
+declare_id!("66cHt9qwQTBsKdVvBhJw8quFmXiPPXmgwuxKkpdgz1bT");
 
 // Stałe globalne
 const MASTER_ACCOUNT: Pubkey = pubkey!("4Wg5ZqjS3AktHzq34hK1T55aFNKSjBpmJ3PyRChpPNDh");
