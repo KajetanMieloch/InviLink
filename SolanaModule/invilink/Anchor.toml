@@ -4,15 +4,15 @@
 resolution = true
 skip-lint = false
 
-[programs.devnet]
-invilink = "DqZf5dE14GCM541qRBNipykFFHDMe2DKxshWk2Q4McMU"
+[programs.localnet]
+invilink = "35kDpALc3cEUUWeWGZkHnThjs2R3zCNq4b4FXZ1eqZFM"
 
 [registry]
 url = "https://api.apr.dev"
 
 [provider]
-cluster = "https://api.devnet.solana.com"
-wallet = "~/.config/solana/id.json"
+cluster = "localnet"
+wallet = "/home/alternator/.config/solana/id.json"
 
 [scripts]
 test = "yarn run ts-mocha -p ./tsconfig.json -t 1000000 tests/**/*.ts"
