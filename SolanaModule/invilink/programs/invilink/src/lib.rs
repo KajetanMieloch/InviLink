@@ -345,8 +345,8 @@ pub struct InitializeOrganizersPool<'info> {
 
 #[derive(Accounts)]
 pub struct InitializeEventRegistry<'info> {
-    //1000 eventów
-    #[account(init, payer = payer, space = 8 + 4 + (1000 * 32), seeds = [b"event_registry"], bump)]
+    //10240 - max solany
+    #[account(init, payer = payer, space = 10240, seeds = [b"event_registry"], bump)]
     pub registry: Account<'info, EventRegistry>,
     #[account(mut)]
     pub payer: Signer<'info>,
