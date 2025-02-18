@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+  <meta charset="UTF-8">
+  <title>Zamknij Konto - InviLink</title>
+  <!-- Importujemy bibliotekę Solana Web3.js -->
+  <script src="https://cdn.jsdelivr.net/npm/@solana/web3.js@latest/lib/index.iife.min.js"></script>
+  <style>
+    body { font-family: Arial, sans-serif; text-align: center; padding: 20px; }
+    input, button { margin: 10px; padding: 10px; font-size: 16px; }
+    #log { margin: 20px auto; padding: 10px; border: 1px solid #ccc; width: 80%; white-space: pre-wrap; text-align: left; }
+  </style>
+</head>
+<body>
+  <h1>Zamknij Konto</h1>
+  <p>Podaj publiczny klucz konta, które chcesz zamknąć:</p>
+  <input type="text" id="targetAccount" placeholder="Wpisz adres konta">
+  <button onclick="closeTargetAccount()">Zamknij Konto</button>
+  <div id="log"></div>
+
+  <script>
+    // Funkcja do logowania wiadomości
+    function logMessage(message) {
+      const logEl = document.getElementById("log");
+      logEl.textContent += message + "\n";
+      console.log(message);
+    }
+
+    async function closeTargetAccount() {
+      logMessage("Rozpoczynam zamykanie konta...");
+
+      // Sprawdź, czy Phantom Wallet jest dostępny
+      if (!window.phantom || !window.phantom.solana) {
+        alert("Phantom Wallet jest wymagany!");
+        return;
+      }
+
+      const provider = window.phantom.solana;
+      if (!provider.isConnected) {
+        await provider.connect();
+      }
+
+      const walletPublicKey = provider.publicKey;
+      logMessage("Twój klucz publiczny: " + walletPublicKey.toBase58());
+
+      // Połącz z devnet (lub mainnet, jeśli potrzebujesz)
+      const connection = new solanaWeb3.Connection("https://api.devnet.solana.com", "confirmed");
+
+      // ID Twojego programu Anchor
+      const PROGRAM_ID = new solanaWeb3.PublicKey("66cHt9qwQTBsKdVvBhJw8quFmXiPPXmgwuxKkpdgz1bT");
+
+      // Pobierz z formularza adres konta do zamknięcia
+      const targetAccountStr = document.getElementById("targetAccount").value.trim();
+      if (!targetAccountStr) {
+        alert("Wpisz adres konta, które chcesz zamknąć!");
+        return;
+      }
+
+      let targetAccountPubkey;
+      try {
+        targetAccountPubkey = new solanaWeb3.PublicKey(targetAccountStr);
+      } catch (e) {
+        alert("Niepoprawny adres!");
+        return;
+      }
+
+      // Oblicz dyskryminator dla funkcji close_target_account (przykładowa wartość; uzupełnij właściwą wartość)
+      const discriminator = new Uint8Array([210, 40, 225, 29, 150, 34, 22, 103]);
+
+      // Instrukcja transakcji
+      const instructionData = discriminator; // brak dodatkowych argumentów
+
+      const transactionInstruction = new solanaWeb3.TransactionInstruction({
+          keys: [
+            { pubkey: walletPublicKey, isSigner: true, isWritable: true }, // authority
+            { pubkey: targetAccountPubkey, isSigner: false, isWritable: true } // konto do zamknięcia
+          ],
+          programId: PROGRAM_ID,
+          data: instructionData
+      });
+
+      try {
+        let transaction = new solanaWeb3.Transaction().add(transactionInstruction);
+        transaction.feePayer = walletPublicKey;
+        const { blockhash } = await connection.getLatestBlockhash();
+        transaction.recentBlockhash = blockhash;
+
+        const signedTransaction = await provider.signTransaction(transaction);
+        const txSignature = await connection.sendRawTransaction(signedTransaction.serialize());
+
+        logMessage("Transakcja wysłana, signature: " + txSignature);
+        await connection.confirmTransaction(txSignature, "confirmed");
+        logMessage("Konto zostało zamknięte! Tx Sig: " + txSignature);
+        alert("Konto zostało zamknięte!\nTx Sig: " + txSignature);
+      } catch (err) {
+        logMessage("Błąd: " + err.message);
+        alert("Błąd: " + err.message);
+      }
+    }
+  </script>
+</body>
+</html>

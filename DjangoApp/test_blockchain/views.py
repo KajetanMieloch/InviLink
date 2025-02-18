@@ -31,3 +31,6 @@ def create_event(request):
 
 def init_event_reg(request):
     return render(request, 'test_blockchain/init_event_reg.html')
+
+def close_account(request):
+    return render(request, 'test_blockchain/close_account.html')
