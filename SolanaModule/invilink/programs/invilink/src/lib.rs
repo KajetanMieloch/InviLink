@@ -1,7 +1,7 @@
 use anchor_lang::prelude::*;
 
 
-declare_id!("66cHt9qwQTBsKdVvBhJw8quFmXiPPXmgwuxKkpdgz1bT");
+declare_id!("DxRDuknmyMNHHN8vd6LKGoAwpqSc5k92sFHTDz8bDvey");
 
 // Stałe globalne
 const MASTER_ACCOUNT: Pubkey = pubkey!("4Wg5ZqjS3AktHzq34hK1T55aFNKSjBpmJ3PyRChpPNDh");
@@ -28,7 +28,9 @@ pub mod invilink {
 
     pub fn initialize_event_registry(ctx: Context<InitializeEventRegistry>) -> Result<()> {
         let registry = &mut ctx.accounts.registry;
-        registry.events = Vec::new();
+        registry.event_count = 0;
+        // Inicjujemy tablicę z domyślnymi wartościami (Pubkey::default())
+        registry.events = [Pubkey::default(); 10];
         Ok(())
     }
 
@@ -62,6 +64,8 @@ pub mod invilink {
         seating_type: u8, // 0 = open-space, 1 = numerowane, 2 = mieszane
     ) -> Result<()> {
         let event = &mut ctx.accounts.event;
+        let registry = &mut ctx.accounts.registry;
+        
         require!(
             ctx.accounts.organizers_pool.organizers.contains(ctx.accounts.organizer.key),
             ErrorCode::Unauthorized
@@ -74,7 +78,13 @@ pub mod invilink {
         event.sold_tickets = 0;
         event.seating_type = seating_type;
         event.active = true;
-        ctx.accounts.registry.events.push(event.key());
+    
+        // Sprawdzamy, czy nie przekroczono maksymalnej liczby eventów
+        let count = registry.event_count as usize;
+        require!(count < 1000, ErrorCode::RegistryFull);
+        registry.events[count] = event.key();
+        registry.event_count += 1;
+    
         Ok(())
     }
 
@@ -345,7 +355,6 @@ pub struct InitializeOrganizersPool<'info> {
 
 #[derive(Accounts)]
 pub struct InitializeEventRegistry<'info> {
-    //10240 - max solany
     #[account(init, payer = payer, space = 10240, seeds = [b"event_registry"], bump)]
     pub registry: Account<'info, EventRegistry>,
     #[account(mut)]
@@ -502,7 +511,8 @@ pub struct OrganizersPool {
 
 #[account]
 pub struct EventRegistry {
-    pub events: Vec<Pubkey>,
+    pub event_count: u32,           // liczba zapisanych eventów
+    pub events: [Pubkey; 10],     // stała tablica dla maksymalnie 100 eventów
 }
 
 #[account]
@@ -602,4 +612,6 @@ pub enum ErrorCode {
     InvalidTicketQuantity,
     #[msg("Cannot update seating configuration after tickets have been sold.")]
     CannotUpdateSeatingAfterSales,
+    #[msg("Event registry is full.")]
+    RegistryFull,
 }
