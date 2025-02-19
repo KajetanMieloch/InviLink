@@ -5,6 +5,8 @@
   <title>Panel Eventów - InviLink</title>
   <!-- Solana Web3 -->
   <script src="https://cdn.jsdelivr.net/npm/@solana/web3.js@latest/lib/index.iife.min.js"></script>
+  <!-- BN.js -->
+  <script src="https://cdn.jsdelivr.net/npm/bn.js@5.2.0/lib/bn.min.js"></script>
   <style>
     body { font-family: Arial, sans-serif; padding: 20px; }
     table { border-collapse: collapse; margin: 20px auto; width: 90%; }
@@ -35,21 +37,21 @@
   </table>
 
   <script>
-    // Program ID Twojego kontraktu
+    // Ustawienia
     const PROGRAM_ID = new solanaWeb3.PublicKey("BeK6S5TgUTHEkW8tmsC55mxmjDTTHd3c1QULKtEtjWpY");
-    // Seed użyty przy inicjalizacji rejestru eventów
     const REGISTRY_SEED = "event_registry";
-    // Domyślny Pubkey (Pubkey::default()) – 32 bajty zer (reprezentowany jako "11111111111111111111111111111111")
     const DEFAULT_PUBKEY = "11111111111111111111111111111111";
-    // Dyskryminatory z IDL
+
+    // Dyskryminatory zgodne z IDL:
+    const ACTIVATE_EVENT_DISCRIMINATOR = new Uint8Array([231, 184, 218, 110, 194, 0, 39, 115]);
     const DEACTIVATE_EVENT_DISCRIMINATOR = new Uint8Array([222, 84, 182, 86, 46, 110, 215, 19]);
-    const DELETE_EVENT_DISCRIMINATOR = new Uint8Array([103, 111, 95, 106, 232, 24, 190, 84]);
+    const DELETE_EVENT_DISCRIMINATOR    = new Uint8Array([103, 111, 95, 106, 232, 24, 190, 84]);
+    const UPDATE_EVENT_DISCRIMINATOR    = new Uint8Array([70, 108, 211, 125, 171, 176, 25, 217]);
 
     let connection, provider, walletPublicKey;
 
-    // Dekodowanie EventRegistry (pomijamy 8 bajtów discriminator)
     function decodeRegistry(data) {
-      let offset = 8; // pomijamy discriminator
+      let offset = 8;
       const dv = new DataView(data.buffer, data.byteOffset, data.byteLength);
       const eventCount = dv.getUint32(offset, true);
       offset += 4;
@@ -65,33 +67,21 @@
       return { eventCount, events };
     }
 
-    // Dekodowanie EventNFT (pomijamy 8 bajtów discriminator)
     function decodeEvent(data) {
       let offset = 8;
       const dv = new DataView(data.buffer, data.byteOffset, data.byteLength);
-      // event_id
-      const eventIdLen = dv.getUint32(offset, true);
-      offset += 4;
+      const eventIdLen = dv.getUint32(offset, true); offset += 4;
       const eventIdBytes = data.slice(offset, offset + eventIdLen);
-      const event_id = new TextDecoder().decode(eventIdBytes);
-      offset += eventIdLen;
-      // organizer (32 bajty)
+      const event_id = new TextDecoder().decode(eventIdBytes); offset += eventIdLen;
       const organizerBytes = data.slice(offset, offset + 32);
-      const organizer = new solanaWeb3.PublicKey(organizerBytes).toBase58();
-      offset += 32;
-      // name
-      const nameLen = dv.getUint32(offset, true);
-      offset += 4;
+      const organizer = new solanaWeb3.PublicKey(organizerBytes).toBase58(); offset += 32;
+      const nameLen = dv.getUint32(offset, true); offset += 4;
       const nameBytes = data.slice(offset, offset + nameLen);
-      const name = new TextDecoder().decode(nameBytes);
-      offset += nameLen;
-      // ticket_price, available_tickets, sold_tickets (8 bajtów każdy)
+      const name = new TextDecoder().decode(nameBytes); offset += nameLen;
       const ticket_price = dv.getBigUint64(offset, true); offset += 8;
       const available_tickets = dv.getBigUint64(offset, true); offset += 8;
       const sold_tickets = dv.getBigUint64(offset, true); offset += 8;
-      // seating_type (1 bajt)
       const seating_type = dv.getUint8(offset); offset += 1;
-      // active (1 bajt)
       const active = dv.getUint8(offset) !== 0; offset += 1;
       return { event_id, organizer, name, 
                ticket_price: ticket_price.toString(), 
@@ -106,7 +96,38 @@
       console.log(msg);
     }
 
-    // Ładowanie listy eventów
+    // Pomocnicze funkcje do serializacji opcji (dla update_event)
+    function encodeOptionString(str) {
+      if (!str) return new Uint8Array([0]);
+      const encoder = new TextEncoder();
+      const strBytes = encoder.encode(str);
+      const lengthBytes = new Uint8Array(4);
+      new DataView(lengthBytes.buffer).setUint32(0, strBytes.length, true);
+      const result = new Uint8Array(1 + 4 + strBytes.length);
+      result[0] = 1;
+      result.set(lengthBytes, 1);
+      result.set(strBytes, 5);
+      return result;
+    }
+
+    function encodeOptionU64(val) {
+      if (val === null || val === undefined || val === "") return new Uint8Array([0]);
+      let bnVal = new BN(val.toString());
+      const buf = bnVal.toArrayLike(Uint8Array, 'le', 8);
+      const result = new Uint8Array(1 + 8);
+      result[0] = 1;
+      result.set(buf, 1);
+      return result;
+    }
+
+    function encodeOptionU8(val) {
+      if (val === null || val === undefined || val === "") return new Uint8Array([0]);
+      const result = new Uint8Array(2);
+      result[0] = 1;
+      result[1] = Number(val);
+      return result;
+    }
+
     async function loadEvents() {
       try {
         if (!window.phantom || !window.phantom.solana) {
@@ -114,13 +135,10 @@
           return;
         }
         provider = window.phantom.solana;
-        if (!provider.isConnected) {
-          await provider.connect();
-        }
+        if (!provider.isConnected) await provider.connect();
         walletPublicKey = provider.publicKey;
         connection = new solanaWeb3.Connection("https://api.devnet.solana.com", "confirmed");
 
-        // Obliczenie PDA dla EventRegistry
         const [registryPDA] = await solanaWeb3.PublicKey.findProgramAddress(
           [new TextEncoder().encode(REGISTRY_SEED)],
           PROGRAM_ID
@@ -128,18 +146,13 @@
         logMessage("Registry PDA: " + registryPDA.toBase58());
 
         const regAccount = await connection.getAccountInfo(registryPDA);
-        if (!regAccount) {
-          alert("Nie znaleziono konta rejestru eventów.");
-          return;
-        }
+        if (!regAccount) { alert("Nie znaleziono konta rejestru eventów."); return; }
         const registry = decodeRegistry(regAccount.data);
         logMessage("Liczba zapisanych eventów: " + registry.eventCount);
 
-        // Czyścimy tabelę
         const tbody = document.querySelector("#eventsTable tbody");
         tbody.innerHTML = "";
 
-        // Dla każdego eventu pobieramy dane eventu
         for (let pubkeyStr of registry.events) {
           const eventPubkey = new solanaWeb3.PublicKey(pubkeyStr);
           const eventAcc = await connection.getAccountInfo(eventPubkey);
@@ -158,19 +171,29 @@
               <td id="action-${pubkeyStr}"></td>
             `;
             tbody.appendChild(tr);
-            // Jeśli aktualny użytkownik jest organizatorem, dodajemy oba przyciski
             if (eventData.organizer === walletPublicKey.toBase58()) {
               const actionTd = document.getElementById("action-" + pubkeyStr);
-              // Przycisk dezaktywacji
-              const btnDeactivate = document.createElement("button");
-              btnDeactivate.textContent = "Dezaktywuj";
-              btnDeactivate.onclick = () => deactivateEvent(eventPubkey);
-              actionTd.appendChild(btnDeactivate);
-              // Przycisk usunięcia
-              const btnDelete = document.createElement("button");
-              btnDelete.textContent = "Usuń";
-              btnDelete.onclick = () => deleteEvent(eventPubkey);
-              actionTd.appendChild(btnDelete);
+              if (!eventData.active) {
+                const btnUpdate = document.createElement("button");
+                btnUpdate.textContent = "Aktualizuj";
+                btnUpdate.onclick = () => updateEvent(eventPubkey);
+                actionTd.appendChild(btnUpdate);
+
+                const btnActivate = document.createElement("button");
+                btnActivate.textContent = "Aktywuj";
+                btnActivate.onclick = () => activateEvent(eventPubkey);
+                actionTd.appendChild(btnActivate);
+
+                const btnDelete = document.createElement("button");
+                btnDelete.textContent = "Usuń";
+                btnDelete.onclick = () => deleteEvent(eventPubkey);
+                actionTd.appendChild(btnDelete);
+              } else {
+                const btnDeactivate = document.createElement("button");
+                btnDeactivate.textContent = "Dezaktywuj";
+                btnDeactivate.onclick = () => deactivateEvent(eventPubkey);
+                actionTd.appendChild(btnDeactivate);
+              }
             }
           }
         }
@@ -180,10 +203,105 @@
       }
     }
 
-    // Funkcja dezaktywująca event (ustawia active = false)
+    async function updateEvent(eventPubkey) {
+    try {
+      logMessage("Aktualizacja eventu: " + eventPubkey.toBase58());
+      const newName = prompt("Podaj nową nazwę eventu (lub pozostaw puste, aby nie zmieniać):");
+      const newTicketPrice = prompt("Podaj nową cenę biletu (lamporty) (pozostaw puste, aby zachować dotychczasową):");
+      const newAvailableTickets = prompt("Podaj nową liczbę dostępnych biletów (lub pozostaw puste):");
+      const newSeatingType = prompt("Podaj nowy typ miejsc (0=open-space, 1=numerowane, 2=mieszane) (lub pozostaw puste):");
+
+      // Serializujemy opcjonalne wartości – pusta wartość będzie interpretowana jako None
+      const encodedName = encodeOptionString(newName);
+      const encodedTicketPrice = encodeOptionU64(newTicketPrice);
+      const encodedAvailable = encodeOptionU64(newAvailableTickets);
+      const encodedSeatingType = encodeOptionU8(newSeatingType);
+
+      const updateData = new Uint8Array(
+        UPDATE_EVENT_DISCRIMINATOR.length +
+        encodedName.length +
+        encodedTicketPrice.length +
+        encodedAvailable.length +
+        encodedSeatingType.length
+      );
+      let offset = 0;
+      updateData.set(UPDATE_EVENT_DISCRIMINATOR, offset);
+      offset += UPDATE_EVENT_DISCRIMINATOR.length;
+      updateData.set(encodedName, offset);
+      offset += encodedName.length;
+      updateData.set(encodedTicketPrice, offset);
+      offset += encodedTicketPrice.length;
+      updateData.set(encodedAvailable, offset);
+      offset += encodedAvailable.length;
+      updateData.set(encodedSeatingType, offset);
+
+      const instruction = new solanaWeb3.TransactionInstruction({
+        keys: [
+          { pubkey: eventPubkey, isWritable: true, isSigner: false },
+          { pubkey: walletPublicKey, isWritable: true, isSigner: true }
+        ],
+        programId: PROGRAM_ID,
+        data: updateData
+      });
+      logMessage("Instrukcja update_event utworzona.");
+      const transaction = new solanaWeb3.Transaction().add(instruction);
+      transaction.feePayer = walletPublicKey;
+      const { blockhash } = await connection.getLatestBlockhash();
+      transaction.recentBlockhash = blockhash;
+      logMessage("Transakcja przygotowana, podpisuję...");
+      const signedTx = await provider.signTransaction(transaction);
+      logMessage("Transakcja podpisana.");
+      const txSig = await connection.sendRawTransaction(signedTx.serialize());
+      logMessage("Transakcja wysłana. Signature: " + txSig);
+      logMessage("Czekam na potwierdzenie transakcji...");
+      await connection.confirmTransaction(txSig, "confirmed");
+      logMessage("Transakcja potwierdzona.");
+      alert("Event zaktualizowany! Tx Sig: " + txSig);
+      loadEvents();
+    } catch (err) {
+      console.error(err);
+      logMessage("Błąd podczas aktualizacji eventu: " + err.message);
+      alert("Błąd podczas aktualizacji eventu: " + err.message);
+    }
+  }
+
+
+    async function activateEvent(eventPubkey) {
+      try {
+        logMessage("Aktywacja eventu: " + eventPubkey.toBase58());
+        const instruction = new solanaWeb3.TransactionInstruction({
+          keys: [
+            { pubkey: eventPubkey, isWritable: true, isSigner: false },
+            { pubkey: walletPublicKey, isWritable: true, isSigner: true }
+          ],
+          programId: PROGRAM_ID,
+          data: ACTIVATE_EVENT_DISCRIMINATOR
+        });
+        logMessage("Instrukcja activate_event utworzona.");
+        const transaction = new solanaWeb3.Transaction().add(instruction);
+        transaction.feePayer = walletPublicKey;
+        const { blockhash } = await connection.getLatestBlockhash();
+        transaction.recentBlockhash = blockhash;
+        logMessage("Transakcja przygotowana, podpisuję...");
+        const signedTx = await provider.signTransaction(transaction);
+        logMessage("Transakcja podpisana.");
+        const txSig = await connection.sendRawTransaction(signedTx.serialize());
+        logMessage("Transakcja wysłana. Signature: " + txSig);
+        logMessage("Czekam na potwierdzenie transakcji...");
+        await connection.confirmTransaction(txSig, "confirmed");
+        logMessage("Transakcja potwierdzona.");
+        alert("Event aktywowany! Tx Sig: " + txSig);
+        loadEvents();
+      } catch (err) {
+        console.error(err);
+        logMessage("Błąd podczas aktywacji eventu: " + err.message);
+        alert("Błąd podczas aktywacji eventu: " + err.message);
+      }
+    }
+
     async function deactivateEvent(eventPubkey) {
       try {
-        logMessage("Rozpoczynam dezaktywację eventu: " + eventPubkey.toBase58());
+        logMessage("Dezaktywacja eventu: " + eventPubkey.toBase58());
         const instruction = new solanaWeb3.TransactionInstruction({
           keys: [
             { pubkey: eventPubkey, isWritable: true, isSigner: false },
@@ -214,11 +332,9 @@
       }
     }
 
-    // Funkcja usuwająca event z rejestru
     async function deleteEvent(eventPubkey) {
       try {
-        logMessage("Rozpoczynam usuwanie eventu: " + eventPubkey.toBase58());
-        // Obliczamy PDA rejestru eventów
+        logMessage("Usuwanie eventu: " + eventPubkey.toBase58());
         const [registryPDA] = await solanaWeb3.PublicKey.findProgramAddress(
           [new TextEncoder().encode(REGISTRY_SEED)],
           PROGRAM_ID
@@ -246,7 +362,7 @@
         logMessage("Czekam na potwierdzenie transakcji...");
         await connection.confirmTransaction(txSig, "confirmed");
         logMessage("Transakcja potwierdzona.");
-        alert("Event usunięty z rejestru! Tx Sig: " + txSig);
+        alert("Event usunięty! Tx Sig: " + txSig);
         loadEvents();
       } catch (err) {
         console.error(err);
