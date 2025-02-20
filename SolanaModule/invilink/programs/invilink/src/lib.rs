@@ -4,7 +4,7 @@ use bs58;
 use solana_program::hash::hash;
 
 
-declare_id!("BeK6S5TgUTHEkW8tmsC55mxmjDTTHd3c1QULKtEtjWpY");
+declare_id!("64TryRyV2mf5VTsRcQTr5fAX4GPuvwXSsLUG42t5cqZp");
 
 // Stałe globalne
 const MASTER_ACCOUNT: Pubkey = pubkey!("4Wg5ZqjS3AktHzq34hK1T55aFNKSjBpmJ3PyRChpPNDh");
