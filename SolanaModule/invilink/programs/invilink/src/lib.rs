@@ -1,4 +1,8 @@
 use anchor_lang::prelude::*;
+//Biblioteka do formatu Base58. Używana do generowania ID eventów.
+use bs58;
+use solana_program::hash::hash;
+
 
 declare_id!("BeK6S5TgUTHEkW8tmsC55mxmjDTTHd3c1QULKtEtjWpY");
 
@@ -6,6 +10,23 @@ declare_id!("BeK6S5TgUTHEkW8tmsC55mxmjDTTHd3c1QULKtEtjWpY");
 const MASTER_ACCOUNT: Pubkey = pubkey!("4Wg5ZqjS3AktHzq34hK1T55aFNKSjBpmJ3PyRChpPNDh");
 const FEE_PERCENTAGE: u64 = 5; // 5% opłaty manipulacyjnej
 
+// ================= FUNKCJE POMOCNICZE POZA CHAINEM =================
+// Seed jest stały, nonce jest przekazany jako argument
+fn generate_event_id(nonce: u32) -> String {
+    // Stały seed
+    let seed = b"339562";
+    // Tworzymy wektor, który zawiera seed i nonce
+    let mut data = Vec::new();
+    data.extend_from_slice(seed);
+    data.extend_from_slice(&nonce.to_le_bytes());
+    // Oblicz hash (solana_program::hash::hash, zwraca Hash)
+    let hash_result = hash(&data);
+    // Zakoduj wynik w base58, to nasze ID eventu
+    let encoded = bs58::encode(hash_result.as_ref()).into_string();
+    encoded
+}
+
+//Tutaj zaczyna się program na chainie
 #[program]
 pub mod invilink {
     use super::*;
@@ -56,7 +77,6 @@ pub mod invilink {
 
     pub fn create_event(
         ctx: Context<CreateEvent>,
-        event_id: String,
         name: String,
         ticket_price: u64,
         available_tickets: u64,
@@ -69,23 +89,28 @@ pub mod invilink {
             ctx.accounts.organizers_pool.organizers.contains(ctx.accounts.organizer.key),
             ErrorCode::Unauthorized
         );
+        
+        // Używamy aktualnego czasu oraz pierwszego bajtu klucza organizatora jako nonce
+        let nonce = (Clock::get()?.unix_timestamp as u32)
+            .wrapping_mul(ctx.accounts.organizer.key.to_bytes()[0] as u32);
+        let event_id = generate_event_id(nonce);
+        
         event.event_id = event_id;
         event.organizer = *ctx.accounts.organizer.key;
         event.name = name;
         event.ticket_price = ticket_price;
         event.available_tickets = available_tickets;
         event.sold_tickets = 0;
-        // Domyślnie event jest nieaktywny – można go edytować przed aktywacją
         event.active = false;
     
-        // Sprawdzamy, czy nie przekroczono maksymalnej liczby eventów
         let count = registry.event_count as usize;
         require!(count < 10, ErrorCode::RegistryFull);
         registry.events[count] = event.key();
         registry.event_count += 1;
     
         Ok(())
-    }
+    }    
+    
 
     // Modyfikacja eventu dozwolona tylko, gdy event nie jest aktywny
     pub fn update_event(
