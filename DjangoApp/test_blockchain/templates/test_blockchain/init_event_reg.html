@@ -45,8 +45,8 @@
       //Połączenie z Solana Devnet
       const connection = new solanaWeb3.Connection("https://api.devnet.solana.com", "confirmed");
 
-      //ID twojego programu Anchor
-      const PROGRAM_ID = new solanaWeb3.PublicKey("FcvFm8s5E99PTH956k4hYkYkwZkXqNdK8DLMJgYr5Wkh");
+      //ID programu Anchor
+      const PROGRAM_ID = new solanaWeb3.PublicKey("BeK6S5TgUTHEkW8tmsC55mxmjDTTHd3c1QULKtEtjWpY");
 
       //Obliczanie PDA (Program Derived Address) dla `event_registry`
       const [organizersPoolPDA] = await solanaWeb3.PublicKey.findProgramAddress(
