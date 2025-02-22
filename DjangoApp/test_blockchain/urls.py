@@ -12,4 +12,7 @@ urlpatterns = [
     path('init_event_reg/', views.init_event_reg, name='init_event_reg'),
     path('close_account/', views.close_account, name='close_account'),
     path('explore_events/', views.explore_events, name='explore_events'),
+    path('manage_events/', views.manage_events, name='manage_events'),
+    path('init_dictionary/', views.init_dictionary, name='init_dictionary'),
+    path('init', views.init, name='init'),
 ]

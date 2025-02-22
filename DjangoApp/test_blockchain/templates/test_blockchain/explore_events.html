@@ -38,7 +38,7 @@
 
   <script>
     // Ustawienia
-    const PROGRAM_ID = new solanaWeb3.PublicKey("64TryRyV2mf5VTsRcQTr5fAX4GPuvwXSsLUG42t5cqZp");
+    const PROGRAM_ID = new solanaWeb3.PublicKey("EW1pWhJkpreYMn2FpYC3fZzqvLCgRdr79dh6E8SL7qwW");
     const REGISTRY_SEED = "event_registry";
     const DEFAULT_PUBKEY = "11111111111111111111111111111111";
 
@@ -47,9 +47,11 @@
     const DEACTIVATE_EVENT_DISCRIMINATOR = new Uint8Array([222, 84, 182, 86, 46, 110, 215, 19]);
     const DELETE_EVENT_DISCRIMINATOR    = new Uint8Array([103, 111, 95, 106, 232, 24, 190, 84]);
     const UPDATE_EVENT_DISCRIMINATOR    = new Uint8Array([70, 108, 211, 125, 171, 176, 25, 217]);
+    const UPDATE_EVENT_SEATING_TYPE_DISCRIMINATOR = new Uint8Array([89, 204, 60, 113, 135, 16, 115, 142]);
 
     let connection, provider, walletPublicKey;
 
+    // Dekodowanie konta rejestru eventów
     function decodeRegistry(data) {
       let offset = 8;
       const dv = new DataView(data.buffer, data.byteOffset, data.byteLength);
@@ -67,6 +69,7 @@
       return { eventCount, events };
     }
 
+    // Dekodowanie konta eventu (zgodnie z formatem Anchor)
     function decodeEvent(data) {
       let offset = 8;
       const dv = new DataView(data.buffer, data.byteOffset, data.byteLength);
@@ -179,6 +182,11 @@
                 btnUpdate.onclick = () => updateEvent(eventPubkey);
                 actionTd.appendChild(btnUpdate);
 
+                const btnChangeSeating = document.createElement("button");
+                btnChangeSeating.textContent = "Zmień typ miejsc";
+                btnChangeSeating.onclick = () => updateEventSeatingType(eventPubkey);
+                actionTd.appendChild(btnChangeSeating);
+
                 const btnActivate = document.createElement("button");
                 btnActivate.textContent = "Aktywuj";
                 btnActivate.onclick = () => activateEvent(eventPubkey);
@@ -204,67 +212,118 @@
     }
 
     async function updateEvent(eventPubkey) {
-    try {
-      logMessage("Aktualizacja eventu: " + eventPubkey.toBase58());
-      const newName = prompt("Podaj nową nazwę eventu (lub pozostaw puste, aby nie zmieniać):");
-      const newTicketPrice = prompt("Podaj nową cenę biletu (lamporty) (pozostaw puste, aby zachować dotychczasową):");
-      const newAvailableTickets = prompt("Podaj nową liczbę dostępnych biletów (lub pozostaw puste):");
-      const newSeatingType = prompt("Podaj nowy typ miejsc (0=open-space, 1=numerowane, 2=mieszane) (lub pozostaw puste):");
-
-      // Serializujemy opcjonalne wartości – pusta wartość będzie interpretowana jako None
-      const encodedName = encodeOptionString(newName);
-      const encodedTicketPrice = encodeOptionU64(newTicketPrice);
-      const encodedAvailable = encodeOptionU64(newAvailableTickets);
-      const encodedSeatingType = encodeOptionU8(newSeatingType);
-
-      const updateData = new Uint8Array(
-        UPDATE_EVENT_DISCRIMINATOR.length +
-        encodedName.length +
-        encodedTicketPrice.length +
-        encodedAvailable.length +
-        encodedSeatingType.length
-      );
-      let offset = 0;
-      updateData.set(UPDATE_EVENT_DISCRIMINATOR, offset);
-      offset += UPDATE_EVENT_DISCRIMINATOR.length;
-      updateData.set(encodedName, offset);
-      offset += encodedName.length;
-      updateData.set(encodedTicketPrice, offset);
-      offset += encodedTicketPrice.length;
-      updateData.set(encodedAvailable, offset);
-      offset += encodedAvailable.length;
-      updateData.set(encodedSeatingType, offset);
-
-      const instruction = new solanaWeb3.TransactionInstruction({
-        keys: [
-          { pubkey: eventPubkey, isWritable: true, isSigner: false },
-          { pubkey: walletPublicKey, isWritable: true, isSigner: true }
-        ],
-        programId: PROGRAM_ID,
-        data: updateData
-      });
-      logMessage("Instrukcja update_event utworzona.");
-      const transaction = new solanaWeb3.Transaction().add(instruction);
-      transaction.feePayer = walletPublicKey;
-      const { blockhash } = await connection.getLatestBlockhash();
-      transaction.recentBlockhash = blockhash;
-      logMessage("Transakcja przygotowana, podpisuję...");
-      const signedTx = await provider.signTransaction(transaction);
-      logMessage("Transakcja podpisana.");
-      const txSig = await connection.sendRawTransaction(signedTx.serialize());
-      logMessage("Transakcja wysłana. Signature: " + txSig);
-      logMessage("Czekam na potwierdzenie transakcji...");
-      await connection.confirmTransaction(txSig, "confirmed");
-      logMessage("Transakcja potwierdzona.");
-      alert("Event zaktualizowany! Tx Sig: " + txSig);
-      loadEvents();
-    } catch (err) {
-      console.error(err);
-      logMessage("Błąd podczas aktualizacji eventu: " + err.message);
-      alert("Błąd podczas aktualizacji eventu: " + err.message);
+      try {
+        logMessage("Aktualizacja eventu: " + eventPubkey.toBase58());
+        const newName = prompt("Podaj nową nazwę eventu (lub pozostaw puste, aby nie zmieniać):");
+        const newTicketPrice = prompt("Podaj nową cenę biletu (lamporty) (pozostaw puste, aby zachować dotychczasową):");
+        const newAvailableTickets = prompt("Podaj nową liczbę dostępnych biletów (lub pozostaw puste):");
+        // Serializujemy opcjonalne wartości – pusta wartość będzie interpretowana jako None
+        const encodedName = encodeOptionString(newName);
+        const encodedTicketPrice = encodeOptionU64(newTicketPrice);
+        const encodedAvailable = encodeOptionU64(newAvailableTickets);
+        const updateData = new Uint8Array(
+          UPDATE_EVENT_DISCRIMINATOR.length +
+          encodedName.length +
+          encodedTicketPrice.length +
+          encodedAvailable.length
+        );
+        let offset = 0;
+        updateData.set(UPDATE_EVENT_DISCRIMINATOR, offset);
+        offset += UPDATE_EVENT_DISCRIMINATOR.length;
+        updateData.set(encodedName, offset);
+        offset += encodedName.length;
+        updateData.set(encodedTicketPrice, offset);
+        offset += encodedTicketPrice.length;
+        updateData.set(encodedAvailable, offset);
+        const instruction = new solanaWeb3.TransactionInstruction({
+          keys: [
+            { pubkey: eventPubkey, isWritable: true, isSigner: false },
+            { pubkey: walletPublicKey, isWritable: true, isSigner: true }
+          ],
+          programId: PROGRAM_ID,
+          data: updateData
+        });
+        logMessage("Instrukcja update_event utworzona.");
+        const transaction = new solanaWeb3.Transaction().add(instruction);
+        transaction.feePayer = walletPublicKey;
+        const { blockhash } = await connection.getLatestBlockhash();
+        transaction.recentBlockhash = blockhash;
+        logMessage("Transakcja przygotowana, podpisuję...");
+        const signedTx = await provider.signTransaction(transaction);
+        logMessage("Transakcja podpisana.");
+        const txSig = await connection.sendRawTransaction(signedTx.serialize());
+        logMessage("Transakcja wysłana. Signature: " + txSig);
+        logMessage("Czekam na potwierdzenie transakcji...");
+        await connection.confirmTransaction(txSig, "confirmed");
+        logMessage("Transakcja potwierdzona.");
+        alert("Event zaktualizowany! Tx Sig: " + txSig);
+        loadEvents();
+      } catch (err) {
+        console.error(err);
+        logMessage("Błąd podczas aktualizacji eventu: " + err.message);
+        alert("Błąd podczas aktualizacji eventu: " + err.message);
+      }
     }
-  }
 
+    async function updateEventSeatingType(eventPubkey) {
+      try {
+        logMessage("Aktualizacja typu miejsc dla eventu: " + eventPubkey.toBase58());
+        const newSeatingType = prompt("Podaj nowy typ miejsc (0=open-space, 1=numerowane, 2=mieszane):");
+        if (newSeatingType === null || newSeatingType === "") {
+          logMessage("Nie podano nowego typu miejsc.");
+          return;
+        }
+        const newSeatingTypeVal = parseInt(newSeatingType);
+
+        // Pobierz konto eventu, aby odczytać event_id
+        const eventAcc = await connection.getAccountInfo(eventPubkey);
+        if (!eventAcc) {
+          alert("Nie znaleziono konta eventu.");
+          return;
+        }
+        const eventData = decodeEvent(eventAcc.data);
+
+        // Oblicz PDA dla new_seating_map (seed: [b"seating_map", eventData.event_id])
+        const [newSeatingMapPDA] = await solanaWeb3.PublicKey.findProgramAddress(
+          [new TextEncoder().encode("seating_map"), new TextEncoder().encode(eventData.event_id)],
+          PROGRAM_ID
+        );
+
+        // Budujemy dane instrukcji: dyskryminator + jeden bajt dla newSeatingType
+        const data = new Uint8Array(UPDATE_EVENT_SEATING_TYPE_DISCRIMINATOR.length + 1);
+        data.set(UPDATE_EVENT_SEATING_TYPE_DISCRIMINATOR, 0);
+        data[UPDATE_EVENT_SEATING_TYPE_DISCRIMINATOR.length] = newSeatingTypeVal;
+
+        const instruction = new solanaWeb3.TransactionInstruction({
+          keys: [
+            { pubkey: eventPubkey, isWritable: true, isSigner: false },
+            { pubkey: newSeatingMapPDA, isWritable: true, isSigner: false },
+            { pubkey: walletPublicKey, isWritable: true, isSigner: true },
+            { pubkey: solanaWeb3.SystemProgram.programId, isSigner: false, isWritable: false }
+          ],
+          programId: PROGRAM_ID,
+          data: data
+        });
+        logMessage("Instrukcja update_event_seating_type utworzona.");
+        let transaction = new solanaWeb3.Transaction().add(instruction);
+        transaction.feePayer = walletPublicKey;
+        const { blockhash } = await connection.getLatestBlockhash();
+        transaction.recentBlockhash = blockhash;
+        logMessage("Transakcja przygotowana, podpisuję...");
+        const signedTx = await provider.signTransaction(transaction);
+        const txSig = await connection.sendRawTransaction(signedTx.serialize());
+        logMessage("Transakcja wysłana. Signature: " + txSig);
+        logMessage("Czekam na potwierdzenie transakcji...");
+        await connection.confirmTransaction(txSig, "confirmed");
+        logMessage("Transakcja potwierdzona.");
+        alert("Typ miejsc zaktualizowany! Tx Sig: " + txSig);
+        loadEvents();
+      } catch (err) {
+        console.error(err);
+        logMessage("Błąd podczas aktualizacji typu miejsc: " + err.message);
+        alert("Błąd podczas aktualizacji typu miejsc: " + err.message);
+      }
+    }
 
     async function activateEvent(eventPubkey) {
       try {

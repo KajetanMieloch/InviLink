@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+  <meta charset="UTF-8">
+  <title>Inicjalizacja Event Dictionary</title>
+  <!-- Importujemy bibliotekę Solana Web3.js -->
+  <script src="https://cdn.jsdelivr.net/npm/@solana/web3.js@latest/lib/index.iife.min.js"></script>
+  <style>
+    body { font-family: Arial, sans-serif; text-align: center; padding: 20px; }
+    button { margin: 10px; padding: 10px; font-size: 16px; }
+    #log { margin: 20px auto; padding: 10px; border: 1px solid #ccc; width: 80%; white-space: pre-wrap; text-align: left; }
+  </style>
+</head>
+<body>
+  <h1>Inicjalizacja Event Dictionary</h1>
+  <button onclick="initializeEventDictionary()">Zainicjalizuj Event Dictionary</button>
+  <div id="log"></div>
+
+  <script>
+    // Funkcja do logowania wiadomości
+    function logMessage(message) {
+      const logEl = document.getElementById("log");
+      logEl.textContent += message + "\n";
+      console.log(message);
+    }
+
+    async function initializeEventDictionary() {
+      logMessage("Rozpoczynam inicjalizację Event Dictionary...");
+
+      // Sprawdzenie dostępności Phantom Wallet
+      if (!window.phantom || !window.phantom.solana) {
+        alert("Phantom Wallet jest wymagany!");
+        return;
+      }
+      const provider = window.phantom.solana;
+      if (!provider.isConnected) await provider.connect();
+
+      // Pobranie klucza publicznego użytkownika
+      const walletPublicKey = provider.publicKey;
+      logMessage("Twój klucz publiczny: " + walletPublicKey.toBase58());
+
+      // Połączenie z Solana Devnet
+      const connection = new solanaWeb3.Connection("https://api.devnet.solana.com", "confirmed");
+
+      // Ustawienie identyfikatora programu Anchor – upewnij się, że jest zgodny z Twoim kontraktem
+      const PROGRAM_ID = new solanaWeb3.PublicKey("EW1pWhJkpreYMn2FpYC3fZzqvLCgRdr79dh6E8SL7qwW");
+
+      // Obliczanie PDA dla konta event_dictionary przy użyciu seedu "event_dictionary"
+      const [eventDictionaryPDA] = await solanaWeb3.PublicKey.findProgramAddress(
+        [new TextEncoder().encode("event_dictionary")],
+        PROGRAM_ID
+      );
+      logMessage("Event Dictionary PDA: " + eventDictionaryPDA.toBase58());
+
+      // Ustalanie discriminatora dla funkcji initialize_event_dictionary.
+      // Upewnij się, że te 8 bajtów zgadza się z Twoim IDL dla initialize_event_dictionary.
+      const discriminator = new Uint8Array([196, 74, 140, 133, 101, 20, 91, 122]);
+
+      // Budowanie instrukcji transakcji
+      const transactionInstruction = new solanaWeb3.TransactionInstruction({
+        keys: [
+          { pubkey: eventDictionaryPDA, isSigner: false, isWritable: true }, // Konto event_dictionary (PDA)
+          { pubkey: walletPublicKey, isSigner: true, isWritable: true },      // Payer
+          { pubkey: solanaWeb3.SystemProgram.programId, isSigner: false, isWritable: false }
+        ],
+        programId: PROGRAM_ID,
+        data: discriminator // Przesyłamy tylko 8 bajtów discriminatora
+      });
+
+      try {
+        // Tworzenie transakcji
+        let transaction = new solanaWeb3.Transaction().add(transactionInstruction);
+        transaction.feePayer = walletPublicKey;
+        const { blockhash } = await connection.getLatestBlockhash();
+        transaction.recentBlockhash = blockhash;
+
+        // Podpisanie transakcji przez Phantom
+        const signedTransaction = await provider.signTransaction(transaction);
+
+        // Wysłanie transakcji do blockchaina Solana
+        const txSignature = await connection.sendRawTransaction(signedTransaction.serialize());
+        logMessage("Transakcja wysłana, signature: " + txSignature);
+
+        // Potwierdzenie transakcji
+        const confirmation = await connection.confirmTransaction(txSignature, "confirmed");
+        if (confirmation.value.err) {
+          throw new Error("Transakcja nie powiodła się: " + JSON.stringify(confirmation.value.err));
+        }
+
+        logMessage("Event Dictionary został zainicjalizowany! Tx Sig: " + txSignature);
+        alert("Event Dictionary został zainicjalizowany! Tx Sig: " + txSignature);
+      } catch (err) {
+        logMessage("Błąd: " + err.message);
+        alert("Błąd: " + err.message);
+      }
+    }
+  </script>
+</body>
+</html>

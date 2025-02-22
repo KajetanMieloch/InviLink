@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+  <meta charset="UTF-8">
+  <title>Menadżer Seating - InviLink</title>
+  <!-- Solana Web3 -->
+  <script src="https://cdn.jsdelivr.net/npm/@solana/web3.js@latest/lib/index.iife.min.js"></script>
+  <!-- bn.js – globalna zmienna BN -->
+  <script src="https://cdn.jsdelivr.net/npm/bn.js@5.2.0/lib/bn.min.js"></script>
+  <style>
+    body { font-family: Arial, sans-serif; padding: 20px; }
+    table { border-collapse: collapse; margin: 10px auto; width: 90%; }
+    td, th { border: 1px solid #ddd; padding: 4px; vertical-align: middle; text-align: center; }
+    .seat-preview { display: grid; grid-template-columns: repeat(auto-fit, 10px); gap: 2px; }
+    .seat-preview div { width: 10px; height: 10px; background-color: #8fbc8f; }
+    button { margin: 2px; padding: 4px 8px; }
+    #log { margin: 20px auto; padding: 10px; border: 1px solid #ccc; width: 90%; white-space: pre-wrap; }
+  </style>
+</head>
+<body>
+  <h1>Menadżer Seating</h1>
+
+  <label>Podaj Event ID: 
+    <input id="eventIdInput" type="text" placeholder="Wprowadź Event ID">
+  </label>
+  <br>
+  <label>Podaj klucz organizatora:
+    <input id="organizerKeyInput" type="text" placeholder="Wprowadź klucz organizatora">
+  </label>
+  <br>
+  <button onclick="loadEvent()">Wczytaj Event</button>
+
+  <div id="log"></div>
+  <div id="eventDetails"></div>
+  <div id="seatingControls"></div>
+  <div id="seatingLayout"></div>
+
+  <script>
+    // Ustawienia – PROGRAM_ID musi odpowiadać Twojemu kontraktowi
+    const PROGRAM_ID = new solanaWeb3.PublicKey("EW1pWhJkpreYMn2FpYC3fZzqvLCgRdr79dh6E8SL7qwW");
+    let connection, provider, walletPublicKey;
+
+    async function init() {
+      if (!window.phantom || !window.phantom.solana) {
+        alert("Phantom Wallet jest wymagany!");
+        return;
+      }
+      provider = window.phantom.solana;
+      if (!provider.isConnected) await provider.connect();
+      walletPublicKey = provider.publicKey;
+      connection = new solanaWeb3.Connection("https://api.devnet.solana.com", "confirmed");
+      logMessage("Połączono z Phantom. Wallet: " + walletPublicKey.toBase58());
+    }
+    window.addEventListener("load", init);
+
+    function logMessage(msg) {
+      const logEl = document.getElementById("log");
+      logEl.textContent += msg + "\n";
+      console.log(msg);
+    }
+
+    // Funkcja dekodująca dane EventNFT (przykładowa implementacja)
+    function decodeEventNFT(data) {
+      let offset = 8; // pomijamy 8 bajtów dyskryminatora
+      const dv = new DataView(data.buffer, data.byteOffset, data.byteLength);
+
+      const eventIdLen = dv.getUint32(offset, true); offset += 4;
+      const eventIdBytes = data.slice(offset, offset + eventIdLen); offset += eventIdLen;
+      const event_id = new TextDecoder().decode(eventIdBytes);
+
+      const organizerBytes = data.slice(offset, offset + 32);
+      const organizer = new solanaWeb3.PublicKey(organizerBytes).toBase58();
+      offset += 32;
+
+      const nameLen = dv.getUint32(offset, true); offset += 4;
+      const nameBytes = data.slice(offset, offset + nameLen); offset += nameLen;
+      const name = new TextDecoder().decode(nameBytes);
+
+      const ticket_price = dv.getBigUint64(offset, true); offset += 8;
+      const available_tickets = dv.getBigUint64(offset, true); offset += 8;
+      const sold_tickets = dv.getBigUint64(offset, true); offset += 8;
+      const seating_type = dv.getUint8(offset); offset += 1;
+      const active = dv.getUint8(offset) !== 0; offset += 1;
+
+      return {
+        event_id,
+        organizer,
+        name,
+        ticket_price: ticket_price.toString(),
+        available_tickets: available_tickets.toString(),
+        sold_tickets: sold_tickets.toString(),
+        seating_type,
+        active
+      };
+    }
+
+    async function loadEvent() {
+      try {
+        const eventId = document.getElementById("eventIdInput").value.trim();
+        const organizerKey = document.getElementById("organizerKeyInput").value.trim();
+        if (!eventId || !organizerKey) {
+          alert("Podaj zarówno Event ID jak i klucz organizatora!");
+          return;
+        }
+        logMessage("Wczytano Event ID: " + eventId);
+        logMessage("Wczytano klucz organizatora: " + organizerKey);
+
+        // Obliczamy PDA dla eventu. W kontrakcie seeds = [ "event", event_id ]
+        const seed1 = new TextEncoder().encode("event");
+        const seed2 = new TextEncoder().encode(eventId);
+        const [eventPDA] = await solanaWeb3.PublicKey.findProgramAddress(
+          [seed1, seed2],
+          PROGRAM_ID
+        );
+        logMessage("Obliczone Event PDA: " + eventPDA.toBase58());
+
+        // Pobieramy konto eventu
+        const eventAcc = await connection.getAccountInfo(eventPDA);
+        if (!eventAcc) {
+          logMessage("Nie znaleziono konta eventu przy PDA: " + eventPDA.toBase58());
+          document.getElementById("eventDetails").textContent = "Nie znaleziono eventu o podanym Event ID.";
+          document.getElementById("seatingControls").innerHTML = "";
+          document.getElementById("seatingLayout").innerHTML = "";
+          return;
+        }
+        logMessage("Znaleziono konto eventu.");
+        const eventData = decodeEventNFT(eventAcc.data);
+        logMessage("Zdekodowane dane eventu: " + JSON.stringify(eventData, null, 2));
+        showEventInfo(eventData);
+
+        if (eventData.seating_type === 0) {
+          document.getElementById("seatingControls").innerHTML = "";
+          document.getElementById("seatingLayout").innerHTML = "<p>Event jest typu open-space (brak seating mapy).</p>";
+          return;
+        }
+
+        // Jeśli event ma seating, ładujemy sekcje (tutaj symulujemy dummy dane)
+        const sections = await loadSeatingSectionsDummy();
+        showSeatingSections(sections);
+      } catch (err) {
+        logMessage("Błąd: " + err.message);
+        alert("Błąd podczas wczytywania eventu: " + err.message);
+      }
+    }
+
+    function showEventInfo(eventData) {
+      const ed = document.getElementById("eventDetails");
+      ed.innerHTML = `
+        <h2>Event: ${eventData.name}</h2>
+        <p><b>EventID:</b> ${eventData.event_id}</p>
+        <p><b>Organizer:</b> ${eventData.organizer}</p>
+        <p><b>Ticket Price:</b> ${eventData.ticket_price} lamportów</p>
+        <p><b>Available Tickets:</b> ${eventData.available_tickets}</p>
+        <p><b>Sold Tickets:</b> ${eventData.sold_tickets}</p>
+        <p><b>Seating Type:</b> ${eventData.seating_type}</p>
+        <p><b>Active:</b> ${eventData.active}</p>
+      `;
+    }
+
+    // Funkcja symulująca pobranie danych sekcji seatingowych
+    async function loadSeatingSectionsDummy() {
+      return [
+        { section_name: "Front Stage", rows: 5, seats_per_row: 10, seat_status: Array(50).fill(0) },
+        { section_name: "Balcony", rows: 3, seats_per_row: 8, seat_status: Array(24).fill(0) }
+      ];
+    }
+
+    // Funkcja tworząca tabelkę z sekcjami seatingowymi
+    function showSeatingSections(sections) {
+      const container = document.getElementById("seatingLayout");
+      container.innerHTML = "";
+      const table = document.createElement("table");
+      const header = document.createElement("tr");
+      header.innerHTML = "<th>Podgląd</th><th>Nazwa Sekcji</th><th>Akcje</th>";
+      table.appendChild(header);
+
+      sections.forEach((section, idx) => {
+        const row = document.createElement("tr");
+
+        // Komórka z podglądem – generujemy siatkę 10x10px kwadracików
+        const previewCell = document.createElement("td");
+        const previewDiv = document.createElement("div");
+        previewDiv.className = "seat-preview";
+        previewDiv.style.gridTemplateColumns = `repeat(${section.seats_per_row}, 10px)`;
+        const totalSeats = section.rows * section.seats_per_row;
+        for (let i = 0; i < totalSeats; i++) {
+          const seatDiv = document.createElement("div");
+          seatDiv.style.backgroundColor = (section.seat_status[i] === 0) ? "#8fbc8f" : "#ff7f7f";
+          previewDiv.appendChild(seatDiv);
+        }
+        previewCell.appendChild(previewDiv);
+        row.appendChild(previewCell);
+
+        // Komórka z nazwą sekcji
+        const nameCell = document.createElement("td");
+        nameCell.textContent = section.section_name;
+        row.appendChild(nameCell);
+
+        // Komórka z akcjami: Edytuj i Usuń
+        const actionCell = document.createElement("td");
+        const editBtn = document.createElement("button");
+        editBtn.textContent = "Edytuj";
+        editBtn.onclick = () => {
+          alert("Edytuj sekcję: " + section.section_name);
+          // Tu można dodać funkcjonalność aktualizacji
+        };
+        const deleteBtn = document.createElement("button");
+        deleteBtn.textContent = "Usuń";
+        deleteBtn.onclick = () => {
+          if (confirm("Czy na pewno usunąć sekcję: " + section.section_name + "?")) {
+            alert("Sekcja usunięta (symulacja).");
+            // Tu można dodać funkcjonalność usuwania
+          }
+        };
+        actionCell.appendChild(editBtn);
+        actionCell.appendChild(deleteBtn);
+        row.appendChild(actionCell);
+
+        table.appendChild(row);
+      });
+      container.appendChild(table);
+    }
+  </script>
+</body>
+</html>

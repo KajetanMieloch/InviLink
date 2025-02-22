@@ -37,3 +37,12 @@ def close_account(request):
 
 def explore_events(request):
     return render(request, 'test_blockchain/explore_events.html')
+
+def manage_events(request):
+    return render(request, 'test_blockchain/manage_events.html')
+
+def init_dictionary(request):
+    return render(request, 'test_blockchain/init_dictionary.html')
+
+def init(request):
+    return render(request, 'test_blockchain/init.html')
