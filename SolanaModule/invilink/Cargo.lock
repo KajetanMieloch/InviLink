@@ -902,7 +902,6 @@ name = "invilink"
 version = "0.1.0"
 dependencies = [
  "anchor-lang",
- "bs58 0.4.0",
  "solana-program",
 ]
 
