@@ -9,36 +9,57 @@
   <script src="https://cdn.jsdelivr.net/npm/bn.js@5.2.0/lib/bn.min.js"></script>
   <style>
     body { font-family: Arial, sans-serif; padding: 20px; }
-    table { border-collapse: collapse; margin: 10px auto; width: 90%; }
-    td, th { border: 1px solid #ddd; padding: 4px; vertical-align: middle; text-align: center; }
-    .seat-preview { display: grid; grid-template-columns: repeat(auto-fit, 10px); gap: 2px; }
-    .seat-preview div { width: 10px; height: 10px; background-color: #8fbc8f; }
-    button { margin: 2px; padding: 4px 8px; }
-    #log { margin: 20px auto; padding: 10px; border: 1px solid #ccc; width: 90%; white-space: pre-wrap; }
+    label { display: block; margin: 10px 0; }
+    input, select { width: 300px; padding: 8px; font-size: 16px; }
+    button { margin: 10px 0; padding: 10px 15px; font-size: 16px; }
+    #log { margin: 20px 0; padding: 10px; border: 1px solid #ccc; width: 90%; white-space: pre-wrap; }
+    #eventDetails, #seatingCounter { margin-top: 20px; }
+    table { border-collapse: collapse; width: 90%; margin-top: 20px; }
+    th, td { border: 1px solid #ddd; padding: 8px; text-align: center; }
+    .seat-preview { display: grid; gap: 2px; }
+    .seat-preview div { width: 10px; height: 10px; }
+    #addSectionForm { margin-top: 20px; padding: 10px; border: 1px solid #aaa; width: 90%; display: none; }
   </style>
 </head>
 <body>
-  <h1>Menadżer Seating</h1>
-
-  <label>Podaj Event ID: 
+  <h1>Menadżer Seating - Szczegóły Eventu</h1>
+  
+  <label>Podaj Event ID:
     <input id="eventIdInput" type="text" placeholder="Wprowadź Event ID">
   </label>
-  <br>
-  <label>Podaj klucz organizatora:
-    <input id="organizerKeyInput" type="text" placeholder="Wprowadź klucz organizatora">
-  </label>
-  <br>
   <button onclick="loadEvent()">Wczytaj Event</button>
-
+  
   <div id="log"></div>
   <div id="eventDetails"></div>
-  <div id="seatingControls"></div>
-  <div id="seatingLayout"></div>
-
+  <div id="seatingCounter"></div>
+  <div id="sectionsTable"></div>
+  
+  <!-- Formularz dodania sekcji siedzeniowej (widoczny tylko, gdy event.seating_type jest 1 lub 2) -->
+  <div id="addSectionForm">
+    <h3>Dodaj Sekcję Siedzeniową</h3>
+    <label>Nazwa sekcji:
+      <input id="sectionNameInput" type="text" placeholder="np. Front Stage" required>
+    </label>
+    <label>Typ sekcji:
+      <select id="sectionTypeInput" required>
+        <option value="1">Numerowane</option>
+        <option value="0">Stojące</option>
+      </select>
+    </label>
+    <label>Liczba wierszy:
+      <input id="rowsInput" type="number" placeholder="np. 5" min="1" required>
+    </label>
+    <label>Liczba miejsc w wierszu:
+      <input id="seatsPerRowInput" type="number" placeholder="np. 10" min="1" required>
+    </label>
+    <button onclick="addSeatingSection()">Dodaj Sekcję</button>
+  </div>
+  
   <script>
-    // Ustawienia – PROGRAM_ID musi odpowiadać Twojemu kontraktowi
+    // Ustawienia – PROGRAM_ID musi odpowiadać Twojemu kontraktowi on‑chain
     const PROGRAM_ID = new solanaWeb3.PublicKey("EW1pWhJkpreYMn2FpYC3fZzqvLCgRdr79dh6E8SL7qwW");
     let connection, provider, walletPublicKey;
+    window.currentEvent = null; // Globalne dane eventu
 
     async function init() {
       if (!window.phantom || !window.phantom.solana) {
@@ -59,29 +80,57 @@
       console.log(msg);
     }
 
-    // Funkcja dekodująca dane EventNFT (przykładowa implementacja)
-    function decodeEventNFT(data) {
-      let offset = 8; // pomijamy 8 bajtów dyskryminatora
-      const dv = new DataView(data.buffer, data.byteOffset, data.byteLength);
+    // Funkcja serializująca string: [4 bajty długości LE + bajty UTF-8]
+    function serializeString(str) {
+      const encoder = new TextEncoder();
+      const strBytes = encoder.encode(str);
+      const lengthBytes = new Uint8Array(4);
+      new DataView(lengthBytes.buffer).setUint32(0, strBytes.length, true);
+      const result = new Uint8Array(4 + strBytes.length);
+      result.set(lengthBytes, 0);
+      result.set(strBytes, 4);
+      return result;
+    }
 
+    // Funkcja serializująca BN (u64) do 8 bajtów LE
+    function serializeU64(bnValue) {
+      return bnValue.toArrayLike(Uint8Array, 'le', 8);
+    }
+
+    // Funkcja serializująca argumenty dla initialize_seating_section:
+    // (section_name: string, section_type: u8, rows: u8, seats_per_row: u8)
+    function serializeInitializeSeatingSectionArgs({ section_name, section_type, rows, seats_per_row }) {
+      const sectionNameBytes = serializeString(section_name);
+      const sectionTypeByte = new Uint8Array([section_type]);
+      const rowsByte = new Uint8Array([rows]);
+      const seatsByte = new Uint8Array([seats_per_row]);
+      const totalLen = sectionNameBytes.length + sectionTypeByte.length + rowsByte.length + seatsByte.length;
+      const buffer = new Uint8Array(totalLen);
+      let offset = 0;
+      buffer.set(sectionNameBytes, offset); offset += sectionNameBytes.length;
+      buffer.set(sectionTypeByte, offset); offset += sectionTypeByte.length;
+      buffer.set(rowsByte, offset); offset += rowsByte.length;
+      buffer.set(seatsByte, offset);
+      return buffer;
+    }
+
+    // Dekodowanie EventNFT (pomijamy 8 bajtów dyskryminatora)
+    function decodeEventNFT(data) {
+      let offset = 8;
+      const dv = new DataView(data.buffer, data.byteOffset, data.byteLength);
       const eventIdLen = dv.getUint32(offset, true); offset += 4;
       const eventIdBytes = data.slice(offset, offset + eventIdLen); offset += eventIdLen;
       const event_id = new TextDecoder().decode(eventIdBytes);
-
-      const organizerBytes = data.slice(offset, offset + 32);
+      const organizerBytes = data.slice(offset, offset + 32); offset += 32;
       const organizer = new solanaWeb3.PublicKey(organizerBytes).toBase58();
-      offset += 32;
-
       const nameLen = dv.getUint32(offset, true); offset += 4;
       const nameBytes = data.slice(offset, offset + nameLen); offset += nameLen;
       const name = new TextDecoder().decode(nameBytes);
-
       const ticket_price = dv.getBigUint64(offset, true); offset += 8;
       const available_tickets = dv.getBigUint64(offset, true); offset += 8;
       const sold_tickets = dv.getBigUint64(offset, true); offset += 8;
       const seating_type = dv.getUint8(offset); offset += 1;
       const active = dv.getUint8(offset) !== 0; offset += 1;
-
       return {
         event_id,
         organizer,
@@ -94,18 +143,56 @@
       };
     }
 
+    // Dekodowanie SeatingMap – zakładamy: event_id, vec<Pubkey>, total_seats
+    function decodeSeatingMap(data) {
+      let offset = 8;
+      const dv = new DataView(data.buffer, data.byteOffset, data.byteLength);
+      const eventIdLen = dv.getUint32(offset, true); offset += 4;
+      const eventIdBytes = data.slice(offset, offset + eventIdLen); offset += eventIdLen;
+      const event_id = new TextDecoder().decode(eventIdBytes);
+      const vecLen = dv.getUint32(offset, true); offset += 4;
+      let sections = [];
+      for (let i = 0; i < vecLen; i++) {
+        const keyBytes = data.slice(offset, offset + 32);
+        sections.push(new solanaWeb3.PublicKey(keyBytes).toBase58());
+        offset += 32;
+      }
+      const total_seats = dv.getBigUint64(offset, true); offset += 8;
+      return { event_id, sections, total_seats: total_seats.toString() };
+    }
+
+    // Dekodowanie SeatingSectionAccount
+    function decodeSeatingSectionAccount(data) {
+      let offset = 8;
+      const dv = new DataView(data.buffer, data.byteOffset, data.byteLength);
+      const eventIdLen = dv.getUint32(offset, true); offset += 4;
+      const eventIdBytes = data.slice(offset, offset + eventIdLen); offset += eventIdLen;
+      const event_id = new TextDecoder().decode(eventIdBytes);
+      const sectionNameLen = dv.getUint32(offset, true); offset += 4;
+      const sectionNameBytes = data.slice(offset, offset + sectionNameLen); offset += sectionNameLen;
+      const section_name = new TextDecoder().decode(sectionNameBytes);
+      const section_type = dv.getUint8(offset); offset += 1;
+      const rows = dv.getUint8(offset); offset += 1;
+      const seats_per_row = dv.getUint8(offset); offset += 1;
+      const vecLen = dv.getUint32(offset, true); offset += 4;
+      let seat_status = [];
+      for (let i = 0; i < vecLen; i++) {
+        seat_status.push(dv.getUint8(offset));
+        offset += 1;
+      }
+      return { event_id, section_name, section_type, rows, seats_per_row, seat_status };
+    }
+
     async function loadEvent() {
       try {
         const eventId = document.getElementById("eventIdInput").value.trim();
-        const organizerKey = document.getElementById("organizerKeyInput").value.trim();
-        if (!eventId || !organizerKey) {
-          alert("Podaj zarówno Event ID jak i klucz organizatora!");
+        if (!eventId) {
+          alert("Podaj Event ID!");
           return;
         }
         logMessage("Wczytano Event ID: " + eventId);
-        logMessage("Wczytano klucz organizatora: " + organizerKey);
-
-        // Obliczamy PDA dla eventu. W kontrakcie seeds = [ "event", event_id ]
+      
+        // Obliczamy PDA dla eventu: seeds = [ "event", eventId ]
         const seed1 = new TextEncoder().encode("event");
         const seed2 = new TextEncoder().encode(eventId);
         const [eventPDA] = await solanaWeb3.PublicKey.findProgramAddress(
@@ -113,30 +200,31 @@
           PROGRAM_ID
         );
         logMessage("Obliczone Event PDA: " + eventPDA.toBase58());
-
-        // Pobieramy konto eventu
+      
         const eventAcc = await connection.getAccountInfo(eventPDA);
         if (!eventAcc) {
           logMessage("Nie znaleziono konta eventu przy PDA: " + eventPDA.toBase58());
           document.getElementById("eventDetails").textContent = "Nie znaleziono eventu o podanym Event ID.";
-          document.getElementById("seatingControls").innerHTML = "";
-          document.getElementById("seatingLayout").innerHTML = "";
+          document.getElementById("seatingCounter").innerHTML = "";
+          document.getElementById("sectionsTable").innerHTML = "";
+          document.getElementById("addSectionForm").style.display = "none";
           return;
         }
         logMessage("Znaleziono konto eventu.");
         const eventData = decodeEventNFT(eventAcc.data);
         logMessage("Zdekodowane dane eventu: " + JSON.stringify(eventData, null, 2));
         showEventInfo(eventData);
-
-        if (eventData.seating_type === 0) {
-          document.getElementById("seatingControls").innerHTML = "";
-          document.getElementById("seatingLayout").innerHTML = "<p>Event jest typu open-space (brak seating mapy).</p>";
-          return;
+        window.currentEvent = eventData;
+      
+        // Jeśli event ma seating (typ 1 lub 2), ładujemy SeatingMap i sekcje
+        if (eventData.seating_type === 1 || eventData.seating_type === 2) {
+          document.getElementById("addSectionForm").style.display = "block";
+          await loadSeatingSections(eventId);
+        } else {
+          document.getElementById("seatingCounter").innerHTML = "";
+          document.getElementById("sectionsTable").innerHTML = "<p>Event jest typu open-space (brak seating mapy).</p>";
+          document.getElementById("addSectionForm").style.display = "none";
         }
-
-        // Jeśli event ma seating, ładujemy sekcje (tutaj symulujemy dummy dane)
-        const sections = await loadSeatingSectionsDummy();
-        showSeatingSections(sections);
       } catch (err) {
         logMessage("Błąd: " + err.message);
         alert("Błąd podczas wczytywania eventu: " + err.message);
@@ -157,68 +245,334 @@
       `;
     }
 
-    // Funkcja symulująca pobranie danych sekcji seatingowych
-    async function loadSeatingSectionsDummy() {
-      return [
-        { section_name: "Front Stage", rows: 5, seats_per_row: 10, seat_status: Array(50).fill(0) },
-        { section_name: "Balcony", rows: 3, seats_per_row: 8, seat_status: Array(24).fill(0) }
-      ];
+    // Ładowanie SeatingMap i sekcji z łańcucha
+    async function loadSeatingSections(eventId) {
+      try {
+        // Obliczamy PDA dla SeatingMap: seeds = [ "seating_map", eventId ]
+        const seed1 = new TextEncoder().encode("seating_map");
+        const seed2 = new TextEncoder().encode(eventId);
+        const [seatingMapPDA] = await solanaWeb3.PublicKey.findProgramAddress(
+          [seed1, seed2],
+          PROGRAM_ID
+        );
+        logMessage("Obliczone Seating Map PDA: " + seatingMapPDA.toBase58());
+        
+        const seatingMapAcc = await connection.getAccountInfo(seatingMapPDA);
+        if (!seatingMapAcc) {
+          logMessage("Nie znaleziono konta SeatingMap dla eventu: " + eventId);
+          document.getElementById("seatingCounter").innerHTML = "<p>Brak konta SeatingMap.</p>";
+          document.getElementById("sectionsTable").innerHTML = "";
+          return;
+        }
+        const seatingMap = decodeSeatingMap(seatingMapAcc.data);
+        logMessage("Zdekodowane dane SeatingMap: " + JSON.stringify(seatingMap, null, 2));
+        
+        document.getElementById("seatingCounter").innerHTML = `<p><b>Zainicjalizowane miejsca:</b> ${seatingMap.total_seats} / ${window.currentEvent.available_tickets}</p>`;
+        
+        let sections = [];
+        for (let sectionPubkey of seatingMap.sections) {
+          const sectionAcc = await connection.getAccountInfo(new solanaWeb3.PublicKey(sectionPubkey));
+          if (sectionAcc) {
+            const sectionData = decodeSeatingSectionAccount(sectionAcc.data);
+            sections.push(sectionData);
+          } else {
+            logMessage("Nie znaleziono konta sekcji: " + sectionPubkey);
+          }
+        }
+        showSeatingSections(sections);
+      } catch (err) {
+        logMessage("Błąd ładowania sekcji: " + err.message);
+      }
     }
 
-    // Funkcja tworząca tabelkę z sekcjami seatingowymi
+    // Wyświetlenie tabelki z sekcjami (z kolumną akcji: Edytuj, Usuń)
     function showSeatingSections(sections) {
-      const container = document.getElementById("seatingLayout");
-      container.innerHTML = "";
-      const table = document.createElement("table");
-      const header = document.createElement("tr");
-      header.innerHTML = "<th>Podgląd</th><th>Nazwa Sekcji</th><th>Akcje</th>";
-      table.appendChild(header);
-
-      sections.forEach((section, idx) => {
-        const row = document.createElement("tr");
-
-        // Komórka z podglądem – generujemy siatkę 10x10px kwadracików
-        const previewCell = document.createElement("td");
-        const previewDiv = document.createElement("div");
-        previewDiv.className = "seat-preview";
-        previewDiv.style.gridTemplateColumns = `repeat(${section.seats_per_row}, 10px)`;
-        const totalSeats = section.rows * section.seats_per_row;
+      const container = document.getElementById("sectionsTable");
+      if (sections.length === 0) {
+        container.innerHTML = "<p>Brak sekcji siedzeniowych.</p>";
+        return;
+      }
+      let html = `<table>
+        <tr>
+          <th>Nazwa sekcji</th>
+          <th>Typ</th>
+          <th>Wiersze</th>
+          <th>Miejsca/wiersz</th>
+          <th>Podgląd miejsc</th>
+          <th>Akcje</th>
+        </tr>`;
+      sections.forEach(sec => {
+        const typeStr = sec.section_type === 1 ? "Numerowane" : "Stojące";
+        let previewHTML = `<div class="seat-preview" style="grid-template-columns: repeat(${sec.seats_per_row}, 10px);">`;
+        const totalSeats = sec.rows * sec.seats_per_row;
         for (let i = 0; i < totalSeats; i++) {
-          const seatDiv = document.createElement("div");
-          seatDiv.style.backgroundColor = (section.seat_status[i] === 0) ? "#8fbc8f" : "#ff7f7f";
-          previewDiv.appendChild(seatDiv);
+          const color = sec.seat_status[i] === 0 ? "#8fbc8f" : "#ff7f7f";
+          previewHTML += `<div style="background-color:${color};"></div>`;
         }
-        previewCell.appendChild(previewDiv);
-        row.appendChild(previewCell);
-
-        // Komórka z nazwą sekcji
-        const nameCell = document.createElement("td");
-        nameCell.textContent = section.section_name;
-        row.appendChild(nameCell);
-
-        // Komórka z akcjami: Edytuj i Usuń
-        const actionCell = document.createElement("td");
-        const editBtn = document.createElement("button");
-        editBtn.textContent = "Edytuj";
-        editBtn.onclick = () => {
-          alert("Edytuj sekcję: " + section.section_name);
-          // Tu można dodać funkcjonalność aktualizacji
-        };
-        const deleteBtn = document.createElement("button");
-        deleteBtn.textContent = "Usuń";
-        deleteBtn.onclick = () => {
-          if (confirm("Czy na pewno usunąć sekcję: " + section.section_name + "?")) {
-            alert("Sekcja usunięta (symulacja).");
-            // Tu można dodać funkcjonalność usuwania
-          }
-        };
-        actionCell.appendChild(editBtn);
-        actionCell.appendChild(deleteBtn);
-        row.appendChild(actionCell);
-
-        table.appendChild(row);
+        previewHTML += `</div>`;
+        html += `<tr>
+          <td>${sec.section_name}</td>
+          <td>${typeStr}</td>
+          <td>${sec.rows}</td>
+          <td>${sec.seats_per_row}</td>
+          <td>${previewHTML}</td>
+          <td>
+            <button onclick="editSection('${sec.section_name}')">Edytuj</button>
+            <button onclick="deleteSection('${sec.section_name}')">Usuń</button>
+          </td>
+        </tr>`;
       });
-      container.appendChild(table);
+      html += `</table>`;
+      container.innerHTML = html;
+    }
+
+    // Funkcja dodająca sekcję siedzeniową – wysyłamy transakcję do initialize_seating_section on‑chain
+    async function addSeatingSection() {
+      const sectionName = document.getElementById("sectionNameInput").value.trim();
+      const rows = parseInt(document.getElementById("rowsInput").value);
+      const seatsPerRow = parseInt(document.getElementById("seatsPerRowInput").value);
+      const sectionType = parseInt(document.getElementById("sectionTypeInput").value);
+    
+      if (!sectionName || isNaN(rows) || isNaN(seatsPerRow) || isNaN(sectionType)) {
+        alert("Wszystkie pola muszą być wypełnione!");
+        return;
+      }
+      
+      if (!window.currentEvent) {
+        alert("Najpierw wczytaj event!");
+        return;
+      }
+      
+      const eventId = window.currentEvent.event_id;
+      logMessage("Dodaję sekcję: " + sectionName + " dla eventu: " + eventId);
+      
+      // Obliczamy PDA dla SeatingMap: seeds = [ "seating_map", eventId ]
+      const seed1 = new TextEncoder().encode("seating_map");
+      const seed2 = new TextEncoder().encode(eventId);
+      const [seatingMapPDA] = await solanaWeb3.PublicKey.findProgramAddress(
+        [seed1, seed2],
+        PROGRAM_ID
+      );
+      logMessage("Obliczone Seating Map PDA: " + seatingMapPDA.toBase58());
+      
+      // Obliczamy PDA dla Event: seeds = [ "event", eventId ]
+      const [eventPDA] = await solanaWeb3.PublicKey.findProgramAddress(
+        [new TextEncoder().encode("event"), new TextEncoder().encode(eventId)],
+        PROGRAM_ID
+      );
+      
+      // Obliczamy PDA dla nowej sekcji: seeds = [ "seating_section", eventPDA, sectionName ]
+      const [seatingSectionPDA] = await solanaWeb3.PublicKey.findProgramAddress(
+        [
+          new TextEncoder().encode("seating_section"),
+          eventPDA.toBytes(),
+          new TextEncoder().encode(sectionName)
+        ],
+        PROGRAM_ID
+      );
+      logMessage("Obliczone Seating Section PDA: " + seatingSectionPDA.toBase58());
+      
+      const serializedArgs = serializeInitializeSeatingSectionArgs({
+          section_name: sectionName,
+          section_type: sectionType,
+          rows: rows,
+          seats_per_row: seatsPerRow
+      });
+      
+      // Dyskryminator dla initialize_seating_section
+      const INITIALIZE_SEATING_SECTION_DISCRIMINATOR = new Uint8Array([151,223,44,246,213,70,7,65]);
+      const instructionData = new Uint8Array(INITIALIZE_SEATING_SECTION_DISCRIMINATOR.length + serializedArgs.length);
+      instructionData.set(INITIALIZE_SEATING_SECTION_DISCRIMINATOR, 0);
+      instructionData.set(serializedArgs, INITIALIZE_SEATING_SECTION_DISCRIMINATOR.length);
+      
+      const keys = [
+        { pubkey: seatingMapPDA, isSigner: false, isWritable: true },
+        { pubkey: seatingSectionPDA, isSigner: false, isWritable: true },
+        { pubkey: eventPDA, isSigner: false, isWritable: false },
+        { pubkey: walletPublicKey, isSigner: true, isWritable: true },
+        { pubkey: solanaWeb3.SystemProgram.programId, isSigner: false, isWritable: false }
+      ];
+      
+      const txInstruction = new solanaWeb3.TransactionInstruction({
+        keys,
+        programId: PROGRAM_ID,
+        data: instructionData
+      });
+      
+      try {
+        let transaction = new solanaWeb3.Transaction().add(txInstruction);
+        transaction.feePayer = walletPublicKey;
+        const { blockhash } = await connection.getLatestBlockhash();
+        transaction.recentBlockhash = blockhash;
+        const signedTransaction = await provider.signTransaction(transaction);
+        const txSignature = await connection.sendRawTransaction(signedTransaction.serialize());
+        logMessage("Transakcja dodania sekcji wysłana, signature: " + txSignature);
+        await connection.confirmTransaction(txSignature, "confirmed");
+        logMessage("Sekcja została dodana! Tx Sig: " + txSignature);
+        alert("Sekcja została dodana! Tx Sig: " + txSignature);
+        // Po dodaniu sekcji ładujemy ponownie listę sekcji
+        await loadSeatingSections(eventId);
+      } catch (err) {
+        logMessage("Błąd dodawania sekcji: " + err.message);
+        alert("Błąd dodawania sekcji: " + err.message);
+      }
+    }
+
+    // Funkcja edycji sekcji siedzeniowej – wysyłamy transakcję do update_seating_section on‑chain
+    async function editSection(sectionName) {
+      if (!window.currentEvent) {
+        alert("Najpierw wczytaj event!");
+        return;
+      }
+      const eventId = window.currentEvent.event_id;
+      // Pobierz nowe wartości od użytkownika
+      let newRowsInput = prompt("Podaj nową liczbę wierszy (pozostaw puste, aby nie zmieniać):");
+      let newSeatsInput = prompt("Podaj nową liczbę miejsc w wierszu (pozostaw puste, aby nie zmieniać):");
+      let newTypeInput = prompt("Podaj nowy typ sekcji (1 = Numerowane, 0 = Stojące) (pozostaw puste, aby nie zmieniać):");
+      
+      const newRows = newRowsInput ? parseInt(newRowsInput) : null;
+      const newSeats = newSeatsInput ? parseInt(newSeatsInput) : null;
+      const newType = newTypeInput ? parseInt(newTypeInput) : null;
+      
+      // Obliczamy PDA dla Event: seeds = [ "event", eventId ]
+      const [eventPDA] = await solanaWeb3.PublicKey.findProgramAddress(
+        [new TextEncoder().encode("event"), new TextEncoder().encode(eventId)],
+        PROGRAM_ID
+      );
+      
+      // Obliczamy PDA dla SeatingMap: seeds = [ "seating_map", eventId ]
+      const [seatingMapPDA] = await solanaWeb3.PublicKey.findProgramAddress(
+        [new TextEncoder().encode("seating_map"), new TextEncoder().encode(eventId)],
+        PROGRAM_ID
+      );
+      
+      // Obliczamy PDA dla SeatingSection (na podstawie Event PDA i nazwy sekcji)
+      const [seatingSectionPDA] = await solanaWeb3.PublicKey.findProgramAddress(
+        [new TextEncoder().encode("seating_section"), eventPDA.toBytes(), new TextEncoder().encode(sectionName)],
+        PROGRAM_ID
+      );
+      logMessage("Obliczone Seating Section PDA (update): " + seatingSectionPDA.toBase58());
+      
+      // Funkcja pomocnicza do serializacji opcjonalnych wartości (u8)
+      function serializeOptionU8(value) {
+        if (value === null || isNaN(value)) {
+          return new Uint8Array([0]);
+        } else {
+          return new Uint8Array([1, value]);
+        }
+      }
+      
+      const newRowsBytes = serializeOptionU8(newRows);
+      const newSeatsBytes = serializeOptionU8(newSeats);
+      const newTypeBytes = serializeOptionU8(newType);
+      
+      const totalLen = newRowsBytes.length + newSeatsBytes.length + newTypeBytes.length;
+      const argsBuffer = new Uint8Array(totalLen);
+      let offset = 0;
+      argsBuffer.set(newRowsBytes, offset); offset += newRowsBytes.length;
+      argsBuffer.set(newSeatsBytes, offset); offset += newSeatsBytes.length;
+      argsBuffer.set(newTypeBytes, offset);
+      
+      // Dyskryminator dla update_seating_section: [46,155,128,9,243,228,210,182]
+      const UPDATE_SEATING_SECTION_DISCRIMINATOR = new Uint8Array([46,155,128,9,243,228,210,182]);
+      const instructionData = new Uint8Array(UPDATE_SEATING_SECTION_DISCRIMINATOR.length + argsBuffer.length);
+      instructionData.set(UPDATE_SEATING_SECTION_DISCRIMINATOR, 0);
+      instructionData.set(argsBuffer, UPDATE_SEATING_SECTION_DISCRIMINATOR.length);
+      
+      const keys = [
+        { pubkey: seatingMapPDA, isSigner: false, isWritable: true },
+        { pubkey: seatingSectionPDA, isSigner: false, isWritable: true },
+        { pubkey: eventPDA, isSigner: false, isWritable: false },
+        { pubkey: walletPublicKey, isSigner: true, isWritable: true },
+        { pubkey: solanaWeb3.SystemProgram.programId, isSigner: false, isWritable: false }
+      ];
+      
+      const txInstruction = new solanaWeb3.TransactionInstruction({
+        keys,
+        programId: PROGRAM_ID,
+        data: instructionData
+      });
+      
+      try {
+        let transaction = new solanaWeb3.Transaction().add(txInstruction);
+        transaction.feePayer = walletPublicKey;
+        const { blockhash } = await connection.getLatestBlockhash();
+        transaction.recentBlockhash = blockhash;
+        const signedTransaction = await provider.signTransaction(transaction);
+        const txSignature = await connection.sendRawTransaction(signedTransaction.serialize());
+        logMessage("Transakcja update sekcji wysłana, signature: " + txSignature);
+        await connection.confirmTransaction(txSignature, "confirmed");
+        logMessage("Sekcja została zaktualizowana! Tx Sig: " + txSignature);
+        alert("Sekcja została zaktualizowana! Tx Sig: " + txSignature);
+        await loadSeatingSections(eventId);
+      } catch (err) {
+        logMessage("Błąd update sekcji: " + err.message);
+        alert("Błąd update sekcji: " + err.message);
+      }
+    }
+
+    // Funkcja usuwająca sekcję – wywołanie remove_seating_section on‑chain
+    async function deleteSection(sectionName) {
+      if (!window.currentEvent) {
+        alert("Najpierw wczytaj event!");
+        return;
+      }
+      const eventId = window.currentEvent.event_id;
+      logMessage("Usuwam sekcję: " + sectionName + " dla eventu: " + eventId);
+      
+      // Obliczamy PDA dla Event: seeds = [ "event", eventId ]
+      const [eventPDA] = await solanaWeb3.PublicKey.findProgramAddress(
+        [new TextEncoder().encode("event"), new TextEncoder().encode(eventId)],
+        PROGRAM_ID
+      );
+      
+      // Obliczamy PDA dla SeatingMap: seeds = [ "seating_map", eventId ]
+      const [seatingMapPDA] = await solanaWeb3.PublicKey.findProgramAddress(
+        [new TextEncoder().encode("seating_map"), new TextEncoder().encode(eventId)],
+        PROGRAM_ID
+      );
+      
+      // Obliczamy PDA dla SeatingSection: seeds = [ "seating_section", eventPDA, sectionName ]
+      const [seatingSectionPDA] = await solanaWeb3.PublicKey.findProgramAddress(
+        [new TextEncoder().encode("seating_section"), eventPDA.toBytes(), new TextEncoder().encode(sectionName)],
+        PROGRAM_ID
+      );
+      logMessage("Obliczone Seating Section PDA (delete): " + seatingSectionPDA.toBase58());
+      
+      // Dyskryminator dla remove_seating_section: [26,199,35,22,4,211,10,86]
+      const REMOVE_SEATING_SECTION_DISCRIMINATOR = new Uint8Array([26,199,35,22,4,211,10,86]);
+      const instructionData = REMOVE_SEATING_SECTION_DISCRIMINATOR;
+      
+      const keys = [
+        { pubkey: seatingMapPDA, isSigner: false, isWritable: true },
+        { pubkey: seatingSectionPDA, isSigner: false, isWritable: true },
+        { pubkey: eventPDA, isSigner: false, isWritable: false },
+        { pubkey: walletPublicKey, isSigner: true, isWritable: true },
+        { pubkey: solanaWeb3.SystemProgram.programId, isSigner: false, isWritable: false }
+      ];
+      
+      const txInstruction = new solanaWeb3.TransactionInstruction({
+        keys,
+        programId: PROGRAM_ID,
+        data: instructionData
+      });
+      
+      try {
+        let transaction = new solanaWeb3.Transaction().add(txInstruction);
+        transaction.feePayer = walletPublicKey;
+        const { blockhash } = await connection.getLatestBlockhash();
+        transaction.recentBlockhash = blockhash;
+        const signedTransaction = await provider.signTransaction(transaction);
+        const txSignature = await connection.sendRawTransaction(signedTransaction.serialize());
+        logMessage("Transakcja usunięcia sekcji wysłana, signature: " + txSignature);
+        await connection.confirmTransaction(txSignature, "confirmed");
+        logMessage("Sekcja została usunięta! Tx Sig: " + txSignature);
+        alert("Sekcja została usunięta! Tx Sig: " + txSignature);
+        await loadSeatingSections(eventId);
+      } catch (err) {
+        logMessage("Błąd usuwania sekcji: " + err.message);
+        alert("Błąd usuwania sekcji: " + err.message);
+      }
     }
   </script>
 </body>
