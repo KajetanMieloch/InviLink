@@ -21,6 +21,18 @@ fn generate_event_id(name: &str, organizer: &Pubkey) -> String {
     encoded.chars().take(12).collect()
 }
 
+fn generate_ticket_id(buyer: &Pubkey, event_id: &str, section_name: &str, row: u8, seat: u8) -> String {
+    let mut data = Vec::new();
+    data.extend_from_slice(buyer.to_bytes().as_ref());
+    data.extend_from_slice(event_id.as_bytes());
+    data.extend_from_slice(section_name.as_bytes());
+    data.push(row);
+    data.push(seat);
+    let hash_result = hash(&data);
+    let encoded = base64::encode(hash_result);
+    encoded.chars().take(12).collect()
+}
+
 // ---------------- PROGRAM NA CHAINIE ----------------
 
 #[program]
@@ -461,10 +473,8 @@ pub mod invilink {
 
     // ---------------- Mintowanie biletu ----------------
     
-    // Uproszczona funkcja mint_ticket – zakładamy zawsze numerowane miejsca.
     pub fn mint_ticket(
         ctx: Context<MintTicket>,
-        ticket_id: String,
         event_id: String,
         section_name: String,
         row: u8,
@@ -487,6 +497,9 @@ pub mod invilink {
         require!(seating_section.seat_status[index] == 0, ErrorCode::SeatAlreadyTaken);
         seating_section.seat_status[index] = 2;
 
+        // Generujemy ticket_id na łańcuchu
+        let ticket_id = generate_ticket_id(ctx.accounts.buyer.key, &event_id, &section_name, row, seat);
+
         ticket.ticket_id = ticket_id;
         ticket.event_id = event_id;
         ticket.owner = *ctx.accounts.buyer.key;
@@ -497,6 +510,7 @@ pub mod invilink {
         event.sold_tickets = event.sold_tickets.checked_add(1).ok_or(ErrorCode::InvalidTicket)?;
         Ok(())
     }
+
     
     // ---------------- Operacje biletowe ----------------
 
