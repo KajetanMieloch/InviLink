@@ -25,13 +25,6 @@
   <label>Dostępne bilety:
     <input id="availableTickets" type="number" placeholder="np. 100">
   </label>
-  <label>Rodzaj miejsc:
-    <select id="seatingType">
-      <option value="0">Open-space</option>
-      <option value="1">Numerowane</option>
-      <option value="2">Mieszane</option>
-    </select>
-  </label>
   
   <button onclick="createNewEvent()">Stwórz Event</button>
   <div id="log"></div>
@@ -161,7 +154,7 @@
       const eventName = document.getElementById("eventName").value.trim();
       const ticketPriceSol = parseFloat(document.getElementById("ticketPrice").value);
       const availableTickets = parseInt(document.getElementById("availableTickets").value);
-      const seatingType = parseInt(document.getElementById("seatingType").value);
+      const seatingType = 1;
 
       if (!eventName || isNaN(ticketPriceSol) || isNaN(availableTickets)) {
         alert("Wszystkie pola muszą być wypełnione!");
