@@ -1,0 +1,449 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+  <meta charset="UTF-8">
+  <title>Strona Eventu - InviLink</title>
+  <!-- Solana Web3 -->
+  <script src="https://cdn.jsdelivr.net/npm/@solana/web3.js@latest/lib/index.iife.min.js"></script>
+  <!-- BN.js -->
+  <script src="https://cdn.jsdelivr.net/npm/bn.js@5.2.0/lib/bn.min.js"></script>
+  <style>
+    body { font-family: Arial, sans-serif; padding: 20px; }
+    #log { margin: 20px 0; padding: 10px; border: 1px solid #ccc; width: 90%; white-space: pre-wrap; }
+    #eventDetails, #sectionsContainer { margin-top: 20px; }
+    table { border-collapse: collapse; width: 100%; margin-top: 20px; }
+    th, td { border: 1px solid #ddd; padding: 8px; text-align: center; }
+    .seat-grid { display: grid; gap: 4px; margin-top: 10px; }
+    .seat-button { width: 30px; height: 30px; border: none; cursor: pointer; }
+    /* Wolne miejsca – zielone, zajęte – czerwone */
+    .seat-available { background-color: green; }
+    .seat-taken { background-color: red; cursor: not-allowed; }
+  </style>
+</head>
+<body>
+  <h1>Strona Eventu</h1>
+  <div id="log"></div>
+  <div id="eventDetails"></div>
+  <h2>Sekcje</h2>
+  <div id="sectionsContainer"></div>
+
+  <script>
+    // Zakładamy, że event_id jest przekazywane z Django (np. przez templating)
+    const eventId = "{{ event_id }}";
+    const PROGRAM_ID = new solanaWeb3.PublicKey("EW1pWhJkpreYMn2FpYC3fZzqvLCgRdr79dh6E8SL7qwW");
+    let connection, provider, walletPublicKey;
+    let eventData = null;  // globalne dane eventu
+
+    // Dyskryminator dla mint_ticket – 8 bajtów zgodnie z IDL
+    const MINT_TICKET_DISCRIMINATOR = new Uint8Array([159,167,223,60,138,6,23,29]);
+
+    // Logowanie
+    function logMessage(msg) {
+      const logEl = document.getElementById("log");
+      logEl.textContent += msg + "\n";
+      console.log(msg);
+    }
+
+    // Funkcje pomocnicze do obliczania PDA
+    async function getEventPDA(eventId) {
+      const seed1 = new TextEncoder().encode("event");
+      const seed2 = new TextEncoder().encode(eventId);
+      const [eventPDA] = await solanaWeb3.PublicKey.findProgramAddress([seed1, seed2], PROGRAM_ID);
+      return eventPDA;
+    }
+    async function getSeatingSectionPDA(eventPDA, sectionName) {
+      const seed1 = new TextEncoder().encode("seating_section");
+      const seed2 = eventPDA.toBytes();
+      const seed3 = new TextEncoder().encode(sectionName);
+      const [seatingSectionPDA] = await solanaWeb3.PublicKey.findProgramAddress([seed1, seed2, seed3], PROGRAM_ID);
+      return seatingSectionPDA;
+    }
+
+    // Funkcja generująca interaktywną mapę miejsc dla sekcji numerowanej
+    function createInteractiveMapForElement(container, sectionData) {
+      container.innerHTML = "";
+      const grid = document.createElement("div");
+      grid.className = "seat-grid";
+      grid.style.gridTemplateColumns = `repeat(${sectionData.seats_per_row}, 30px)`;
+      const totalSeats = sectionData.rows * sectionData.seats_per_row;
+      for (let i = 0; i < totalSeats; i++) {
+        const btn = document.createElement("button");
+        btn.className = "seat-button";
+        if (sectionData.seat_status[i] === 0) {
+          btn.classList.add("seat-available"); // wolne – zielone
+          btn.innerText = i;
+          btn.onclick = () => buyTicketInSection(sectionData, i);
+        } else {
+          btn.classList.add("seat-taken"); // zajęte – czerwone
+          btn.disabled = true;
+          btn.innerText = "X";
+        }
+        grid.appendChild(btn);
+      }
+      container.appendChild(grid);
+    }
+
+    // Helper: serializuj string (4 bajty długości LE + UTF-8)
+    function serializeString(str) {
+      const encoder = new TextEncoder();
+      const strBytes = encoder.encode(str);
+      const lengthBytes = new Uint8Array(4);
+      new DataView(lengthBytes.buffer).setUint32(0, strBytes.length, true);
+      const result = new Uint8Array(4 + strBytes.length);
+      result.set(lengthBytes, 0);
+      result.set(strBytes, 4);
+      return result;
+    }
+    // Helper: serializuj u8 (1 bajt)
+    function serializeU8(val) {
+      return new Uint8Array([val]);
+    }
+
+    // Inicjalizacja połączenia z Phantom i Solana
+    async function initConnection() {
+      if (!window.phantom || !window.phantom.solana) {
+        alert("Phantom Wallet jest wymagany!");
+        return;
+      }
+      provider = window.phantom.solana;
+      if (!provider.isConnected) await provider.connect();
+      walletPublicKey = provider.publicKey;
+      connection = new solanaWeb3.Connection("https://api.devnet.solana.com", "confirmed");
+      logMessage("Połączono z Phantom. Wallet: " + walletPublicKey.toBase58());
+    }
+    async function init() {
+      await initConnection();
+      loadEvent();
+    }
+    window.addEventListener("load", init);
+
+    // Dekodowanie EventNFT
+    function decodeEventNFT(data) {
+      let offset = 8; // pomijamy dyskryminator
+      const dv = new DataView(data.buffer, data.byteOffset, data.byteLength);
+      const eventIdLen = dv.getUint32(offset, true); offset += 4;
+      const eventIdBytes = data.slice(offset, offset + eventIdLen); offset += eventIdLen;
+      const event_id = new TextDecoder().decode(eventIdBytes);
+      const organizerBytes = data.slice(offset, offset + 32); offset += 32;
+      const organizer = new solanaWeb3.PublicKey(organizerBytes).toBase58();
+      const nameLen = dv.getUint32(offset, true); offset += 4;
+      const nameBytes = data.slice(offset, offset + nameLen); offset += nameLen;
+      const name = new TextDecoder().decode(nameBytes);
+      const ticket_price = dv.getBigUint64(offset, true); offset += 8;
+      const available_tickets = dv.getBigUint64(offset, true); offset += 8;
+      const sold_tickets = dv.getBigUint64(offset, true); offset += 8;
+      const seating_type = dv.getUint8(offset); offset += 1;
+      const active = dv.getUint8(offset) !== 0; offset += 1;
+      return { event_id, organizer, name,
+               ticket_price: ticket_price.toString(),
+               available_tickets: available_tickets.toString(),
+               sold_tickets: sold_tickets.toString(),
+               seating_type, active };
+    }
+
+    async function loadEvent() {
+      try {
+        logMessage("Ładowanie eventu: " + eventId);
+        const seed1 = new TextEncoder().encode("event");
+        const seed2 = new TextEncoder().encode(eventId);
+        const [eventPDA] = await solanaWeb3.PublicKey.findProgramAddress([seed1, seed2], PROGRAM_ID);
+        logMessage("Event PDA: " + eventPDA.toBase58());
+        const eventAcc = await connection.getAccountInfo(eventPDA);
+        if (!eventAcc) {
+          logMessage("Nie znaleziono eventu.");
+          document.getElementById("eventDetails").innerText = "Nie znaleziono eventu.";
+          return;
+        }
+        eventData = decodeEventNFT(eventAcc.data);
+        logMessage("Dane eventu: " + JSON.stringify(eventData, null, 2));
+        displayEvent(eventData);
+        loadSeatingSections(eventId);
+      } catch (err) {
+        logMessage("Błąd: " + err.message);
+      }
+    }
+
+    function displayEvent(ev) {
+      const detailsDiv = document.getElementById("eventDetails");
+      detailsDiv.innerHTML = `
+        <h2>${ev.name}</h2>
+        <p><strong>Event ID:</strong> ${ev.event_id}</p>
+        <p><strong>Organizator:</strong> ${ev.organizer}</p>
+        <p><strong>Cena biletu:</strong> ${ev.ticket_price} lamportów</p>
+        <p><strong>Dostępne bilety:</strong> ${ev.available_tickets}</p>
+        <p><strong>Sprzedane bilety:</strong> ${ev.sold_tickets}</p>
+        <p><strong>Rodzaj miejsc:</strong> ${ev.seating_type === 1 ? "Numerowane" : "Inny"}</p>
+        <p><strong>Aktywny:</strong> ${ev.active}</p>
+      `;
+    }
+
+    // Dekodowanie SeatingMap
+    function decodeSeatingMap(data) {
+      let offset = 8;
+      const dv = new DataView(data.buffer, data.byteOffset, data.byteLength);
+      const eventIdLen = dv.getUint32(offset, true); offset += 4;
+      const eventIdBytes = data.slice(offset, offset + eventIdLen); offset += eventIdLen;
+      const event_id = new TextDecoder().decode(eventIdBytes);
+      const vecLen = dv.getUint32(offset, true); offset += 4;
+      let sections = [];
+      for (let i = 0; i < vecLen; i++) {
+        const keyBytes = data.slice(offset, offset + 32);
+        sections.push(new solanaWeb3.PublicKey(keyBytes).toBase58());
+        offset += 32;
+      }
+      const total_seats = dv.getBigUint64(offset, true); offset += 8;
+      return { event_id, sections, total_seats: total_seats.toString() };
+    }
+
+    async function loadSeatingSections(eventId) {
+      try {
+        const seed1 = new TextEncoder().encode("seating_map");
+        const seed2 = new TextEncoder().encode(eventId);
+        const [seatingMapPDA] = await solanaWeb3.PublicKey.findProgramAddress([seed1, seed2], PROGRAM_ID);
+        logMessage("Seating Map PDA: " + seatingMapPDA.toBase58());
+        const seatingMapAcc = await connection.getAccountInfo(seatingMapPDA);
+        if (!seatingMapAcc) {
+          logMessage("Nie znaleziono mapy miejsc.");
+          document.getElementById("sectionsContainer").innerHTML = "<p>Brak mapy miejsc.</p>";
+          return;
+        }
+        const seatingMap = decodeSeatingMap(seatingMapAcc.data);
+        logMessage("SeatingMap: " + JSON.stringify(seatingMap, null, 2));
+        loadSections(seatingMap.sections);
+      } catch (err) {
+        logMessage("Błąd ładowania mapy miejsc: " + err.message);
+      }
+    }
+
+    // Dekodowanie SeatingSectionAccount
+    function decodeSeatingSectionAccount(data) {
+      let offset = 8;
+      const dv = new DataView(data.buffer, data.byteOffset, data.byteLength);
+      const eventIdLen = dv.getUint32(offset, true); offset += 4;
+      const eventIdBytes = data.slice(offset, offset + eventIdLen); offset += eventIdLen;
+      const event_id = new TextDecoder().decode(eventIdBytes);
+      const sectionNameLen = dv.getUint32(offset, true); offset += 4;
+      const sectionNameBytes = data.slice(offset, offset + sectionNameLen); offset += sectionNameLen;
+      const section_name = new TextDecoder().decode(sectionNameBytes);
+      const section_type = dv.getUint8(offset); offset += 1;
+      const rows = dv.getUint8(offset); offset += 1;
+      const seats_per_row = dv.getUint8(offset); offset += 1;
+      const vecLen = dv.getUint32(offset, true); offset += 4;
+      let seat_status = [];
+      for (let i = 0; i < vecLen; i++) {
+        seat_status.push(dv.getUint8(offset));
+        offset += 1;
+      }
+      return { event_id, section_name, section_type, rows, seats_per_row, seat_status };
+    }
+
+    async function loadSections(sectionPubkeys) {
+      try {
+        const container = document.getElementById("sectionsContainer");
+        container.innerHTML = "";
+        if (sectionPubkeys.length === 0) {
+          container.innerHTML = "<p>Brak sekcji.</p>";
+          return;
+        }
+        let table = document.createElement("table");
+        table.innerHTML = `
+          <thead>
+            <tr>
+              <th>Nazwa sekcji</th>
+              <th>Typ</th>
+              <th>Wiersze</th>
+              <th>Miejsca/wiersz</th>
+              <th>Cena biletu</th>
+              <th>Mapa miejsc</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        `;
+        const tbody = table.querySelector("tbody");
+        for (let pubkeyStr of sectionPubkeys) {
+          const sectionPubkey = new solanaWeb3.PublicKey(pubkeyStr);
+          const sectionAcc = await connection.getAccountInfo(sectionPubkey);
+          if (sectionAcc) {
+            const sectionData = decodeSeatingSectionAccount(sectionAcc.data);
+            const ticketPrice = eventData ? eventData.ticket_price : "0";
+            let tr = document.createElement("tr");
+            tr.innerHTML = `
+              <td>${sectionData.section_name}</td>
+              <td>${sectionData.section_type === 1 ? "Numerowane" : "Stojące"}</td>
+              <td>${sectionData.rows}</td>
+              <td>${sectionData.seats_per_row}</td>
+              <td>${ticketPrice}</td>
+              <td id="map-${pubkeyStr}"></td>
+            `;
+            tbody.appendChild(tr);
+            const tdMap = tr.querySelector(`#map-${pubkeyStr}`);
+            if (sectionData.section_type === 1) {
+              // Sekcja numerowana
+              createInteractiveMapForElement(tdMap, sectionData);
+            } else {
+              // Sekcja stojąca – unikamy wstawiania JSON w onclick
+              const dataStr = JSON.stringify(sectionData).replace(/"/g, '&quot;');
+              tdMap.innerHTML = `
+                <p>Sekcja stojąca</p>
+                <button
+                  data-section="${dataStr}"
+                  data-section-name="${sectionData.section_name}"
+                  onclick="buyTicketRandom(this)">
+                  Kup bilet
+                </button>
+              `;
+            }
+          }
+        }
+        container.appendChild(table);
+      } catch (err) {
+        logMessage("Błąd ładowania sekcji: " + err.message);
+      }
+    }
+
+    // Funkcja kupna biletu dla sekcji numerowanej
+    async function buyTicketInSection(sectionData, seatIndex) {
+      const row = Math.floor(seatIndex / sectionData.seats_per_row);
+      const seat = seatIndex % sectionData.seats_per_row;
+      logMessage(`Kupuję bilet dla sekcji "${sectionData.section_name}", wiersz ${row}, numer ${seat}`);
+      try {
+        const eventPDA = await getEventPDA(eventId);
+        logMessage("Event PDA: " + eventPDA.toBase58());
+        const seatingSectionPDA = await getSeatingSectionPDA(eventPDA, sectionData.section_name);
+        logMessage("Seating Section PDA: " + seatingSectionPDA.toBase58());
+        
+        const ticketAccount = solanaWeb3.Keypair.generate();
+        logMessage("Nowe konto biletu: " + ticketAccount.publicKey.toBase58());
+        
+        const eventIdBytes = serializeString(eventId);
+        const sectionNameBytes = serializeString(sectionData.section_name);
+        const rowByte = serializeU8(row);
+        const seatByte = serializeU8(seat);
+        const argsData = new Uint8Array(eventIdBytes.length + sectionNameBytes.length + rowByte.length + seatByte.length);
+        let offset = 0;
+        argsData.set(eventIdBytes, offset); offset += eventIdBytes.length;
+        argsData.set(sectionNameBytes, offset); offset += sectionNameBytes.length;
+        argsData.set(rowByte, offset); offset += rowByte.length;
+        argsData.set(seatByte, offset);
+        
+        const instructionData = new Uint8Array(MINT_TICKET_DISCRIMINATOR.length + argsData.length);
+        instructionData.set(MINT_TICKET_DISCRIMINATOR, 0);
+        instructionData.set(argsData, MINT_TICKET_DISCRIMINATOR.length);
+        
+        const mintTicketIx = new solanaWeb3.TransactionInstruction({
+          keys: [
+            { pubkey: ticketAccount.publicKey, isSigner: true, isWritable: true },
+            { pubkey: eventPDA, isSigner: false, isWritable: true },
+            { pubkey: seatingSectionPDA, isSigner: false, isWritable: true },
+            { pubkey: walletPublicKey, isSigner: true, isWritable: true },
+            { pubkey: solanaWeb3.SystemProgram.programId, isSigner: false, isWritable: false },
+          ],
+          programId: PROGRAM_ID,
+          data: instructionData,
+        });
+        
+        const transaction = new solanaWeb3.Transaction().add(mintTicketIx);
+        transaction.feePayer = walletPublicKey;
+        const { blockhash } = await connection.getLatestBlockhash();
+        transaction.recentBlockhash = blockhash;
+        transaction.partialSign(ticketAccount);
+        const signedTx = await provider.signTransaction(transaction);
+        const txSignature = await connection.sendRawTransaction(signedTx.serialize());
+        logMessage("Transakcja wysłana. Signature: " + txSignature);
+        await connection.confirmTransaction(txSignature, "confirmed");
+
+        logMessage("Bilet został kupiony! Tx Sig: " + txSignature);
+        alert("Bilet kupiony! Tx Sig: " + txSignature);
+
+        // Po kupnie biletu odświeżamy event i sekcje
+        await loadEvent();
+
+      } catch (err) {
+        console.error(err);
+        logMessage("Błąd podczas kupna biletu: " + err.message);
+        alert("Błąd podczas kupna biletu: " + err.message);
+      }
+    }
+
+    // Funkcja kupna biletu dla sekcji stojącej – wczytujemy dane z atrybutów data-*
+    async function buyTicketRandom(btn) {
+      const sectionDataStr = btn.getAttribute('data-section').replace(/&quot;/g, '"');
+      const sectionData = JSON.parse(sectionDataStr);
+      const sectionName = btn.getAttribute('data-section-name');
+
+      // Znajdujemy pierwsze wolne miejsce
+      let freeIndex = sectionData.seat_status.findIndex(status => status === 0);
+      if (freeIndex === -1) {
+        alert("Brak wolnych miejsc w tej sekcji!");
+        return;
+      }
+      const row = Math.floor(freeIndex / sectionData.seats_per_row);
+      const seat = freeIndex % sectionData.seats_per_row;
+
+      logMessage(`Kupuję bilet (stojący) w sekcji "${sectionName}", row=${row}, seat=${seat}`);
+      await buyTicket(sectionName, row, seat);
+    }
+
+    // Funkcja kupna biletu (stojąca) – przyjmuje row i seat
+    async function buyTicket(sectionName, row, seat) {
+      try {
+        const eventPDA = await getEventPDA(eventId);
+        logMessage("Event PDA: " + eventPDA.toBase58());
+        const seatingSectionPDA = await getSeatingSectionPDA(eventPDA, sectionName);
+        logMessage("Seating Section PDA: " + seatingSectionPDA.toBase58());
+        
+        const ticketAccount = solanaWeb3.Keypair.generate();
+        logMessage("Nowe konto biletu: " + ticketAccount.publicKey.toBase58());
+        
+        const eventIdBytes = serializeString(eventId);
+        const sectionNameBytes = serializeString(sectionName);
+        const rowByte = serializeU8(row);
+        const seatByte = serializeU8(seat);
+        const argsData = new Uint8Array(eventIdBytes.length + sectionNameBytes.length + rowByte.length + seatByte.length);
+        let offset = 0;
+        argsData.set(eventIdBytes, offset); offset += eventIdBytes.length;
+        argsData.set(sectionNameBytes, offset); offset += sectionNameBytes.length;
+        argsData.set(rowByte, offset); offset += rowByte.length;
+        argsData.set(seatByte, offset);
+
+        const instructionData = new Uint8Array(MINT_TICKET_DISCRIMINATOR.length + argsData.length);
+        instructionData.set(MINT_TICKET_DISCRIMINATOR, 0);
+        instructionData.set(argsData, MINT_TICKET_DISCRIMINATOR.length);
+
+        const mintTicketIx = new solanaWeb3.TransactionInstruction({
+          keys: [
+            { pubkey: ticketAccount.publicKey, isSigner: true, isWritable: true },
+            { pubkey: eventPDA, isSigner: false, isWritable: true },
+            { pubkey: seatingSectionPDA, isSigner: false, isWritable: true },
+            { pubkey: walletPublicKey, isSigner: true, isWritable: true },
+            { pubkey: solanaWeb3.SystemProgram.programId, isSigner: false, isWritable: false },
+          ],
+          programId: PROGRAM_ID,
+          data: instructionData,
+        });
+
+        const transaction = new solanaWeb3.Transaction().add(mintTicketIx);
+        transaction.feePayer = walletPublicKey;
+        const { blockhash } = await connection.getLatestBlockhash();
+        transaction.recentBlockhash = blockhash;
+        transaction.partialSign(ticketAccount);
+        const signedTx = await provider.signTransaction(transaction);
+        const txSignature = await connection.sendRawTransaction(signedTx.serialize());
+        logMessage("Transakcja wysłana. Signature: " + txSignature);
+        await connection.confirmTransaction(txSignature, "confirmed");
+
+        logMessage("Bilet został kupiony! Tx Sig: " + txSignature);
+        alert("Bilet kupiony! Tx Sig: " + txSignature);
+
+        // Po kupnie biletu odświeżamy event (liczniki, sekcje, itp.)
+        await loadEvent();
+
+      } catch (err) {
+        console.error(err);
+        logMessage("Błąd podczas kupna biletu (stojącego): " + err.message);
+        alert("Błąd podczas kupna biletu: " + err.message);
+      }
+    }
+  </script>
+</body>
+</html>

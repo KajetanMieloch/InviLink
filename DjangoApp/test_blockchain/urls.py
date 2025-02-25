@@ -15,4 +15,6 @@ urlpatterns = [
     path('manage_events/', views.manage_events, name='manage_events'),
     path('init_dictionary/', views.init_dictionary, name='init_dictionary'),
     path('init', views.init, name='init'),
+    path('user_event/', views.user_event, name='user_event'),
+    path('event_detail/<str:event_id>/', views.event_detail, name='event_detail'),
 ]

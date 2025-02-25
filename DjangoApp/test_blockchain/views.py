@@ -46,3 +46,9 @@ def init_dictionary(request):
 
 def init(request):
     return render(request, 'test_blockchain/init.html')
+
+def user_event(request):
+    return render(request, 'test_blockchain/user_event.html')
+
+def event_detail(request, event_id):
+    return render(request, 'test_blockchain/event_detail.html', {'event_id': event_id})
