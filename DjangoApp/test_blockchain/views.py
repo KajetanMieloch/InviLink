@@ -8,15 +8,6 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.chrome.options import Options
 
 
-def phantom_test(request):
-    return render(request, 'test_blockchain/phantom_test.html')
-
-def nft_test(request):
-    return render(request, 'test_blockchain/nft_test.html')
-
-def nft_mint(request):
-    return render(request, 'test_blockchain/nft_mint.html')
-
 def init_org_pool(request):
     return render(request, 'test_blockchain/init_org_pool.html')
 
@@ -52,3 +43,6 @@ def user_event(request):
 
 def event_detail(request, event_id):
     return render(request, 'test_blockchain/event_detail.html', {'event_id': event_id})
+
+def test_mint(request):
+    return render(request, 'test_blockchain/test_mint.html')

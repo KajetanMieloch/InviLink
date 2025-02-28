@@ -9,12 +9,12 @@
   <script src="https://cdn.jsdelivr.net/npm/bn.js@5.2.0/lib/bn.min.js"></script>
   <style>
     body { font-family: Arial, sans-serif; text-align: center; padding: 20px; }
-    input, select, button { display: block; margin: 10px auto; padding: 10px; font-size: 16px; }
+    input, button { display: block; margin: 10px auto; padding: 10px; font-size: 16px; }
     #log { margin: 20px auto; padding: 10px; border: 1px solid #ccc; width: 80%; white-space: pre-wrap; text-align: left; }
   </style>
 </head>
 <body>
-  <h1>Stwórz Event</h1>
+  <h1>Stwórz Event - InviLink</h1>
   
   <label>Nazwa Eventu:
     <input id="eventName" type="text" placeholder="np. Koncert Rockowy">
@@ -30,21 +30,34 @@
   <div id="log"></div>
 
   <script>
-    // Konfiguracja
-    const PROGRAM_ID = new solanaWeb3.PublicKey("EW1pWhJkpreYMn2FpYC3fZzqvLCgRdr79dh6E8SL7qwW");
+    // Logger – moduł diagnostyczny
+    const Logger = (function() {
+      const logEl = document.getElementById("log");
+      function log(message, level = "INFO") {
+        const timestamp = new Date().toLocaleTimeString();
+        const formatted = `[${timestamp}] [${level}] ${message}`;
+        console.log(formatted);
+        if (logEl) {
+          logEl.textContent += formatted + "\n";
+        }
+      }
+      return {
+        info: (msg) => log(msg, "INFO"),
+        warn: (msg) => log(msg, "WARN"),
+        error: (msg) => log(msg, "ERROR"),
+        log: log
+      };
+    })();
+    Logger.info("Logger uruchomiony.");
+
+    // Ustawienia – PROGRAM_ID musi odpowiadać Twojemu kontraktowi on‑chain
+    const PROGRAM_ID = new solanaWeb3.PublicKey("8bM5zjY3CMCwCw7A7vUVVgB3RcSxBzDKjJTJtAyTa2BN");
     const CONNECTION = new solanaWeb3.Connection("https://api.devnet.solana.com", "confirmed");
 
-    // Dyskryminatory zgodne z kontraktem
-    const CREATE_EVENT_OPEN_DISCRIMINATOR = new Uint8Array([90, 17, 107, 0, 47, 10, 201, 166]);
+    // Dyskryminator instrukcji create_event_seating zgodny z kontraktem
     const CREATE_EVENT_SEATING_DISCRIMINATOR = new Uint8Array([235, 92, 108, 158, 159, 112, 128, 66]);
 
-    function logMessage(message) {
-      const logEl = document.getElementById("log");
-      logEl.textContent += message + "\n";
-      console.log(message);
-    }
-
-    // Funkcja serializująca string: [4 bajty długości LE + bajty UTF-8]
+    // Funkcja serializująca string: [4 bajty długości LE + UTF-8]
     function serializeString(str) {
       const encoder = new TextEncoder();
       const strBytes = encoder.encode(str);
@@ -55,14 +68,13 @@
       result.set(strBytes, 4);
       return result;
     }
-
     // Serializacja BN (u64) do 8 bajtów LE
     function serializeU64(bnValue) {
       return bnValue.toArrayLike(Uint8Array, 'le', 8);
     }
-
-    // Nowe funkcje serializujące argumenty – event_id jest pierwszym argumentem
-    function serializeCreateEventOpenArgs({ event_id, name, ticket_price, available_tickets }) {
+    // Funkcja serializująca argumenty dla create_event_seating
+    // Przyjmuje: event_id (string), name (string), ticket_price (u64), available_tickets (u64)
+    function serializeCreateEventSeatingArgs({ event_id, name, ticket_price, available_tickets }) {
       const eventIdBytes = serializeString(event_id);
       const nameBytes = serializeString(name);
       const ticketPriceBytes = serializeU64(ticket_price);
@@ -77,24 +89,7 @@
       return buffer;
     }
 
-    function serializeCreateEventSeatingArgs({ event_id, name, ticket_price, available_tickets, seating_type }) {
-      const eventIdBytes = serializeString(event_id);
-      const nameBytes = serializeString(name);
-      const ticketPriceBytes = serializeU64(ticket_price);
-      const availableBytes = serializeU64(available_tickets);
-      const seatingTypeByte = new Uint8Array([seating_type]);
-      const totalLen = eventIdBytes.length + nameBytes.length + ticketPriceBytes.length + availableBytes.length + seatingTypeByte.length;
-      const buffer = new Uint8Array(totalLen);
-      let offset = 0;
-      buffer.set(eventIdBytes, offset); offset += eventIdBytes.length;
-      buffer.set(nameBytes, offset); offset += nameBytes.length;
-      buffer.set(ticketPriceBytes, offset); offset += ticketPriceBytes.length;
-      buffer.set(availableBytes, offset); offset += availableBytes.length;
-      buffer.set(seatingTypeByte, offset);
-      return buffer;
-    }
-
-    // PDA helpery dla organizators_pool, registry i event_dictionary
+    // PDA helpery dla organizators_pool oraz registry
     async function getOrganizersPoolPDA() {
       const [pda] = await solanaWeb3.PublicKey.findProgramAddress(
         [new TextEncoder().encode("organizers_pool")],
@@ -109,15 +104,21 @@
       );
       return pda;
     }
-    async function getEventDictionaryPDA() {
-      const [pda] = await solanaWeb3.PublicKey.findProgramAddress(
-        [new TextEncoder().encode("event_dictionary")],
-        PROGRAM_ID
-      );
-      return pda;
+
+    // Funkcja pomocnicza do URL-safe base64 – usuwa znaki +, / oraz padding
+    function base64UrlEncode(buffer) {
+      let binary = "";
+      const bytes = new Uint8Array(buffer);
+      for (let i = 0; i < bytes.length; i++) {
+        binary += String.fromCharCode(bytes[i]);
+      }
+      let base64 = btoa(binary);
+      return base64.replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
     }
 
-    // Funkcja generująca event_id po stronie klienta, zgodnie z logiką on-chain
+    // Funkcja generująca event_id zgodnie z logiką on-chain.
+    // Używa seeda "339562", łączy nazwę eventu i bajty klucza organizatora,
+    // hash SHA‑256 oraz URL-safe base64 (i skraca do 12 znaków)
     async function generateEventId(name, organizer) {
       const seed = new TextEncoder().encode("339562");
       const nameBytes = new TextEncoder().encode(name);
@@ -129,122 +130,87 @@
       combined.set(organizerBytes, seed.length + nameBytes.length);
       const hashBuffer = await crypto.subtle.digest("SHA-256", combined);
       const hashArray = new Uint8Array(hashBuffer);
-      let binary = "";
-      for (let i = 0; i < hashArray.byteLength; i++) {
-        binary += String.fromCharCode(hashArray[i]);
-      }
-      const base64String = btoa(binary);
-      return base64String.substring(0, 12);
+      const safeBase64 = base64UrlEncode(hashArray);
+      return safeBase64.substring(0, 12);
     }
 
-    // Funkcja tworząca event – wywołanie create_event_open lub create_event_seating
-    async function createNewEvent() {
-      logMessage("Tworzenie eventu...");
-
+    // Funkcja inicjalizująca połączenie z Phantom
+    async function initConnection() {
       if (!window.phantom || !window.phantom.solana) {
         alert("Phantom Wallet jest wymagany!");
         return;
       }
-      const provider = window.phantom.solana;
+      provider = window.phantom.solana;
       if (!provider.isConnected) await provider.connect();
-      const walletPublicKey = provider.publicKey;
-      logMessage("Twój klucz publiczny: " + walletPublicKey.toBase58());
+      walletPublicKey = provider.publicKey;
+      Logger.info("Twój klucz publiczny: " + walletPublicKey.toBase58());
+    }
 
-      // Pobieramy wartości z formularza
-      const eventName = document.getElementById("eventName").value.trim();
-      const ticketPriceSol = parseFloat(document.getElementById("ticketPrice").value);
-      const availableTickets = parseInt(document.getElementById("availableTickets").value);
-      const seatingType = 1;
-
-      if (!eventName || isNaN(ticketPriceSol) || isNaN(availableTickets)) {
-        alert("Wszystkie pola muszą być wypełnione!");
-        return;
-      }
-
-      // Konwersja SOL -> lamporty
-      const ticketPriceLamports = ticketPriceSol * solanaWeb3.LAMPORTS_PER_SOL;
-      const ticketPriceBN = new BN(ticketPriceLamports.toString());
-      const availableTicketsBN = new BN(availableTickets.toString());
-
-      // Generujemy event_id na podstawie nazwy i klucza organizatora
-      const eventId = await generateEventId(eventName, walletPublicKey);
-      logMessage("Wygenerowany event_id: " + eventId);
-
-      // Obliczamy PDA dla eventu: seeds = [ "event", eventId ]
-      let eventPDA, eventBump;
-      let seatingMapPDA;
+    // Funkcja tworząca event
+    async function createNewEvent() {
       try {
-        if (seatingType === 0) {
+        Logger.info("Tworzenie eventu...");
+        await initConnection();
+        // Pobieramy wartości z formularza
+        const eventName = document.getElementById("eventName").value.trim();
+        const ticketPriceSol = parseFloat(document.getElementById("ticketPrice").value);
+        const availableTickets = parseInt(document.getElementById("availableTickets").value);
+        const seatingType = 1; // Załóżmy, że event ma numerowane miejsca
+
+        if (!eventName || isNaN(ticketPriceSol) || isNaN(availableTickets)) {
+          alert("Wszystkie pola muszą być wypełnione!");
+          return;
+        }
+
+        // Konwersja SOL -> lamporty
+        const ticketPriceLamports = ticketPriceSol * solanaWeb3.LAMPORTS_PER_SOL;
+        const ticketPriceBN = new BN(ticketPriceLamports.toString());
+        const availableTicketsBN = new BN(availableTickets.toString());
+
+        // Generujemy event_id po stronie klienta – musi być zgodne z logiką on‑chain
+        const eventIdGenerated = await generateEventId(eventName, walletPublicKey);
+        Logger.info("Wygenerowany event_id: " + eventIdGenerated);
+
+        // Obliczamy PDA dla eventu i seating_map (seed: "event" oraz "seating_map")
+        let eventPDA, eventBump, seatingMapPDA;
+        try {
           [eventPDA, eventBump] = await solanaWeb3.PublicKey.findProgramAddress(
-            [
-              new TextEncoder().encode("event"),
-              new TextEncoder().encode(eventId)
-            ],
-            PROGRAM_ID
-          );
-        } else {
-          [eventPDA, eventBump] = await solanaWeb3.PublicKey.findProgramAddress(
-            [
-              new TextEncoder().encode("event"),
-              new TextEncoder().encode(eventId)
-            ],
+            [new TextEncoder().encode("event"), new TextEncoder().encode(eventIdGenerated)],
             PROGRAM_ID
           );
           [seatingMapPDA] = await solanaWeb3.PublicKey.findProgramAddress(
-            [
-              new TextEncoder().encode("seating_map"),
-              new TextEncoder().encode(eventId)
-            ],
+            [new TextEncoder().encode("seating_map"), new TextEncoder().encode(eventIdGenerated)],
             PROGRAM_ID
           );
+        } catch (err) {
+          Logger.error("Błąd obliczania PDA: " + err.message);
+          return;
         }
-      } catch (err) {
-        logMessage("Błąd obliczania PDA: " + err.message);
-        return;
-      }
-      logMessage("Nowe konto event (PDA): " + eventPDA.toBase58());
+        Logger.info("Nowe konto event (PDA): " + eventPDA.toBase58());
+        Logger.info("Nowe konto seating_map (PDA): " + seatingMapPDA.toBase58());
 
-      // Budujemy dane instrukcji
-      let discriminator, serializedArgs;
-      if (seatingType === 0) {
-        discriminator = CREATE_EVENT_OPEN_DISCRIMINATOR;
-        serializedArgs = serializeCreateEventOpenArgs({
-          event_id: eventId,
+        // Budujemy dane instrukcji (dyskryminator + zserializowane argumenty)
+        const discriminator = CREATE_EVENT_SEATING_DISCRIMINATOR;
+        const serializedArgs = serializeCreateEventSeatingArgs({
+          event_id: eventIdGenerated,
           name: eventName,
           ticket_price: ticketPriceBN,
           available_tickets: availableTicketsBN
         });
-      } else {
-        discriminator = CREATE_EVENT_SEATING_DISCRIMINATOR;
-        serializedArgs = serializeCreateEventSeatingArgs({
-          event_id: eventId,
-          name: eventName,
-          ticket_price: ticketPriceBN,
-          available_tickets: availableTicketsBN,
-          seating_type: seatingType
-        });
-      }
-      const instructionData = new Uint8Array(discriminator.length + serializedArgs.length);
-      instructionData.set(discriminator, 0);
-      instructionData.set(serializedArgs, discriminator.length);
+        const instructionData = new Uint8Array(discriminator.length + serializedArgs.length);
+        instructionData.set(discriminator, 0);
+        instructionData.set(serializedArgs, discriminator.length);
 
-      // Przygotowujemy listę kont
-      let keys;
-      const organizersPoolPDA = await getOrganizersPoolPDA();
-      const registryPDA = await getRegistryPDA();
-      const eventDictionaryPDA = await getEventDictionaryPDA();
-
-      if (seatingType === 0) {
-        keys = [
-          { pubkey: eventPDA, isSigner: false, isWritable: true },
-          { pubkey: organizersPoolPDA, isSigner: false, isWritable: true },
-          { pubkey: registryPDA, isSigner: false, isWritable: true },
-          { pubkey: eventDictionaryPDA, isSigner: false, isWritable: true },
-          { pubkey: walletPublicKey, isSigner: true, isWritable: true },
-          { pubkey: solanaWeb3.SystemProgram.programId, isSigner: false, isWritable: false }
-        ];
-      } else {
-        keys = [
+        // Przygotowujemy listę kont:
+        // 0. event (PDA, writable)
+        // 1. seating_map (PDA, writable)
+        // 2. organizers_pool (PDA, writable)
+        // 3. registry (PDA, writable)
+        // 4. organizer (wallet, signer, writable)
+        // 5. system_program
+        const organizersPoolPDA = await getOrganizersPoolPDA();
+        const registryPDA = await getRegistryPDA();
+        const keys = [
           { pubkey: eventPDA, isSigner: false, isWritable: true },
           { pubkey: seatingMapPDA, isSigner: false, isWritable: true },
           { pubkey: organizersPoolPDA, isSigner: false, isWritable: true },
@@ -252,29 +218,27 @@
           { pubkey: walletPublicKey, isSigner: true, isWritable: true },
           { pubkey: solanaWeb3.SystemProgram.programId, isSigner: false, isWritable: false }
         ];
-      }
 
-      // Tworzymy instrukcję transakcji
-      const transactionInstruction = new solanaWeb3.TransactionInstruction({
-        keys,
-        programId: PROGRAM_ID,
-        data: instructionData
-      });
+        // Tworzymy instrukcję transakcji
+        const transactionInstruction = new solanaWeb3.TransactionInstruction({
+          keys,
+          programId: PROGRAM_ID,
+          data: instructionData
+        });
 
-      try {
         let transaction = new solanaWeb3.Transaction().add(transactionInstruction);
         transaction.feePayer = walletPublicKey;
         const { blockhash } = await CONNECTION.getLatestBlockhash();
         transaction.recentBlockhash = blockhash;
-    
+
         const signedTransaction = await provider.signTransaction(transaction);
         const txSignature = await CONNECTION.sendRawTransaction(signedTransaction.serialize());
-        logMessage("Transakcja wysłana, signature: " + txSignature);
+        Logger.info("Transakcja wysłana, signature: " + txSignature);
         await CONNECTION.confirmTransaction(txSignature, "confirmed");
-        logMessage("Event został utworzony! Tx Sig: " + txSignature);
+        Logger.info("Event został utworzony! Tx Sig: " + txSignature);
         alert("Event został utworzony! Tx Sig: " + txSignature);
       } catch (err) {
-        logMessage("Błąd: " + err.message);
+        Logger.error("Błąd: " + err.message);
         alert("Błąd: " + err.message);
       }
     }
