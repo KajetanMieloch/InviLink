@@ -1,35 +1,69 @@
 use anchor_lang::prelude::*;
+use anchor_spl::token::{self, Mint, Token, TokenAccount, MintTo};
+use anchor_spl::associated_token::AssociatedToken;
+use anchor_spl::metadata::{
+    create_metadata_accounts_v3, CreateMetadataAccountsV3, Metadata as MetadataAccount,
+};
+use mpl_token_metadata::types::{DataV2, Creator};
 use solana_program::hash::hash;
-use anchor_lang::__private::base64;
+use solana_program::pubkey;
+use anchor_spl::metadata::Metadata;
+use base64::{engine::general_purpose, Engine as _};
 
-declare_id!("EW1pWhJkpreYMn2FpYC3fZzqvLCgRdr79dh6E8SL7qwW");
+declare_id!("8bM5zjY3CMCwCw7A7vUVVgB3RcSxBzDKjJTJtAyTa2BN");
 
 // Stałe globalne
 const MASTER_ACCOUNT: Pubkey = pubkey!("4Wg5ZqjS3AktHzq34hK1T55aFNKSjBpmJ3PyRChpPNDh");
-const FEE_PERCENTAGE: u64 = 5; // 5% opłaty manipulacyjnej
+const FEE_PERCENTAGE: u64 = 5; // 5%
 
-// ---------------- FUNKCJE POZA CHAINEM ----------------
+// ---------------- FUNKCJE POMOCNICZE POZA CHAINEM ----------------
 
 fn generate_event_id(name: &str, organizer: &Pubkey) -> String {
     let seed = b"339562";
-    let mut data = Vec::new();
-    data.extend_from_slice(seed);
-    data.extend_from_slice(name.as_bytes());
-    data.extend_from_slice(&organizer.to_bytes());
-    let hash_result = hash(&data);
-    let encoded = base64::encode(hash_result);
+    let mut buffer = [0u8; 128];
+    let mut pos = 0;
+    buffer[pos..pos + seed.len()].copy_from_slice(seed);
+    pos += seed.len();
+    let name_bytes = name.as_bytes();
+    let name_len = name_bytes.len();
+    buffer[pos..pos + name_len].copy_from_slice(name_bytes);
+    pos += name_len;
+    let pubkey_bytes = organizer.to_bytes();
+    buffer[pos..pos + pubkey_bytes.len()].copy_from_slice(&pubkey_bytes);
+    pos += pubkey_bytes.len();
+    let hash_result = hash(&buffer[..pos]);
+    let encoded = general_purpose::URL_SAFE_NO_PAD.encode(hash_result.as_ref());
     encoded.chars().take(12).collect()
 }
 
-fn generate_ticket_id(buyer: &Pubkey, event_id: &str, section_name: &str, row: u8, seat: u8) -> String {
-    let mut data = Vec::new();
-    data.extend_from_slice(buyer.to_bytes().as_ref());
-    data.extend_from_slice(event_id.as_bytes());
-    data.extend_from_slice(section_name.as_bytes());
-    data.push(row);
-    data.push(seat);
-    let hash_result = hash(&data);
-    let encoded = base64::encode(hash_result);
+fn generate_ticket_id(
+    buyer: &Pubkey, 
+    event_id: &str, 
+    event_name: &str, 
+    section_name: &str, 
+    row: u8, 
+    seat: u8
+) -> String {
+    let mut buffer = [0u8; 256];
+    let mut pos = 0;
+    let buyer_bytes = buyer.to_bytes();
+    buffer[pos..pos + buyer_bytes.len()].copy_from_slice(&buyer_bytes);
+    pos += buyer_bytes.len();
+    let event_id_bytes = event_id.as_bytes();
+    buffer[pos..pos + event_id_bytes.len()].copy_from_slice(event_id_bytes);
+    pos += event_id_bytes.len();
+    let event_name_bytes = event_name.as_bytes();
+    buffer[pos..pos + event_name_bytes.len()].copy_from_slice(event_name_bytes);
+    pos += event_name_bytes.len();
+    let section_bytes = section_name.as_bytes();
+    buffer[pos..pos + section_bytes.len()].copy_from_slice(section_bytes);
+    pos += section_bytes.len();
+    buffer[pos] = row;
+    pos += 1;
+    buffer[pos] = seat;
+    pos += 1;
+    let hash_result = hash(&buffer[..pos]);
+    let encoded = base64::encode(hash_result.as_ref());
     encoded.chars().take(12).collect()
 }
 
@@ -39,8 +73,7 @@ fn generate_ticket_id(buyer: &Pubkey, event_id: &str, section_name: &str, row: u
 pub mod invilink {
     use super::*;
 
-    // ---------------- Inicjalizacja ----------------
-
+    // Inicjalizacja puli opłat
     pub fn initialize(ctx: Context<Initialize>) -> Result<()> {
         let fee_pool = &mut ctx.accounts.fee_pool;
         fee_pool.owner = MASTER_ACCOUNT;
@@ -48,12 +81,14 @@ pub mod invilink {
         Ok(())
     }
 
+    // Inicjalizacja puli organizatorów
     pub fn initialize_organizers_pool(ctx: Context<InitializeOrganizersPool>) -> Result<()> {
         let organizers_pool = &mut ctx.accounts.organizers_pool;
         organizers_pool.organizers = Vec::new();
         Ok(())
     }
 
+    // Inicjalizacja rejestru eventów
     pub fn initialize_event_registry(ctx: Context<InitializeEventRegistry>) -> Result<()> {
         let registry = &mut ctx.accounts.registry;
         registry.event_count = 0;
@@ -61,8 +96,7 @@ pub mod invilink {
         Ok(())
     }
 
-    // ---------------- Zarządzanie organizatorami ----------------
-
+    // Dodanie nowego organizatora
     pub fn add_organizer(ctx: Context<AddOrganizer>, new_organizer: Pubkey) -> Result<()> {
         let organizers = &mut ctx.accounts.organizers_pool;
         require!(ctx.accounts.signer.key() == MASTER_ACCOUNT, ErrorCode::Unauthorized);
@@ -71,6 +105,7 @@ pub mod invilink {
         Ok(())
     }
 
+    // Usunięcie organizatora
     pub fn remove_organizer(ctx: Context<RemoveOrganizer>, organizer_to_remove: Pubkey) -> Result<()> {
         let organizers = &mut ctx.accounts.organizers_pool;
         require!(ctx.accounts.signer.key() == MASTER_ACCOUNT, ErrorCode::Unauthorized);
@@ -80,106 +115,7 @@ pub mod invilink {
         Ok(())
     }
 
-    // ---------------- Zarządzanie eventami ----------------
-
-    #[derive(Accounts)]
-    #[instruction(event_id: String, name: String, ticket_price: u64, available_tickets: u64)]
-    pub struct CreateEventOpen<'info> {
-        #[account(
-            init,
-            payer = organizer,
-            seeds = [b"event", event_id.as_bytes()],
-            bump,
-            space = 1024
-        )]
-        pub event: Account<'info, EventNFT>,
-        #[account(mut)]
-        pub organizers_pool: Account<'info, OrganizersPool>,
-        #[account(mut)]
-        pub registry: Account<'info, EventRegistry>,
-        #[account(mut)]
-        pub event_dictionary: Account<'info, EventDictionary>,
-        #[account(mut)]
-        pub organizer: Signer<'info>,
-        pub system_program: Program<'info, System>,
-    }
-    
-    pub fn create_event_open(
-        ctx: Context<CreateEventOpen>,
-        event_id: String,
-        name: String,
-        ticket_price: u64,
-        available_tickets: u64,
-    ) -> Result<()> {
-        let event = &mut ctx.accounts.event;
-        let registry = &mut ctx.accounts.registry;
-        let dict = &mut ctx.accounts.event_dictionary;
-
-        require!(
-            ctx.accounts.organizers_pool.organizers.contains(ctx.accounts.organizer.key),
-            ErrorCode::Unauthorized
-        );
-
-        let expected_event_id = generate_event_id(&name, ctx.accounts.organizer.key);
-        require!(event_id == expected_event_id, ErrorCode::InvalidEventId);
-
-        event.event_id = event_id.clone();
-        event.organizer = *ctx.accounts.organizer.key;
-        event.name = name;
-        event.ticket_price = ticket_price;
-        event.available_tickets = available_tickets;
-        event.sold_tickets = 0;
-        // Teraz wszystkie eventy traktujemy jako numerowane:
-        event.seating_type = 1;
-        event.active = false;
-            
-        let count = registry.event_count as usize;
-        require!(count < 10, ErrorCode::RegistryFull);
-        registry.events[count] = event.key();
-        registry.event_count += 1;
-            
-        let mapping = EventMapping {
-            event_id: event.event_id.clone(),
-            event_pda: event.key(),
-        };
-        dict.events.push(mapping);
-            
-        Ok(())
-    }
-
-    #[derive(AnchorSerialize, AnchorDeserialize, Clone)]
-    pub struct EventMapping {
-        pub event_id: String,
-        pub event_pda: Pubkey,
-    }
-
-    #[account]
-    pub struct EventDictionary {
-        pub events: Vec<EventMapping>,
-    }
-
-    #[derive(Accounts)]
-    pub struct InitializeEventDictionary<'info> {
-        #[account(
-            init,
-            payer = payer,
-            space = 9000,
-            seeds = [b"event_dictionary"],
-            bump,
-        )]
-        pub event_dictionary: Account<'info, EventDictionary>,
-        #[account(mut)]
-        pub payer: Signer<'info>,
-        pub system_program: Program<'info, System>,
-    }
-
-    pub fn initialize_event_dictionary(ctx: Context<InitializeEventDictionary>) -> Result<()> {
-        let dict = &mut ctx.accounts.event_dictionary;
-        dict.events = Vec::new();
-        Ok(())
-    }
-
-    // Funkcja tworząca event z seating mapą – już nie przyjmuje parametru seating_type
+    // Zarządzanie eventami – wyłącznie przez create_event_seating
     #[derive(Accounts)]
     #[instruction(event_id: String, name: String, ticket_price: u64, available_tickets: u64)]
     pub struct CreateEventSeating<'info> {
@@ -233,7 +169,6 @@ pub mod invilink {
         event.ticket_price = ticket_price;
         event.available_tickets = available_tickets;
         event.sold_tickets = 0;
-        // Ustawiamy zawsze numerowany seating
         event.seating_type = 1;
         event.active = false;
 
@@ -249,7 +184,7 @@ pub mod invilink {
         Ok(())
     }
 
-    // Modyfikacja eventu – bez zmian w tym fragmencie
+    // Aktualizacja eventu
     pub fn update_event(
         ctx: Context<UpdateEvent>,
         new_name: Option<String>,
@@ -289,8 +224,6 @@ pub mod invilink {
         pub system_program: Program<'info, System>,
     }
 
-    // W tej funkcji jedynie ustawiamy nowy typ – ale teraz wszystkie eventy mają seating_type = 1,
-    // więc funkcja może być zbędna lub po prostu ignorować zmianę.
     pub fn update_event_seating_type(
         ctx: Context<UpdateEventSeatingType>,
         new_seating_type: u8,
@@ -303,11 +236,10 @@ pub mod invilink {
                 return Err(ErrorCode::CannotChangeSeatingType.into());
             }
         }
-        // Nawet jeśli próbujesz zmienić, zawsze ustawiamy seating_type = 1.
         event.seating_type = 1;
         Ok(())
     }
-    
+
     pub fn activate_event(ctx: Context<ActivateEvent>) -> Result<()> {
         let event = &mut ctx.accounts.event;
         require!(event.organizer == *ctx.accounts.organizer.key, ErrorCode::Unauthorized);
@@ -323,7 +255,7 @@ pub mod invilink {
         event.active = false;
         Ok(())
     }
-    
+
     pub fn delete_event(ctx: Context<DeleteEvent>) -> Result<()> {
         let event = &mut ctx.accounts.event;
         let registry = &mut ctx.accounts.registry;
@@ -336,20 +268,17 @@ pub mod invilink {
         registry.events[count - 1] = Pubkey::default();
         registry.event_count -= 1;
         Ok(())
-    }   
+    }
 
-    // ---------------- Konfiguracja miejsc (seating) ----------------
-
-    pub fn initialize_seating(
-        ctx: Context<InitializeSeating>,
-        event_id: String,
-    ) -> Result<()> {
+    // Inicjalizacja mapy miejsc
+    pub fn initialize_seating(ctx: Context<InitializeSeating>, event_id: String) -> Result<()> {
         let seating_map = &mut ctx.accounts.seating_map;
         seating_map.event_id = event_id;
         seating_map.sections = Vec::new();
         Ok(())
     }
 
+    // Inicjalizacja sekcji miejsc
     pub fn initialize_seating_section(
         ctx: Context<InitializeSeatingSection>,
         section_name: String,
@@ -360,31 +289,31 @@ pub mod invilink {
         let seating_map = &mut ctx.accounts.seating_map;
         let section_account = &mut ctx.accounts.seating_section;
         let event = &ctx.accounts.event;
-    
+
         require!(!event.active, ErrorCode::EventIsActive);
         require!(event.seating_type != 0, ErrorCode::InvalidSeatingType);
-    
         require!(rows > 0 && seats_per_row > 0, ErrorCode::InvalidSeating);
-    
+
         let new_seats_count = (rows as u64) * (seats_per_row as u64);
         let updated_total = seating_map
             .total_seats
             .checked_add(new_seats_count)
             .ok_or(ErrorCode::InvalidSeating)?;
         require!(updated_total <= event.available_tickets, ErrorCode::InvalidSeating);
-    
+
         section_account.event_id = seating_map.event_id.clone();
         section_account.section_name = section_name.clone();
         section_account.section_type = section_type;
         section_account.rows = rows;
         section_account.seats_per_row = seats_per_row;
         section_account.seat_status = vec![0; (rows as usize) * (seats_per_row as usize)];
-    
+
         seating_map.sections.push(section_account.key());
         seating_map.total_seats = updated_total;
         Ok(())
     }
-    
+
+    // Aktualizacja konfiguracji sekcji miejsc
     pub fn update_seating_section(
         ctx: Context<UpdateSeatingSection>,
         new_rows: Option<u8>,
@@ -432,6 +361,7 @@ pub mod invilink {
         Ok(())
     }
 
+    // Usunięcie sekcji miejsc
     pub fn remove_seating_section(ctx: Context<RemoveSeatingSection>) -> Result<()> {
         let seating_map = &mut ctx.accounts.seating_map;
         let seating_section = &ctx.accounts.seating_section;
@@ -439,7 +369,6 @@ pub mod invilink {
 
         require!(!event.active, ErrorCode::EventIsActive);
         require!(event.seating_type != 0, ErrorCode::InvalidSeatingType);
-
         require!(
             seating_section.seat_status.iter().all(|&s| s == 0),
             ErrorCode::CannotRemoveSectionWithTickets
@@ -461,6 +390,7 @@ pub mod invilink {
         Ok(())
     }
 
+    // Emitowanie szczegółów mapy miejsc jako event
     pub fn emit_seating_map_details(ctx: Context<EmitSeatingMapDetails>) -> Result<()> {
         let seating_map = &ctx.accounts.seating_map;
         emit!(SeatingMapDetails {
@@ -471,146 +401,137 @@ pub mod invilink {
         Ok(())
     }
 
-    // ---------------- Mintowanie biletu ----------------
-    
-    pub fn mint_ticket(
-        ctx: Context<MintTicket>,
+    // Mintowanie biletu NFT
+    pub fn mint_ticket_nft(
+        ctx: Context<MintTicketNft>,
         event_id: String,
+        event_name: String,
         section_name: String,
         row: u8,
         seat: u8,
     ) -> Result<()> {
-        let ticket = &mut ctx.accounts.ticket;
         let event = &mut ctx.accounts.event;
         require!(event.event_id == event_id, ErrorCode::InvalidTicket);
+        require!(event.active, ErrorCode::EventNotActive);
 
-        let seating_section = ctx
-            .accounts
-            .seating_section
-            .as_mut()
-            .ok_or(ErrorCode::InvalidSeating)?;
-        require!(seating_section.event_id == event.event_id, ErrorCode::InvalidSeating);
-        require!(seating_section.section_name == section_name, ErrorCode::InvalidSeating);
+        // Generacja ticket_id przy użyciu funkcji pomocniczej
+        let ticket_id = generate_ticket_id(
+            ctx.accounts.buyer.key,
+            &event_id,
+            &event_name,
+            &section_name,
+            row,
+            seat,
+        );
 
-        let index = (row as usize) * (seating_section.seats_per_row as usize) + (seat as usize);
-        require!(index < seating_section.seat_status.len(), ErrorCode::InvalidSeating);
-        require!(seating_section.seat_status[index] == 0, ErrorCode::SeatAlreadyTaken);
-        seating_section.seat_status[index] = 2;
+        // Mintujemy 1 jednostkę NFT do konta tokenowego
+        let cpi_accounts = MintTo {
+            mint: ctx.accounts.mint.to_account_info(),
+            to: ctx.accounts.token_account.to_account_info(),
+            authority: ctx.accounts.buyer.to_account_info(),
+        };
+        let cpi_ctx = CpiContext::new(ctx.accounts.token_program.to_account_info(), cpi_accounts);
+        token::mint_to(cpi_ctx, 1)?;
 
-        // Generujemy ticket_id na łańcuchu
-        let ticket_id = generate_ticket_id(ctx.accounts.buyer.key, &event_id, &section_name, row, seat);
+        // Konfiguracja metadanych NFT
+        let title = format!("{} Ticket - {} - Row {} Seat {}", event_name, section_name, row, seat);
+        let symbol = "TICKET".to_string();
+        let uri = format!("https://example.com/metadata/{}", ticket_id);
 
-        ticket.ticket_id = ticket_id;
-        ticket.event_id = event_id;
-        ticket.owner = *ctx.accounts.buyer.key;
-        ticket.row = Some(row);
-        ticket.seat = Some(seat);
-        ticket.used = false;
+        let creators = vec![Creator {
+            address: event.organizer,
+            verified: false,
+            share: 100,
+        }];
 
+        let data_v2 = DataV2 {
+            name: title,
+            symbol,
+            uri,
+            seller_fee_basis_points: 0,
+            creators: Some(creators),
+            collection: None,
+            uses: None,
+        };
+
+        // Tworzenie konta metadanych NFT przy użyciu CPI
+        let cpi_accounts = CreateMetadataAccountsV3 {
+            metadata: ctx.accounts.metadata.to_account_info(),
+            mint: ctx.accounts.mint.to_account_info(),
+            mint_authority: ctx.accounts.buyer.to_account_info(),
+            payer: ctx.accounts.buyer.to_account_info(),
+            update_authority: ctx.accounts.buyer.to_account_info(),
+            system_program: ctx.accounts.system_program.to_account_info(),
+            rent: ctx.accounts.rent.to_account_info(),
+        };
+
+        let cpi_ctx = CpiContext::new(ctx.accounts.token_metadata_program.to_account_info(), cpi_accounts);
+        create_metadata_accounts_v3(cpi_ctx, data_v2, true, true, None)?;
+
+        // Aktualizacja liczby sprzedanych biletów
         event.sold_tickets = event.sold_tickets.checked_add(1).ok_or(ErrorCode::InvalidTicket)?;
         Ok(())
     }
 
+
+    pub fn mint_test_nft(
+        ctx: Context<MintTestNft>,
+        event_id: String,
+        event_name: String,
+        section_name: String,
+        row: u8,
+        seat: u8,
+    ) -> Result<()> {
+        // Mintujemy 1 jednostkę NFT
+        let cpi_accounts = MintTo {
+            mint: ctx.accounts.mint.to_account_info(),
+            to: ctx.accounts.token_account.to_account_info(),
+            authority: ctx.accounts.buyer.to_account_info(),
+        };
+        let cpi_ctx = CpiContext::new(ctx.accounts.token_program.to_account_info(), cpi_accounts);
+        token::mint_to(cpi_ctx, 1)?;
     
-    // ---------------- Operacje biletowe ----------------
-
-    pub fn sell_ticket(ctx: Context<SellTicket>, sale_price: u64) -> Result<()> {
-        let ticket = &mut ctx.accounts.ticket;
-        require!(ticket.owner == *ctx.accounts.seller.key, ErrorCode::Unauthorized);
-
-        let fee = sale_price * FEE_PERCENTAGE / 100;
-        let seller_revenue = sale_price - fee;
-
-        let buyer_account_info = ctx.accounts.buyer.to_account_info();
-        let mut buyer_lamports = buyer_account_info.try_borrow_mut_lamports()?;
-        require!(**buyer_lamports >= sale_price, ErrorCode::InsufficientFunds);
-        **buyer_lamports -= sale_price;
-
-        let fee_pool_account_info = ctx.accounts.fee_pool.to_account_info();
-        let mut fee_pool_lamports = fee_pool_account_info.try_borrow_mut_lamports()?;
-        **fee_pool_lamports += fee;
-        ctx.accounts.fee_pool.total_fees += fee;
-
-        let seller_account_info = ctx.accounts.seller.to_account_info();
-        let mut seller_lamports = seller_account_info.try_borrow_mut_lamports()?;
-        **seller_lamports += seller_revenue;
-
-        ticket.owner = *ctx.accounts.buyer.key;
-
-        Ok(())
-    }
-
-    pub fn transfer_ticket(ctx: Context<TransferTicket>, new_owner: Pubkey, ticket_price: u64) -> Result<()> {
-        let ticket = &mut ctx.accounts.ticket;
-        require!(ticket.owner == *ctx.accounts.current_owner.key, ErrorCode::Unauthorized);
-
-        let fee = ticket_price * FEE_PERCENTAGE / 100;
-
-        let owner_account_info = ctx.accounts.current_owner.to_account_info();
-        let mut owner_lamports = owner_account_info.try_borrow_mut_lamports()?;
-        require!(**owner_lamports >= fee, ErrorCode::InsufficientFunds);
-        **owner_lamports -= fee;
-
-        let fee_pool_account_info = ctx.accounts.fee_pool.to_account_info();
-        let mut fee_pool_lamports = fee_pool_account_info.try_borrow_mut_lamports()?;
-        **fee_pool_lamports += fee;
-        ctx.accounts.fee_pool.total_fees += fee;
-
-        ticket.owner = new_owner;
-
-        Ok(())
-    }
-
-    pub fn validate_ticket(ctx: Context<ValidateTicket>, ticket_id: String) -> Result<()> {
-        let ticket = &ctx.accounts.ticket;
-        require!(ticket.ticket_id == ticket_id, ErrorCode::InvalidTicket);
-        require!(!ticket.used, ErrorCode::TicketAlreadyUsed);
-        Ok(())
-    }
-
-    pub fn mark_ticket_used(ctx: Context<MarkTicketUsed>, ticket_id: String) -> Result<()> {
-        let ticket = &mut ctx.accounts.ticket;
-        require!(ticket.ticket_id == ticket_id, ErrorCode::InvalidTicket);
-        require!(!ticket.used, ErrorCode::TicketAlreadyUsed);
-        ticket.used = true;
-        Ok(())
-    }
-
-    pub fn withdraw_fees(ctx: Context<WithdrawFees>) -> Result<()> {
-        require!(ctx.accounts.owner.key() == MASTER_ACCOUNT, ErrorCode::Unauthorized);
-
-        let lamports_to_withdraw = ctx.accounts.fee_pool.total_fees;
-        let fee_pool_account_info = ctx.accounts.fee_pool.to_account_info();
-        let owner_account_info = ctx.accounts.owner.to_account_info();
-
-        {
-            let mut fee_pool_lamports = fee_pool_account_info.try_borrow_mut_lamports()?;
-            let mut owner_lamports = owner_account_info.try_borrow_mut_lamports()?;
-            **fee_pool_lamports -= lamports_to_withdraw;
-            **owner_lamports += lamports_to_withdraw;
-        }
-
-        ctx.accounts.fee_pool.total_fees = 0;
-
-        Ok(())
-    }
-
-    // ----------------- Funkcje pomocnicze -----------------
-
-    pub fn close_target_account(ctx: Context<CloseTargetAccount>) -> Result<()> {
-        require!(ctx.accounts.authority.key() == MASTER_ACCOUNT, ErrorCode::Unauthorized);
+        // Używamy krótkiej nazwy, aby nie przekroczyć limitu (32 bajty)
+        let title = "Test Ticket".to_string();
+        let symbol = "TEST".to_string();
+        let uri = format!("https://example.com/metadata/{}-{}-{}-{}-{}", event_id, event_name, section_name, row, seat);
     
-        let closable = &mut ctx.accounts.closable_account;
-        let authority = &mut ctx.accounts.authority;
+        let creators = vec![mpl_token_metadata::types::Creator {
+            address: ctx.accounts.buyer.key(),
+            verified: true,
+            share: 100,
+        }];
     
-        **authority.to_account_info().lamports.borrow_mut() += closable.lamports();
-        **closable.to_account_info().lamports.borrow_mut() = 0;
+        let data_v2 = mpl_token_metadata::types::DataV2 {
+            name: title,
+            symbol,
+            uri,
+            seller_fee_basis_points: 0,
+            creators: Some(creators),
+            collection: None,
+            uses: None,
+        };
     
+        let cpi_accounts_meta = CreateMetadataAccountsV3 {
+            metadata: ctx.accounts.metadata.to_account_info(),
+            mint: ctx.accounts.mint.to_account_info(),
+            mint_authority: ctx.accounts.buyer.to_account_info(),
+            payer: ctx.accounts.buyer.to_account_info(),
+            update_authority: ctx.accounts.buyer.to_account_info(),
+            system_program: ctx.accounts.system_program.to_account_info(),
+            rent: ctx.accounts.rent.to_account_info(),
+        };
+    
+        let cpi_ctx_meta = CpiContext::new(ctx.accounts.token_metadata_program.to_account_info(), cpi_accounts_meta);
+        create_metadata_accounts_v3(cpi_ctx_meta, data_v2, true, true, None)?;
         Ok(())
     }
+    
 }
 
-// ================= KONTEKSTY (Accounts) =================
+//
+// KONTEKSTY (ACCOUNTS)
+//
 
 #[derive(Accounts)]
 pub struct Initialize<'info> {
@@ -698,7 +619,6 @@ pub struct DeleteEvent<'info> {
     pub organizer: AccountInfo<'info>,
 }
 
-
 #[derive(Accounts)]
 #[instruction(event_id: String)]
 pub struct InitializeSeating<'info> {
@@ -769,69 +689,98 @@ pub struct RemoveSeatingSection<'info> {
 }
 
 #[derive(Accounts)]
+#[instruction(event_id: String, row: u8, seat: u8)]
+pub struct MintTicketNft<'info> {
+    #[account(mut)]
+    pub event: Account<'info, EventNFT>,
+    #[account(mut)]
+    pub buyer: Signer<'info>,
+    #[account(
+        init,
+        payer = buyer,
+        seeds = [b"mint", event_id.as_bytes(), &[row], &[seat]],
+        bump,
+        mint::decimals = 0,
+        mint::authority = buyer,
+        mint::freeze_authority = buyer,
+    )]
+    pub mint: Account<'info, Mint>,
+    #[account(
+        init_if_needed,
+        payer = buyer,
+        associated_token::mint = mint,
+        associated_token::authority = buyer,
+    )]
+    pub token_account: Account<'info, TokenAccount>,
+    pub token_program: Program<'info, Token>,
+    pub associated_token_program: Program<'info, AssociatedToken>,
+    #[account(mut)]
+    /// CHECK: Metadane są walidowane przez CPI.
+    pub metadata: AccountInfo<'info>,
+    pub token_metadata_program: Program<'info, Metadata>,
+    pub system_program: Program<'info, System>,
+    pub rent: Sysvar<'info, Rent>,
+}
+
+#[derive(Accounts)]
 pub struct EmitSeatingMapDetails<'info> {
     pub seating_map: Account<'info, SeatingMap>,
 }
 
 #[derive(Accounts)]
-pub struct MintTicket<'info> {
-    #[account(init, payer = buyer, space = 200)]
-    pub ticket: Account<'info, TicketNFT>,
+pub struct CloseTargetAccount<'info> {
+    /// CHECK: To konto musi być MASTER_ACCOUNT. Sprawdzamy to ręcznie w kodzie.
+    #[account(signer)]
+    pub authority: Signer<'info>,
+    /// CHECK: To konto jest zamykane, a jego bezpieczeństwo wynika z faktu, że cały proces zamykania
+    /// jest kontrolowany przez MASTER_ACCOUNT, więc nie ma potrzeby dodatkowej walidacji.
     #[account(mut)]
-    pub event: Account<'info, EventNFT>,
-    // Dla wszystkich eventów wymagamy konta sekcji
-    #[account(mut)]
-    pub seating_section: Option<Account<'info, SeatingSectionAccount>>,
+    pub closable_account: AccountInfo<'info>,
+}
+
+
+#[derive(Accounts)]
+#[instruction(event_id: String, event_name: String, section_name: String, row: u8, seat: u8)]
+pub struct MintTestNft<'info> {
+    /// Konto kupującego – NFT trafi na ten adres
     #[account(mut)]
     pub buyer: Signer<'info>,
+    #[account(
+        init,
+        payer = buyer,
+        seeds = [
+            b"test_mint",
+            event_id.as_bytes(),
+            event_name.as_bytes(),
+            section_name.as_bytes(),
+            &[row],
+            &[seat]
+        ],
+        bump,
+        mint::decimals = 0,
+        mint::authority = buyer,
+        mint::freeze_authority = buyer,
+    )]
+    pub mint: Account<'info, Mint>,
+    #[account(
+        init_if_needed,
+        payer = buyer,
+        associated_token::mint = mint,
+        associated_token::authority = buyer,
+    )]
+    pub token_account: Account<'info, TokenAccount>,
+    #[account(mut)]
+    /// CHECK: Konto metadanych – walidowane przez CPI
+    pub metadata: AccountInfo<'info>,
+    pub token_program: Program<'info, Token>,
+    pub associated_token_program: Program<'info, AssociatedToken>,
+    pub token_metadata_program: Program<'info, Metadata>,
     pub system_program: Program<'info, System>,
+    pub rent: Sysvar<'info, Rent>,
 }
 
-#[derive(Accounts)]
-pub struct SellTicket<'info> {
-    #[account(mut)]
-    pub ticket: Account<'info, TicketNFT>,
-    #[account(mut)]
-    pub seller: Signer<'info>,
-    #[account(mut)]
-    pub buyer: Signer<'info>,
-    #[account(mut)]
-    pub fee_pool: Account<'info, FeePool>,
-}
 
-#[derive(Accounts)]
-pub struct TransferTicket<'info> {
-    #[account(mut)]
-    pub ticket: Account<'info, TicketNFT>,
-    #[account(mut)]
-    pub current_owner: Signer<'info>,
-    #[account(mut)]
-    pub fee_pool: Account<'info, FeePool>,
-}
-
-#[derive(Accounts)]
-pub struct ValidateTicket<'info> {
-    #[account()]
-    pub ticket: Account<'info, TicketNFT>,
-    pub owner: Signer<'info>,
-}
-
-#[derive(Accounts)]
-pub struct MarkTicketUsed<'info> {
-    #[account(mut)]
-    pub ticket: Account<'info, TicketNFT>,
-    pub owner: Signer<'info>,
-}
-
-#[derive(Accounts)]
-pub struct WithdrawFees<'info> {
-    #[account(mut)]
-    pub fee_pool: Account<'info, FeePool>,
-    #[account(mut)]
-    pub owner: Signer<'info>,
-}
-
-// ================= STRUKTURY KONTA =================
+// ---------------- STRUKTURY KONTA ----------------
 
 #[account]
 pub struct FeePool {
@@ -858,14 +807,13 @@ pub struct EventNFT {
     pub ticket_price: u64,
     pub available_tickets: u64,
     pub sold_tickets: u64,
-    // Wszystkie eventy są numerowane
     pub seating_type: u8,
     pub active: bool,
 }
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone)]
 pub struct SeatingSection {
-    pub section_type: u8,  // dla numerowanych miejsc oczekujemy section_type == 1
+    pub section_type: u8,
     pub rows: u8,
     pub seats_per_row: u8,
     pub seat_status: Vec<u8>,
@@ -895,16 +843,6 @@ pub struct SeatingSectionAccount {
     pub seat_status: Vec<u8>,
 }
 
-#[account]
-pub struct TicketNFT {
-    pub ticket_id: String,
-    pub event_id: String,
-    pub owner: Pubkey,
-    pub row: Option<u8>,
-    pub seat: Option<u8>,
-    pub used: bool,
-}
-
 #[derive(AnchorSerialize, AnchorDeserialize, Clone)]
 pub struct SeatingSectionInput {
     pub section_type: u8,
@@ -912,20 +850,7 @@ pub struct SeatingSectionInput {
     pub seats_per_row: u8,
 }
 
-// ================= FUNKCJE POMOCNICZE =================
-
-#[derive(Accounts)]
-pub struct CloseTargetAccount<'info> {
-    /// CHECK: To konto musi być MASTER_ACCOUNT. Sprawdzamy to ręcznie w kodzie.
-    #[account(signer)]
-    pub authority: Signer<'info>,
-    /// CHECK: To konto jest zamykane, a jego bezpieczeństwo wynika z faktu, że cały proces zamykania
-    /// jest kontrolowany przez MASTER_ACCOUNT, więc nie ma potrzeby dodatkowej walidacji.
-    #[account(mut)]
-    pub closable_account: AccountInfo<'info>,
-}
-
-// ================= ERROR CODE =================
+// ---------------- ERROR CODE ----------------
 
 #[error_code]
 pub enum ErrorCode {

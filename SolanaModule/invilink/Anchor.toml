@@ -1,11 +1,15 @@
 [toolchain]
+anchor_version = "0.30.1"
+cluster = "localnet"
+sbf_version = "v2"
+
 
 [features]
 resolution = true
 skip-lint = false
 
 [programs.localnet]
-invilink = "EW1pWhJkpreYMn2FpYC3fZzqvLCgRdr79dh6E8SL7qwW"
+invilink = "8bM5zjY3CMCwCw7A7vUVVgB3RcSxBzDKjJTJtAyTa2BN"
 
 [registry]
 url = "https://api.apr.dev"
