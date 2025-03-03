@@ -10,7 +10,7 @@ use solana_program::pubkey;
 use anchor_spl::metadata::Metadata;
 use base64::{engine::general_purpose, Engine as _};
 
-declare_id!("8bM5zjY3CMCwCw7A7vUVVgB3RcSxBzDKjJTJtAyTa2BN");
+declare_id!("8NnF5fcT4oxNFHSsfJ8hNaAqt9tSEdnmeErn44YcfyDq");
 
 // Stałe globalne
 const MASTER_ACCOUNT: Pubkey = pubkey!("4Wg5ZqjS3AktHzq34hK1T55aFNKSjBpmJ3PyRChpPNDh");
@@ -154,15 +154,16 @@ pub mod invilink {
         let event = &mut ctx.accounts.event;
         let registry = &mut ctx.accounts.registry;
         let seating_map = &mut ctx.accounts.seating_map;
-
+    
         require!(
             ctx.accounts.organizers_pool.organizers.contains(ctx.accounts.organizer.key),
             ErrorCode::Unauthorized
         );
-
+    
         let expected_event_id = generate_event_id(&name, ctx.accounts.organizer.key);
         require!(event_id == expected_event_id, ErrorCode::InvalidEventId);
-
+    
+        // Inicjalizacja eventu
         event.event_id = event_id.clone();
         event.organizer = *ctx.accounts.organizer.key;
         event.name = name.clone();
@@ -170,20 +171,23 @@ pub mod invilink {
         event.available_tickets = available_tickets;
         event.sold_tickets = 0;
         event.seating_type = 1;
-        event.active = false;
-
+        event.active = false; // lub true, jeśli taki ma być stan początkowy
+    
+        // Inicjalizacja mapy miejsc – teraz ustawiamy wszystkie pola!
         seating_map.event_id = event.event_id.clone();
+        seating_map.organizer = event.organizer; // ustalamy organizatora
+        seating_map.active = event.active;       // kopiujemy stan aktywności eventu
         seating_map.sections = Vec::new();
         seating_map.total_seats = 0;
-
+    
         let count = registry.event_count as usize;
         require!(count < 10, ErrorCode::RegistryFull);
         registry.events[count] = event.key();
         registry.event_count += 1;
-
+    
         Ok(())
     }
-
+    
     // Aktualizacja eventu
     pub fn update_event(
         ctx: Context<UpdateEvent>,
@@ -402,78 +406,6 @@ pub mod invilink {
     }
 
     // Mintowanie biletu NFT
-    pub fn mint_ticket_nft(
-        ctx: Context<MintTicketNft>,
-        event_id: String,
-        event_name: String,
-        section_name: String,
-        row: u8,
-        seat: u8,
-    ) -> Result<()> {
-        let event = &mut ctx.accounts.event;
-        require!(event.event_id == event_id, ErrorCode::InvalidTicket);
-        require!(event.active, ErrorCode::EventNotActive);
-
-        // Generacja ticket_id przy użyciu funkcji pomocniczej
-        let ticket_id = generate_ticket_id(
-            ctx.accounts.buyer.key,
-            &event_id,
-            &event_name,
-            &section_name,
-            row,
-            seat,
-        );
-
-        // Mintujemy 1 jednostkę NFT do konta tokenowego
-        let cpi_accounts = MintTo {
-            mint: ctx.accounts.mint.to_account_info(),
-            to: ctx.accounts.token_account.to_account_info(),
-            authority: ctx.accounts.buyer.to_account_info(),
-        };
-        let cpi_ctx = CpiContext::new(ctx.accounts.token_program.to_account_info(), cpi_accounts);
-        token::mint_to(cpi_ctx, 1)?;
-
-        // Konfiguracja metadanych NFT
-        let title = format!("{} Ticket - {} - Row {} Seat {}", event_name, section_name, row, seat);
-        let symbol = "TICKET".to_string();
-        let uri = format!("https://example.com/metadata/{}", ticket_id);
-
-        let creators = vec![Creator {
-            address: event.organizer,
-            verified: false,
-            share: 100,
-        }];
-
-        let data_v2 = DataV2 {
-            name: title,
-            symbol,
-            uri,
-            seller_fee_basis_points: 0,
-            creators: Some(creators),
-            collection: None,
-            uses: None,
-        };
-
-        // Tworzenie konta metadanych NFT przy użyciu CPI
-        let cpi_accounts = CreateMetadataAccountsV3 {
-            metadata: ctx.accounts.metadata.to_account_info(),
-            mint: ctx.accounts.mint.to_account_info(),
-            mint_authority: ctx.accounts.buyer.to_account_info(),
-            payer: ctx.accounts.buyer.to_account_info(),
-            update_authority: ctx.accounts.buyer.to_account_info(),
-            system_program: ctx.accounts.system_program.to_account_info(),
-            rent: ctx.accounts.rent.to_account_info(),
-        };
-
-        let cpi_ctx = CpiContext::new(ctx.accounts.token_metadata_program.to_account_info(), cpi_accounts);
-        create_metadata_accounts_v3(cpi_ctx, data_v2, true, true, None)?;
-
-        // Aktualizacja liczby sprzedanych biletów
-        event.sold_tickets = event.sold_tickets.checked_add(1).ok_or(ErrorCode::InvalidTicket)?;
-        Ok(())
-    }
-
-
     pub fn mint_test_nft(
         ctx: Context<MintTestNft>,
         event_id: String,
@@ -482,7 +414,19 @@ pub mod invilink {
         row: u8,
         seat: u8,
     ) -> Result<()> {
-        // Mintujemy 1 jednostkę NFT
+        // 1. Sprawdzenie: czy konto SeatingMap zawiera właściwy event_id
+        require!(
+            ctx.accounts.seating_map.event_id == event_id,
+            ErrorCode::InvalidEventId
+        );
+    
+        // 2. Sprawdzenie: czy event (odzwierciedlony przez SeatingMap) jest aktywny
+        require!(
+            ctx.accounts.seating_map.active,
+            ErrorCode::EventNotActive
+        );
+    
+        // Mintujemy 1 jednostkę NFT do konta tokenowego
         let cpi_accounts = MintTo {
             mint: ctx.accounts.mint.to_account_info(),
             to: ctx.accounts.token_account.to_account_info(),
@@ -494,7 +438,10 @@ pub mod invilink {
         // Używamy krótkiej nazwy, aby nie przekroczyć limitu (32 bajty)
         let title = "Test Ticket".to_string();
         let symbol = "TEST".to_string();
-        let uri = format!("https://example.com/metadata/{}-{}-{}-{}-{}", event_id, event_name, section_name, row, seat);
+        let uri = format!(
+            "https://example.com/metadata/{}-{}-{}-{}-{}",
+            event_id, event_name, section_name, row, seat
+        );
     
         let creators = vec![mpl_token_metadata::types::Creator {
             address: ctx.accounts.buyer.key(),
@@ -522,10 +469,13 @@ pub mod invilink {
             rent: ctx.accounts.rent.to_account_info(),
         };
     
-        let cpi_ctx_meta = CpiContext::new(ctx.accounts.token_metadata_program.to_account_info(), cpi_accounts_meta);
+        let cpi_ctx_meta =
+            CpiContext::new(ctx.accounts.token_metadata_program.to_account_info(), cpi_accounts_meta);
         create_metadata_accounts_v3(cpi_ctx_meta, data_v2, true, true, None)?;
         Ok(())
     }
+    
+    
     
 }
 
@@ -742,9 +692,18 @@ pub struct CloseTargetAccount<'info> {
 #[derive(Accounts)]
 #[instruction(event_id: String, event_name: String, section_name: String, row: u8, seat: u8)]
 pub struct MintTestNft<'info> {
+    /// Konto eventu – utworzone przy wywołaniu create_event_seating
+    #[account(mut, seeds = [b"event", event_id.as_bytes()], bump)]
+    pub event: Account<'info, EventNFT>,
+
     /// Konto kupującego – NFT trafi na ten adres
     #[account(mut)]
     pub buyer: Signer<'info>,
+    
+    /// Konto mapy miejsc – musi być już zainicjalizowane (PDA: [b"seating_map", event_id.as_bytes()])
+    #[account(mut, seeds = [b"seating_map", event_id.as_bytes()], bump)]
+    pub seating_map: Account<'info, SeatingMap>,
+    
     #[account(
         init,
         payer = buyer,
@@ -762,6 +721,7 @@ pub struct MintTestNft<'info> {
         mint::freeze_authority = buyer,
     )]
     pub mint: Account<'info, Mint>,
+    
     #[account(
         init_if_needed,
         payer = buyer,
@@ -769,9 +729,11 @@ pub struct MintTestNft<'info> {
         associated_token::authority = buyer,
     )]
     pub token_account: Account<'info, TokenAccount>,
+    
     #[account(mut)]
-    /// CHECK: Konto metadanych – walidowane przez CPI
+    /// CHECK: Konto metadanych – walidowane przez CPI.
     pub metadata: AccountInfo<'info>,
+    
     pub token_program: Program<'info, Token>,
     pub associated_token_program: Program<'info, AssociatedToken>,
     pub token_metadata_program: Program<'info, Metadata>,
@@ -822,9 +784,12 @@ pub struct SeatingSection {
 #[account]
 pub struct SeatingMap {
     pub event_id: String,
+    pub organizer: Pubkey, // adres organizatora, pobieramy go przy tworzeniu eventu
+    pub active: bool,      // stan eventu – true, gdy event jest aktywny
     pub sections: Vec<Pubkey>,
     pub total_seats: u64,
 }
+
 
 #[event]
 pub struct SeatingMapDetails {
