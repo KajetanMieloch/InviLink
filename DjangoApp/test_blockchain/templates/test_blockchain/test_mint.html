@@ -47,8 +47,7 @@
     Logger.info("Logger uruchomiony.");
 
     // Stałe – adresy programu i innych kont
-    const PROGRAM_ID = new solanaWeb3.PublicKey("8bM5zjY3CMCwCw7A7vUVVgB3RcSxBzDKjJTJtAyTa2BN");
-    // Dyskryminator dla mint_test_nft (zgodnie z IDL)
+    const PROGRAM_ID = new solanaWeb3.PublicKey("8NnF5fcT4oxNFHSsfJ8hNaAqt9tSEdnmeErn44YcfyDq");
     const MINT_TEST_DISCRIMINATOR = new Uint8Array([86,115,86,37,54,125,91,90]);
     const METADATA_PROGRAM_ID = new solanaWeb3.PublicKey("metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s");
     const TOKEN_PROGRAM_ID = new solanaWeb3.PublicKey("TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA");
@@ -74,7 +73,7 @@
     }
     window.addEventListener("load", init);
 
-    // Serializacja zgodnie z Borsh: 4B długość + dane
+    // Serializacja zgodnie z Borsh: 4 bajty długości + dane
     function serializeString(str) {
       const encoder = new TextEncoder();
       const encoded = encoder.encode(str);
@@ -89,7 +88,7 @@
       return new Uint8Array([val]);
     }
 
-    // Dodana funkcja getTestMintPDA – seed'y: ["test_mint", event_id, event_name, section_name, [row], [seat]]
+    // Oblicza PDA dla mint NFT – seed'y: ["test_mint", event_id, event_name, section_name, [row], [seat]]
     async function getTestMintPDA(event_id, event_name, section_name, row, seat) {
       const encoder = new TextEncoder();
       const seed1 = encoder.encode("test_mint");
@@ -124,7 +123,7 @@
       return metadataPDA;
     }
 
-    // Ładowanie eventu z łańcucha na podstawie podanego EventID
+    // Ładowanie eventu (pobieramy zarówno event jak i seating_map)
     async function loadEvent() {
       try {
         if (!currentEventID) {
@@ -132,9 +131,10 @@
           return;
         }
         Logger.info("Ładowanie eventu: " + currentEventID);
-        const seed1 = new TextEncoder().encode("event");
-        const seed2 = new TextEncoder().encode(currentEventID);
-        const [eventPDA] = await solanaWeb3.PublicKey.findProgramAddress([seed1, seed2], PROGRAM_ID);
+        // Obliczamy PDA dla eventu: seeds = [ "event", eventId ]
+        const eventSeed1 = new TextEncoder().encode("event");
+        const eventSeed2 = new TextEncoder().encode(currentEventID);
+        const [eventPDA] = await solanaWeb3.PublicKey.findProgramAddress([eventSeed1, eventSeed2], PROGRAM_ID);
         Logger.info("Event PDA: " + eventPDA.toBase58());
         const eventAcc = await connection.getAccountInfo(eventPDA);
         if (!eventAcc) {
@@ -145,7 +145,20 @@
         eventData = decodeEventNFT(eventAcc.data);
         Logger.info("Dane eventu: " + JSON.stringify(eventData, null, 2));
         displayEvent(eventData);
-        loadSeatingSections(currentEventID);
+        // Ładujemy seating_map (PDA: [ "seating_map", eventId ])
+        const seatingSeed1 = new TextEncoder().encode("seating_map");
+        const seatingSeed2 = new TextEncoder().encode(currentEventID);
+        const [seatingMapPDA] = await solanaWeb3.PublicKey.findProgramAddress([seatingSeed1, seatingSeed2], PROGRAM_ID);
+        Logger.info("Seating Map PDA: " + seatingMapPDA.toBase58());
+        const seatingMapAcc = await connection.getAccountInfo(seatingMapPDA);
+        if (!seatingMapAcc) {
+          Logger.error("Nie znaleziono mapy miejsc.");
+          return;
+        }
+        // Przechowujemy seating_map w eventData (dla późniejszego użytku)
+        eventData.seating_map = decodeSeatingMap(seatingMapAcc.data);
+        Logger.info("SeatingMap: " + JSON.stringify(eventData.seating_map, null, 2));
+        loadSections(eventData.seating_map.sections);
       } catch (err) {
         Logger.error("Błąd ładowania eventu: " + err.message);
       }
@@ -170,6 +183,26 @@
       return { event_id, organizer, name, ticket_price: ticket_price.toString(), available_tickets: available_tickets.toString(), sold_tickets: sold_tickets.toString(), seating_type, active };
     }
 
+    function decodeSeatingMap(data) {
+      let offset = 8; // pomijamy dyskryminator
+      const dv = new DataView(data.buffer, data.byteOffset, data.byteLength);
+      const eventIdLen = dv.getUint32(offset, true); offset += 4;
+      const eventIdBytes = data.slice(offset, offset + eventIdLen); offset += eventIdLen;
+      const event_id = new TextDecoder().decode(eventIdBytes);
+      const organizerBytes = data.slice(offset, offset + 32); offset += 32;
+      const organizer = new solanaWeb3.PublicKey(organizerBytes).toBase58();
+      const active = dv.getUint8(offset) !== 0; offset += 1;
+      const vecLen = dv.getUint32(offset, true); offset += 4;
+      let sections = [];
+      for (let i = 0; i < vecLen; i++) {
+        const keyBytes = data.slice(offset, offset + 32);
+        sections.push(new solanaWeb3.PublicKey(keyBytes).toBase58());
+        offset += 32;
+      }
+      const total_seats = dv.getBigUint64(offset, true); offset += 8;
+      return { event_id, organizer, active, sections, total_seats: total_seats.toString() };
+    }
+
     function displayEvent(ev) {
       const detailsDiv = document.getElementById("eventDetails");
       detailsDiv.innerHTML = `
@@ -182,43 +215,6 @@
         <p><strong>Rodzaj miejsc:</strong> ${ev.seating_type === 1 ? "Numerowane" : "Inny"}</p>
         <p><strong>Aktywny:</strong> ${ev.active}</p>
       `;
-    }
-
-    async function loadSeatingSections(eventID) {
-      try {
-        const seed1 = new TextEncoder().encode("seating_map");
-        const seed2 = new TextEncoder().encode(eventID);
-        const [seatingMapPDA] = await solanaWeb3.PublicKey.findProgramAddress([seed1, seed2], PROGRAM_ID);
-        Logger.info("Seating Map PDA: " + seatingMapPDA.toBase58());
-        const seatingMapAcc = await connection.getAccountInfo(seatingMapPDA);
-        if (!seatingMapAcc) {
-          Logger.error("Nie znaleziono mapy miejsc.");
-          document.getElementById("sectionsContainer").innerHTML = "<p>Brak mapy miejsc.</p>";
-          return;
-        }
-        const seatingMap = decodeSeatingMap(seatingMapAcc.data);
-        Logger.info("SeatingMap: " + JSON.stringify(seatingMap, null, 2));
-        loadSections(seatingMap.sections);
-      } catch (err) {
-        Logger.error("Błąd ładowania mapy miejsc: " + err.message);
-      }
-    }
-
-    function decodeSeatingMap(data) {
-      let offset = 8;
-      const dv = new DataView(data.buffer, data.byteOffset, data.byteLength);
-      const eventIdLen = dv.getUint32(offset, true); offset += 4;
-      const eventIdBytes = data.slice(offset, offset + eventIdLen); offset += eventIdLen;
-      const event_id = new TextDecoder().decode(eventIdBytes);
-      const vecLen = dv.getUint32(offset, true); offset += 4;
-      let sections = [];
-      for (let i = 0; i < vecLen; i++) {
-        const keyBytes = data.slice(offset, offset + 32);
-        sections.push(new solanaWeb3.PublicKey(keyBytes).toBase58());
-        offset += 32;
-      }
-      const total_seats = dv.getBigUint64(offset, true); offset += 8;
-      return { event_id, sections, total_seats: total_seats.toString() };
     }
 
     async function loadSections(sectionPubkeys) {
@@ -265,6 +261,7 @@
       return { event_id, section_name, section_type, rows, seats_per_row, seat_status };
     }
 
+    // TWORZENIE INTERAKTYWNEJ MAPY MIEJSC
     function createInteractiveMapForElement(container, sectionData) {
       container.innerHTML = "";
       const grid = document.createElement("div");
@@ -292,7 +289,8 @@
       const row = Math.floor(seatIndex / sectionData.seats_per_row);
       const seat = seatIndex % sectionData.seats_per_row;
       Logger.info(`Mint NFT dla sekcji "${sectionData.section_name}", row ${row}, seat ${seat}`);
-      mintTestNFTFromSeat(sectionData.section_name, row, seat);
+      Logger.info("Wysyłam mint dla sekcji: " + sectionData.section_name + ", row: " + row + ", seat: " + seat);
+      mintTestNFTFromSeat(sectionData, seatIndex, sectionData.section_name, row, seat);
     }
 
     // Buduje dane instrukcji: dyskryminator + serializowane argumenty
@@ -319,8 +317,8 @@
       return data;
     }
 
-    // Funkcja mintująca NFT z parametrami pobranymi z łańcucha
-    async function mintTestNFTFromSeat(sectionName, row, seat) {
+    // Funkcja mintująca NFT – wywołanie funkcji mint_test_nft w kontrakcie
+    async function mintTestNFTFromSeat(sectionData, seatIndex, sectionName, row, seat) {
       try {
         if (!eventData) {
           Logger.error("Brak danych eventu!");
@@ -330,16 +328,47 @@
         const event_name = eventData.name;
         Logger.info(`Mint NFT: event_id=${event_id}, event_name=${event_name}, section=${sectionName}, row=${row}, seat=${seat}`);
         
+        // Obliczamy PDA dla konta eventu (seed: ["event", event_id])
+        const eventSeed1 = new TextEncoder().encode("event");
+        const eventSeed2 = new TextEncoder().encode(event_id);
+        const [eventPDA] = await solanaWeb3.PublicKey.findProgramAddress([eventSeed1, eventSeed2], PROGRAM_ID);
+        Logger.info("Obliczone Event PDA: " + eventPDA.toBase58());
+        
+        // Obliczamy PDA dla seating_map (seed: ["seating_map", event_id])
+        const seatingSeed1 = new TextEncoder().encode("seating_map");
+        const seatingSeed2 = new TextEncoder().encode(event_id);
+        const [seatingMapPDA] = await solanaWeb3.PublicKey.findProgramAddress([seatingSeed1, seatingSeed2], PROGRAM_ID);
+        Logger.info("Obliczone Seating Map PDA: " + seatingMapPDA.toBase58());
+        
+        // Obliczamy PDA dla mint (seed: ["test_mint", event_id, event_name, section_name, [row], [seat]])
         const { mintPDA } = await getTestMintPDA(event_id, event_name, sectionName, row, seat);
+        
+        // Obliczamy ATA dla mint
         const tokenAccount = await getAssociatedTokenAddress(walletPublicKey, mintPDA);
         Logger.info("Obliczony ATA: " + tokenAccount.toBase58());
+        
+        // Obliczamy PDA dla metadanych mint
         const metadataPDA = await getMetadataPDA(mintPDA);
         Logger.info("Obliczony metadata PDA: " + metadataPDA.toBase58());
         
         const ixData = buildInstructionData(event_id, event_name, sectionName, row, seat);
         
+        // Budujemy listę kont zgodną z kontekstem MintTestNft:
+        // 0. event (PDA, seeds: ["event", event_id])
+        // 1. buyer (wallet)
+        // 2. seating_map (PDA, seeds: ["seating_map", event_id])
+        // 3. mint (PDA, seeds: ["test_mint", event_id, event_name, section_name, [row], [seat]])
+        // 4. token_account
+        // 5. metadata
+        // 6. token_program
+        // 7. associated_token_program
+        // 8. token_metadata_program
+        // 9. system_program
+        // 10. rent
         const keys = [
+          { pubkey: eventPDA, isSigner: false, isWritable: true },
           { pubkey: walletPublicKey, isSigner: true, isWritable: true },
+          { pubkey: seatingMapPDA, isSigner: false, isWritable: true },
           { pubkey: mintPDA, isSigner: false, isWritable: true },
           { pubkey: tokenAccount, isSigner: false, isWritable: true },
           { pubkey: metadataPDA, isSigner: false, isWritable: true },
@@ -371,6 +400,9 @@
         loadEvent();
       } catch (err) {
         Logger.error("Błąd mintowania NFT: " + err.message);
+        if (err.message.includes("already in use")) {
+          loadEvent();
+        }
         alert("Błąd mintowania NFT: " + err.message);
       }
     }

@@ -48,7 +48,7 @@
     Logger.info("Logger uruchomiony.");
 
     // Stałe – PROGRAM_ID, MINT_TICKET_DISCRIMINATOR, METADATA_PROGRAM_ID itd.
-    const PROGRAM_ID = new solanaWeb3.PublicKey("8bM5zjY3CMCwCw7A7vUVVgB3RcSxBzDKjJTJtAyTa2BN");
+    const PROGRAM_ID = new solanaWeb3.PublicKey("8NnF5fcT4oxNFHSsfJ8hNaAqt9tSEdnmeErn44YcfyDq");
     const MINT_TICKET_DISCRIMINATOR = new Uint8Array([212, 78, 142, 4, 188, 28, 203, 17]);
     const METADATA_PROGRAM_ID = new solanaWeb3.PublicKey('metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s');
     const TOKEN_PROGRAM_ID = new solanaWeb3.PublicKey("TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA");
@@ -195,21 +195,38 @@
     }
 
     function decodeSeatingMap(data) {
-      let offset = 8;
+      let offset = 8; // pomijamy 8 bajtów dyskryminatora
       const dv = new DataView(data.buffer, data.byteOffset, data.byteLength);
-      const eventIdLen = dv.getUint32(offset, true); offset += 4;
-      const eventIdBytes = data.slice(offset, offset + eventIdLen); offset += eventIdLen;
+      // Odczytujemy event_id
+      const eventIdLen = dv.getUint32(offset, true); 
+      offset += 4;
+      const eventIdBytes = data.slice(offset, offset + eventIdLen); 
+      offset += eventIdLen;
       const event_id = new TextDecoder().decode(eventIdBytes);
-      const vecLen = dv.getUint32(offset, true); offset += 4;
+      // Odczytujemy organizer (32 bajty)
+      const organizerBytes = data.slice(offset, offset + 32);
+      offset += 32;
+      const organizer = new solanaWeb3.PublicKey(organizerBytes).toBase58();
+      // Odczytujemy flagę active (1 bajt)
+      const active = dv.getUint8(offset) !== 0;
+      offset += 1;
+      // Odczytujemy długość wektora sekcji (4 bajty)
+      const vecLen = dv.getUint32(offset, true);
+      offset += 4;
       let sections = [];
       for (let i = 0; i < vecLen; i++) {
         const keyBytes = data.slice(offset, offset + 32);
         sections.push(new solanaWeb3.PublicKey(keyBytes).toBase58());
         offset += 32;
       }
-      const total_seats = dv.getBigUint64(offset, true); offset += 8;
-      return { event_id, sections, total_seats: total_seats.toString() };
+      
+      // Odczytujemy total_seats (8 bajtów)
+      const total_seats = dv.getBigUint64(offset, true);
+      offset += 8;
+      
+      return { event_id, organizer, active, sections, total_seats: total_seats.toString() };
     }
+
 
     async function loadEvent() {
       try {
