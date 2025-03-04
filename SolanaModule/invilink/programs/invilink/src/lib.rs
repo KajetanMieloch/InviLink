@@ -13,7 +13,7 @@ use base64::{engine::general_purpose, Engine as _};
 use solana_program::program::invoke;
 use solana_program::system_instruction;
 
-declare_id!("9RDpAbkF9uYLpvZnL4aK6exgEDZM4Ntj4se3BvecVrBJ");
+declare_id!("3fJWaFB9arGR6eH3B8xidtfh15Jjcd8VE9YGGymEBvt1");
 
 // Stałe globalne
 const MASTER_ACCOUNT: Pubkey = pubkey!("4Wg5ZqjS3AktHzq34hK1T55aFNKSjBpmJ3PyRChpPNDh");
@@ -75,14 +75,6 @@ fn generate_ticket_id(
 #[program]
 pub mod invilink {
     use super::*;
-
-    // Inicjalizacja puli opłat
-    pub fn initialize(ctx: Context<Initialize>) -> Result<()> {
-        let fee_pool = &mut ctx.accounts.fee_pool;
-        fee_pool.owner = MASTER_ACCOUNT;
-        fee_pool.total_fees = 0;
-        Ok(())
-    }
 
     // Inicjalizacja puli organizatorów
     pub fn initialize_organizers_pool(ctx: Context<InitializeOrganizersPool>) -> Result<()> {
@@ -469,26 +461,31 @@ pub mod invilink {
         // Odejmujemy pełną kwotę od kupującego
         {
             let buyer_info = ctx.accounts.buyer.to_account_info();
-            let mut buyer_lamports = buyer_info.lamports.borrow_mut();
-            let current_balance = **buyer_lamports;
-            let new_balance = current_balance.checked_sub(price).ok_or(ErrorCode::InsufficientFunds)?;
-            **buyer_lamports = new_balance;
-        }        
-        // Przekazujemy 95% do portfela organizatora
-        {
             let organizer_info = ctx.accounts.organizer_wallet.to_account_info();
-            let mut org_lamports = organizer_info.lamports.borrow_mut();
-            let current_balance = **org_lamports;
-            let new_balance = current_balance.checked_add(organizer_amount).unwrap();
-            **org_lamports = new_balance;
-        }
-        // Przekazujemy 5% bezpośrednio do MASTER_ACCOUNT
-        {
             let master_info = ctx.accounts.master_account.to_account_info();
-            let mut master_lamports = master_info.lamports.borrow_mut();
-            let current_balance = **master_lamports;
-            let new_balance = current_balance.checked_add(fee).unwrap();
-            **master_lamports = new_balance;
+            let system_program_info = ctx.accounts.system_program.to_account_info();
+        
+            // Transfer 95% ceny do organizatora
+            let ix_to_organizer = system_instruction::transfer(
+                buyer_info.key,
+                organizer_info.key,
+                organizer_amount,
+            );
+            invoke(
+                &ix_to_organizer,
+                &[buyer_info.clone(), organizer_info.clone(), system_program_info.clone()],
+            )?;
+        
+            // Transfer 5% ceny do MASTER_ACCOUNT
+            let ix_to_master = system_instruction::transfer(
+                buyer_info.key,
+                master_info.key,
+                fee,
+            );
+            invoke(
+                &ix_to_master,
+                &[buyer_info.clone(), master_info.clone(), system_program_info.clone()],
+            )?;
         }
 
                   
@@ -561,21 +558,6 @@ pub mod invilink {
 }
 
 // ---------------- KONTEKSTY (ACCOUNTS) ----------------
-
-#[derive(Accounts)]
-pub struct Initialize<'info> {
-    #[account(
-        init,
-        payer = payer,
-        seeds = [b"fee_pool"],
-        bump,
-        space = 48
-    )]
-    pub fee_pool: Account<'info, FeePool>,
-    #[account(mut)]
-    pub payer: Signer<'info>,
-    pub system_program: Program<'info, System>,
-}
 
 #[derive(Accounts)]
 pub struct InitializeOrganizersPool<'info> {
