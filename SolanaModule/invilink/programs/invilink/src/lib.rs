@@ -176,7 +176,7 @@ pub mod invilink {
         // Inicjalizacja mapy miejsc – teraz ustawiamy wszystkie pola!
         seating_map.event_id = event.event_id.clone();
         seating_map.organizer = event.organizer; // ustalamy organizatora
-        seating_map.active = event.active;       // kopiujemy stan aktywności eventu
+        //seating_map.active = event.active;       // Do usunięcia, jeszcze testuje czy można usunąć
         seating_map.sections = Vec::new();
         seating_map.total_seats = 0;
     
@@ -256,9 +256,11 @@ pub mod invilink {
         let event = &mut ctx.accounts.event;
         require!(event.organizer == *ctx.accounts.organizer.key, ErrorCode::Unauthorized);
         require!(event.active, ErrorCode::EventNotActive);
+        // Dodany warunek: nie da się deaktywować eventu, jeśli sprzedano jakiekolwiek bilety
+        require!(event.sold_tickets == 0, ErrorCode::EventCannotDeactivate);
         event.active = false;
         Ok(())
-    }
+    }    
 
     pub fn delete_event(ctx: Context<DeleteEvent>) -> Result<()> {
         let event = &mut ctx.accounts.event;
@@ -406,6 +408,78 @@ pub mod invilink {
     }
 
     // Mintowanie biletu NFT
+    pub fn mint_ticket_nft(
+        ctx: Context<MintTicketNft>,
+        event_id: String,
+        event_name: String,
+        section_name: String,
+        row: u8,
+        seat: u8,
+    ) -> Result<()> {
+        let event = &mut ctx.accounts.event;
+        require!(event.event_id == event_id, ErrorCode::InvalidTicket);
+        require!(event.active, ErrorCode::EventNotActive);
+
+        // Generacja ticket_id przy użyciu funkcji pomocniczej
+        let ticket_id = generate_ticket_id(
+            ctx.accounts.buyer.key,
+            &event_id,
+            &event_name,
+            &section_name,
+            row,
+            seat,
+        );
+
+        // Mintujemy 1 jednostkę NFT do konta tokenowego
+        let cpi_accounts = MintTo {
+            mint: ctx.accounts.mint.to_account_info(),
+            to: ctx.accounts.token_account.to_account_info(),
+            authority: ctx.accounts.buyer.to_account_info(),
+        };
+        let cpi_ctx = CpiContext::new(ctx.accounts.token_program.to_account_info(), cpi_accounts);
+        token::mint_to(cpi_ctx, 1)?;
+
+        // Konfiguracja metadanych NFT
+        let title = format!("{} Ticket - {} - Row {} Seat {}", event_name, section_name, row, seat);
+        let symbol = "TICKET".to_string();
+        let uri = format!("https://example.com/metadata/{}", ticket_id);
+
+        let creators = vec![Creator {
+            address: event.organizer,
+            verified: false,
+            share: 100,
+        }];
+
+        let data_v2 = DataV2 {
+            name: title,
+            symbol,
+            uri,
+            seller_fee_basis_points: 0,
+            creators: Some(creators),
+            collection: None,
+            uses: None,
+        };
+
+        // Tworzenie konta metadanych NFT przy użyciu CPI
+        let cpi_accounts = CreateMetadataAccountsV3 {
+            metadata: ctx.accounts.metadata.to_account_info(),
+            mint: ctx.accounts.mint.to_account_info(),
+            mint_authority: ctx.accounts.buyer.to_account_info(),
+            payer: ctx.accounts.buyer.to_account_info(),
+            update_authority: ctx.accounts.buyer.to_account_info(),
+            system_program: ctx.accounts.system_program.to_account_info(),
+            rent: ctx.accounts.rent.to_account_info(),
+        };
+
+        let cpi_ctx = CpiContext::new(ctx.accounts.token_metadata_program.to_account_info(), cpi_accounts);
+        create_metadata_accounts_v3(cpi_ctx, data_v2, true, true, None)?;
+
+        // Aktualizacja liczby sprzedanych biletów
+        event.sold_tickets = event.sold_tickets.checked_add(1).ok_or(ErrorCode::InvalidTicket)?;
+        Ok(())
+    }
+
+
     pub fn mint_test_nft(
         ctx: Context<MintTestNft>,
         event_id: String,
@@ -414,16 +488,38 @@ pub mod invilink {
         row: u8,
         seat: u8,
     ) -> Result<()> {
-        // 1. Sprawdzenie: czy konto SeatingMap zawiera właściwy event_id
+        // 1. Sprawdzenie, czy konto SeatingMap zawiera właściwy event_id
         require!(
             ctx.accounts.seating_map.event_id == event_id,
             ErrorCode::InvalidEventId
         );
-    
-        // 2. Sprawdzenie: czy event (odzwierciedlony przez SeatingMap) jest aktywny
+        // 2. Sprawdzenie, czy event jest aktywny
         require!(
-            ctx.accounts.seating_map.active,
+            ctx.accounts.event.active,
             ErrorCode::EventNotActive
+        );
+        // 3. Sprawdzenie, czy miejsce w danej sekcji istnieje
+        let seating_section = &mut ctx.accounts.seating_section;
+        // Czy podany wiersz mieści się w zakresie?
+        require!(
+            (row as usize) < (seating_section.rows as usize),
+            ErrorCode::InvalidSeating
+        );
+        // Czy podana liczba miejsc w wierszu mieści się w zakresie?
+        require!(
+            (seat as usize) < (seating_section.seats_per_row as usize),
+            ErrorCode::InvalidSeating
+        );
+        // Wyliczenie indeksu miejsca
+        let seat_index = (row as usize) * (seating_section.seats_per_row as usize) + (seat as usize);
+        require!(
+            seat_index < seating_section.seat_status.len(),
+            ErrorCode::InvalidSeating
+        );
+        // Czy miejsce jest wolne? (0 = wolne)
+        require!(
+            seating_section.seat_status[seat_index] == 0,
+            ErrorCode::SeatAlreadyTaken
         );
     
         // Mintujemy 1 jednostkę NFT do konta tokenowego
@@ -472,8 +568,18 @@ pub mod invilink {
         let cpi_ctx_meta =
             CpiContext::new(ctx.accounts.token_metadata_program.to_account_info(), cpi_accounts_meta);
         create_metadata_accounts_v3(cpi_ctx_meta, data_v2, true, true, None)?;
+    
+        // Aktualizacja stanu miejsca – ustawienie na 1 (zajęte)
+        seating_section.seat_status[seat_index] = 1;
+
+        // Aktualizacja liczby sprzedanych biletów – zwiększenie o 1
+        ctx.accounts.event.sold_tickets = ctx.accounts.event.sold_tickets
+        .checked_add(1)
+        .ok_or(ErrorCode::InvalidTicket)?;
+    
         Ok(())
     }
+    
     
     
     
@@ -699,11 +805,15 @@ pub struct MintTestNft<'info> {
     /// Konto kupującego – NFT trafi na ten adres
     #[account(mut)]
     pub buyer: Signer<'info>,
-    
+
     /// Konto mapy miejsc – musi być już zainicjalizowane (PDA: [b"seating_map", event_id.as_bytes()])
     #[account(mut, seeds = [b"seating_map", event_id.as_bytes()], bump)]
     pub seating_map: Account<'info, SeatingMap>,
-    
+
+    /// Konto sekcji miejsc – przechowuje informacje o danej sekcji (np. "Sekcja A")
+    #[account(mut)]
+    pub seating_section: Account<'info, SeatingSectionAccount>,
+
     #[account(
         init,
         payer = buyer,
@@ -721,7 +831,7 @@ pub struct MintTestNft<'info> {
         mint::freeze_authority = buyer,
     )]
     pub mint: Account<'info, Mint>,
-    
+
     #[account(
         init_if_needed,
         payer = buyer,
@@ -729,17 +839,19 @@ pub struct MintTestNft<'info> {
         associated_token::authority = buyer,
     )]
     pub token_account: Account<'info, TokenAccount>,
-    
+
     #[account(mut)]
     /// CHECK: Konto metadanych – walidowane przez CPI.
     pub metadata: AccountInfo<'info>,
-    
+
     pub token_program: Program<'info, Token>,
     pub associated_token_program: Program<'info, AssociatedToken>,
     pub token_metadata_program: Program<'info, Metadata>,
     pub system_program: Program<'info, System>,
     pub rent: Sysvar<'info, Rent>,
 }
+
+
 
 
 // ---------------- STRUKTURY KONTA ----------------
@@ -857,4 +969,6 @@ pub enum ErrorCode {
     CannotChangeSeatingType,
     #[msg("Invalid event ID.")]
     InvalidEventId,
+    #[msg("Event cannot be deactivated because tickets have been sold.")]
+    EventCannotDeactivate,
 }
