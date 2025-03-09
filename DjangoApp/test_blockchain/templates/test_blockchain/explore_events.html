@@ -38,7 +38,7 @@
 
   <script>
     // Ustawienia
-    const PROGRAM_ID = new solanaWeb3.PublicKey("3fJWaFB9arGR6eH3B8xidtfh15Jjcd8VE9YGGymEBvt1");
+    const PROGRAM_ID = new solanaWeb3.PublicKey("Hv2We2u2yrVNbMwKEMDUu6nLiGiWzsJWRkoqiHXrQBWK");
     const REGISTRY_SEED = "event_registry";
     const DEFAULT_PUBKEY = "11111111111111111111111111111111";
 
@@ -71,28 +71,80 @@
 
     // Dekodowanie konta eventu (zgodnie z formatem Anchor)
     function decodeEvent(data) {
-      let offset = 8;
-      const dv = new DataView(data.buffer, data.byteOffset, data.byteLength);
-      const eventIdLen = dv.getUint32(offset, true); offset += 4;
-      const eventIdBytes = data.slice(offset, offset + eventIdLen);
-      const event_id = new TextDecoder().decode(eventIdBytes); offset += eventIdLen;
-      const organizerBytes = data.slice(offset, offset + 32);
-      const organizer = new solanaWeb3.PublicKey(organizerBytes).toBase58(); offset += 32;
-      const nameLen = dv.getUint32(offset, true); offset += 4;
-      const nameBytes = data.slice(offset, offset + nameLen);
-      const name = new TextDecoder().decode(nameBytes); offset += nameLen;
-      const ticket_price = dv.getBigUint64(offset, true); offset += 8;
-      const available_tickets = dv.getBigUint64(offset, true); offset += 8;
-      const sold_tickets = dv.getBigUint64(offset, true); offset += 8;
-      // Pole seating_type usunięte z wyświetlania
-      const seating_type = dv.getUint8(offset); offset += 1;
-      const active = dv.getUint8(offset) !== 0; offset += 1;
-      return { event_id, organizer, name, 
-               ticket_price: ticket_price.toString(), 
-               available_tickets: available_tickets.toString(), 
-               sold_tickets: sold_tickets.toString(),
-               seating_type, active };
-    }
+  let offset = 8; // pomijamy 8-bajtowy discriminator
+  const dv = new DataView(data.buffer, data.byteOffset, data.byteLength);
+
+  function readString() {
+    if (offset + 4 > data.byteLength) return "";
+    const len = dv.getUint32(offset, true);
+    offset += 4;
+    if (offset + len > data.byteLength) return "";
+    const strBytes = data.slice(offset, offset + len);
+    offset += len;
+    return new TextDecoder().decode(strBytes);
+  }
+
+  // Odczyt event_id
+  const event_id = readString();
+
+  // Odczyt organizatora (32 bajty)
+  let organizer = "";
+  if (offset + 32 <= data.byteLength) {
+    const orgBytes = data.slice(offset, offset + 32);
+    organizer = new solanaWeb3.PublicKey(orgBytes).toBase58();
+    offset += 32;
+  }
+
+  // Odczyt nazwy eventu
+  const name = readString();
+
+  // Odczyt ticket_price
+  let ticket_price = "0";
+  if (offset + 8 <= data.byteLength) {
+    ticket_price = dv.getBigUint64(offset, true).toString();
+    offset += 8;
+  }
+
+  // Odczyt available_tickets
+  let available_tickets = "0";
+  if (offset + 8 <= data.byteLength) {
+    available_tickets = dv.getBigUint64(offset, true).toString();
+    offset += 8;
+  }
+
+  // Odczyt sold_tickets
+  let sold_tickets = "0";
+  if (offset + 8 <= data.byteLength) {
+    sold_tickets = dv.getBigUint64(offset, true).toString();
+    offset += 8;
+  }
+
+  // Odczyt seating_type – może nie być zapisany w starszej wersji
+  let seating_type = 0;
+  if (offset + 1 <= data.byteLength) {
+    seating_type = dv.getUint8(offset);
+    offset += 1;
+  }
+
+  // Odczyt pola active – podobnie, ustalamy domyślnie false
+  let active = false;
+  if (offset + 1 <= data.byteLength) {
+    active = dv.getUint8(offset) !== 0;
+    offset += 1;
+  }
+
+  return {
+    event_id,
+    organizer,
+    name,
+    ticket_price,
+    available_tickets,
+    sold_tickets,
+    seating_type,
+    active,
+  };
+}
+
 
     function logMessage(msg) {
       const logEl = document.getElementById("log");
