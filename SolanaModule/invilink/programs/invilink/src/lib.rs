@@ -13,7 +13,7 @@ use base64::{engine::general_purpose, Engine as _};
 use solana_program::program::invoke;
 use solana_program::system_instruction;
 
-declare_id!("Hv2We2u2yrVNbMwKEMDUu6nLiGiWzsJWRkoqiHXrQBWK");
+declare_id!("DQCwvnVHUzUuv23P6FBJESBn3h6X7XGKtZZ6W9nrVfNW");
 
 // Stałe globalne
 const MASTER_ACCOUNT: Pubkey = pubkey!("4Wg5ZqjS3AktHzq34hK1T55aFNKSjBpmJ3PyRChpPNDh");
@@ -21,23 +21,34 @@ const FEE_PERCENTAGE: u64 = 5; // 5%
 
 // ---------------- FUNKCJE POMOCNICZE POZA CHAINEM ----------------
 
-fn generate_event_id(name: &str, organizer: &Pubkey) -> String {
+fn generate_event_id(name: &str, event_date: i64, organizer: &Pubkey) -> String {
     let seed = b"339562";
     let mut buffer = [0u8; 128];
     let mut pos = 0;
     buffer[pos..pos + seed.len()].copy_from_slice(seed);
     pos += seed.len();
+    
     let name_bytes = name.as_bytes();
     let name_len = name_bytes.len();
     buffer[pos..pos + name_len].copy_from_slice(name_bytes);
     pos += name_len;
+    
+    // Dodajemy datę – 8 bajtów, little-endian
+    let date_bytes = event_date.to_le_bytes();
+    buffer[pos..pos + date_bytes.len()].copy_from_slice(&date_bytes);
+    pos += date_bytes.len();
+    
     let pubkey_bytes = organizer.to_bytes();
     buffer[pos..pos + pubkey_bytes.len()].copy_from_slice(&pubkey_bytes);
     pos += pubkey_bytes.len();
+    
     let hash_result = hash(&buffer[..pos]);
     let encoded = general_purpose::URL_SAFE_NO_PAD.encode(hash_result.as_ref());
     encoded.chars().take(12).collect()
 }
+
+
+
 
 fn generate_ticket_id(
     buyer: &Pubkey, 
@@ -112,14 +123,20 @@ pub mod invilink {
 
     // Zarządzanie eventami – wyłącznie przez create_event_seating
     #[derive(Accounts)]
-    #[instruction(event_id: String, name: String, ticket_price: u64, available_tickets: u64)]
+    #[instruction(
+        event_id: String,
+        name: String,
+        ticket_price: u64,
+        available_tickets: u64
+    )]
     pub struct CreateEventSeating<'info> {
         #[account(
             init,
             payer = organizer,
             seeds = [b"event", event_id.as_bytes()],
             bump,
-            space = 1024
+            // zwiększamy space np. do 1200
+            space = 4096 
         )]
         pub event: Account<'info, EventNFT>,
         #[account(
@@ -138,11 +155,12 @@ pub mod invilink {
         pub organizer: Signer<'info>,
         pub system_program: Program<'info, System>,
     }
-
+    
     pub fn create_event_seating(
         ctx: Context<CreateEventSeating>,
         event_id: String,
         name: String,
+        event_date: i64,        // NOWY parametr
         ticket_price: u64,
         available_tickets: u64,
     ) -> Result<()> {
@@ -155,22 +173,23 @@ pub mod invilink {
             ErrorCode::Unauthorized
         );
     
-        let expected_event_id = generate_event_id(&name, ctx.accounts.organizer.key);
+        let expected_event_id = generate_event_id(&name, event_date, ctx.accounts.organizer.key);
         require!(event_id == expected_event_id, ErrorCode::InvalidEventId);
     
-        // Inicjalizacja eventu
+        // Inicjalizacja eventu – przypisujemy również datę eventu
         event.event_id = event_id.clone();
         event.organizer = *ctx.accounts.organizer.key;
         event.name = name.clone();
+        event.event_date = event_date; // NOWE: ustawiamy datę eventu
         event.ticket_price = ticket_price;
         event.available_tickets = available_tickets;
         event.sold_tickets = 0;
         event.seating_type = 1;
-        event.active = false; // lub true, jeśli taki ma być stan początkowy
+        event.active = false;
     
-        // Inicjalizacja mapy miejsc – teraz ustawiamy wszystkie pola!
+        // Inicjalizacja mapy miejsc
         seating_map.event_id = event.event_id.clone();
-        seating_map.organizer = event.organizer; // ustalamy organizatora
+        seating_map.organizer = event.organizer;
         seating_map.sections = Vec::new();
         seating_map.total_seats = 0;
     
@@ -182,6 +201,8 @@ pub mod invilink {
         Ok(())
     }
     
+    
+    
     // Aktualizacja eventu
     pub fn update_event(
         ctx: Context<UpdateEvent>,
@@ -192,6 +213,7 @@ pub mod invilink {
         let event = &mut ctx.accounts.event;
         require!(event.organizer == *ctx.accounts.organizer.key, ErrorCode::Unauthorized);
         require!(!event.active, ErrorCode::EventIsActive);
+    
         if let Some(name) = new_name {
             event.name = name;
         }
@@ -204,7 +226,7 @@ pub mod invilink {
         }
         Ok(())
     }
-
+    
     #[derive(Accounts)]
     pub struct UpdateEventSeatingType<'info> {
         #[account(mut)]
@@ -454,17 +476,15 @@ pub mod invilink {
             return Err(ErrorCode::InsufficientFunds.into());
         }
         // Obliczamy opłatę (5%) i kwotę dla organizatora (95%)
-        // Pobieramy cenę biletu, obliczamy opłatę (5%) oraz kwotę dla organizatora (95%)
         let fee = price.checked_mul(FEE_PERCENTAGE).unwrap().checked_div(100).unwrap();
         let organizer_amount = price.checked_sub(fee).unwrap();
-
-        // Odejmujemy pełną kwotę od kupującego
+    
         {
             let buyer_info = ctx.accounts.buyer.to_account_info();
             let organizer_info = ctx.accounts.organizer_wallet.to_account_info();
             let master_info = ctx.accounts.master_account.to_account_info();
             let system_program_info = ctx.accounts.system_program.to_account_info();
-        
+    
             // Transfer 95% ceny do organizatora
             let ix_to_organizer = system_instruction::transfer(
                 buyer_info.key,
@@ -475,7 +495,7 @@ pub mod invilink {
                 &ix_to_organizer,
                 &[buyer_info.clone(), organizer_info.clone(), system_program_info.clone()],
             )?;
-        
+    
             // Transfer 5% ceny do MASTER_ACCOUNT
             let ix_to_master = system_instruction::transfer(
                 buyer_info.key,
@@ -487,8 +507,6 @@ pub mod invilink {
                 &[buyer_info.clone(), master_info.clone(), system_program_info.clone()],
             )?;
         }
-
-                  
     
         // Mintujemy NFT – mintujemy 1 jednostkę tokena
         let cpi_accounts = MintTo {
@@ -509,11 +527,18 @@ pub mod invilink {
             seat,
         );
     
-        let title = "Test Ticket".to_string();
+        // Ustalamy metadata – dodajemy informację o dacie eventu
+        // Możemy w tytule lub URI uwzględnić event_date; poniżej przykład, gdzie event_date jest pobierany z konta event.
+        let title = format!("Invilink Ticket");
         let symbol = "TEST".to_string();
         let uri = format!(
-            "https://example.com/metadata/{}-{}-{}-{}-{}",
-            event_id, event_name, section_name, row, seat
+            "https://example.com/metadata/{}-{}-{}-{}-{}-{}",
+            event_id,
+            event_name,
+            section_name,
+            row,
+            seat,
+            ctx.accounts.event.event_date
         );
     
         let creators = vec![mpl_token_metadata::types::Creator {
@@ -552,6 +577,7 @@ pub mod invilink {
             .ok_or(ErrorCode::InvalidTicket)?;
         Ok(())
     }
+    
     
     
     
@@ -793,12 +819,15 @@ pub struct EventNFT {
     pub event_id: String,
     pub organizer: Pubkey,
     pub name: String,
+    pub event_date: i64, // NOWE pole: data eventu (np. UNIX timestamp)
     pub ticket_price: u64,
     pub available_tickets: u64,
     pub sold_tickets: u64,
     pub seating_type: u8,
     pub active: bool,
 }
+
+
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone)]
 pub struct SeatingSection {
