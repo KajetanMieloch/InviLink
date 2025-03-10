@@ -24,10 +24,10 @@
       <tr>
         <th>Event ID</th>
         <th>Nazwa</th>
+        <th>Data</th>
         <th>Cena (lamporty)</th>
         <th>Dostępne bilety</th>
         <th>Sprzedane bilety</th>
-        <!-- Kolumna rodzaj miejsc usunięta -->
         <th>Aktywny</th>
         <th>Organizator</th>
         <th>Akcja</th>
@@ -38,7 +38,7 @@
 
   <script>
     // Ustawienia
-    const PROGRAM_ID = new solanaWeb3.PublicKey("Hv2We2u2yrVNbMwKEMDUu6nLiGiWzsJWRkoqiHXrQBWK");
+    const PROGRAM_ID = new solanaWeb3.PublicKey("DQCwvnVHUzUuv23P6FBJESBn3h6X7XGKtZZ6W9nrVfNW");
     const REGISTRY_SEED = "event_registry";
     const DEFAULT_PUBKEY = "11111111111111111111111111111111";
 
@@ -69,82 +69,89 @@
       return { eventCount, events };
     }
 
-    // Dekodowanie konta eventu (zgodnie z formatem Anchor)
+    // Dekodowanie konta eventu zgodnie z formatem Anchor, uwzględniające nowe pole event_date
     function decodeEvent(data) {
-  let offset = 8; // pomijamy 8-bajtowy discriminator
-  const dv = new DataView(data.buffer, data.byteOffset, data.byteLength);
+      let offset = 8; // pomijamy 8-bajtowy discriminator
+      const dv = new DataView(data.buffer, data.byteOffset, data.byteLength);
 
-  function readString() {
-    if (offset + 4 > data.byteLength) return "";
-    const len = dv.getUint32(offset, true);
-    offset += 4;
-    if (offset + len > data.byteLength) return "";
-    const strBytes = data.slice(offset, offset + len);
-    offset += len;
-    return new TextDecoder().decode(strBytes);
-  }
+      function readString() {
+        if (offset + 4 > data.byteLength) return "";
+        const len = dv.getUint32(offset, true);
+        offset += 4;
+        if (offset + len > data.byteLength) return "";
+        const strBytes = data.slice(offset, offset + len);
+        offset += len;
+        return new TextDecoder().decode(strBytes);
+      }
 
-  // Odczyt event_id
-  const event_id = readString();
+      // Odczyt event_id
+      const event_id = readString();
 
-  // Odczyt organizatora (32 bajty)
-  let organizer = "";
-  if (offset + 32 <= data.byteLength) {
-    const orgBytes = data.slice(offset, offset + 32);
-    organizer = new solanaWeb3.PublicKey(orgBytes).toBase58();
-    offset += 32;
-  }
+      // Odczyt organizatora (32 bajty)
+      let organizer = "";
+      if (offset + 32 <= data.byteLength) {
+        const orgBytes = data.slice(offset, offset + 32);
+        organizer = new solanaWeb3.PublicKey(orgBytes).toBase58();
+        offset += 32;
+      }
 
-  // Odczyt nazwy eventu
-  const name = readString();
+      // Odczyt nazwy eventu
+      const name = readString();
 
-  // Odczyt ticket_price
-  let ticket_price = "0";
-  if (offset + 8 <= data.byteLength) {
-    ticket_price = dv.getBigUint64(offset, true).toString();
-    offset += 8;
-  }
+      // Odczyt daty eventu (i64, UNIX timestamp)
+      let event_date = 0;
+      if (offset + 8 <= data.byteLength) {
+        event_date = Number(dv.getBigUint64(offset, true));
+        offset += 8;
+      }
 
-  // Odczyt available_tickets
-  let available_tickets = "0";
-  if (offset + 8 <= data.byteLength) {
-    available_tickets = dv.getBigUint64(offset, true).toString();
-    offset += 8;
-  }
+      // Odczyt ticket_price
+      let ticket_price = "0";
+      if (offset + 8 <= data.byteLength) {
+        ticket_price = dv.getBigUint64(offset, true).toString();
+        offset += 8;
+      }
 
-  // Odczyt sold_tickets
-  let sold_tickets = "0";
-  if (offset + 8 <= data.byteLength) {
-    sold_tickets = dv.getBigUint64(offset, true).toString();
-    offset += 8;
-  }
+      // Odczyt available_tickets
+      let available_tickets = "0";
+      if (offset + 8 <= data.byteLength) {
+        available_tickets = dv.getBigUint64(offset, true).toString();
+        offset += 8;
+      }
 
-  // Odczyt seating_type – może nie być zapisany w starszej wersji
-  let seating_type = 0;
-  if (offset + 1 <= data.byteLength) {
-    seating_type = dv.getUint8(offset);
-    offset += 1;
-  }
+      // Odczyt sold_tickets
+      let sold_tickets = "0";
+      if (offset + 8 <= data.byteLength) {
+        sold_tickets = dv.getBigUint64(offset, true).toString();
+        offset += 8;
+      }
 
-  // Odczyt pola active – podobnie, ustalamy domyślnie false
-  let active = false;
-  if (offset + 1 <= data.byteLength) {
-    active = dv.getUint8(offset) !== 0;
-    offset += 1;
-  }
+      // Odczyt seating_type – może nie być zapisany w starszej wersji
+      let seating_type = 0;
+      if (offset + 1 <= data.byteLength) {
+        seating_type = dv.getUint8(offset);
+        offset += 1;
+      }
 
-  return {
-    event_id,
-    organizer,
-    name,
-    ticket_price,
-    available_tickets,
-    sold_tickets,
-    seating_type,
-    active,
-  };
-}
+      // Odczyt pola active – ustalamy domyślnie false, jeśli nie ma
+      let active = false;
+      if (offset + 1 <= data.byteLength) {
+        active = dv.getUint8(offset) !== 0;
+        offset += 1;
+      }
 
+      return {
+        event_id,
+        organizer,
+        name,
+        event_date,
+        ticket_price,
+        available_tickets,
+        sold_tickets,
+        seating_type,
+        active,
+      };
+    }
 
     function logMessage(msg) {
       const logEl = document.getElementById("log");
@@ -206,14 +213,17 @@
           const eventAcc = await connection.getAccountInfo(eventPubkey);
           if (eventAcc) {
             const eventData = decodeEvent(eventAcc.data);
+            // Konwersja daty na czytelny format
+            const eventDateStr = new Date(eventData.event_date * 1000).toLocaleDateString();
+
             const tr = document.createElement("tr");
             tr.innerHTML = `
               <td>${eventData.event_id}</td>
               <td>${eventData.name}</td>
+              <td>${eventDateStr}</td>
               <td>${eventData.ticket_price}</td>
               <td>${eventData.available_tickets}</td>
               <td>${eventData.sold_tickets}</td>
-              <!-- Usunięto kolumnę typu miejsc -->
               <td>${eventData.active}</td>
               <td>${eventData.organizer}</td>
               <td id="action-${pubkeyStr}"></td>

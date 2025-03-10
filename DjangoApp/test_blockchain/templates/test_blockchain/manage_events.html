@@ -60,7 +60,7 @@
   
   <script>
     // Ustawienia – PROGRAM_ID musi odpowiadać Twojemu kontraktowi on‑chain
-    const PROGRAM_ID = new solanaWeb3.PublicKey("Hv2We2u2yrVNbMwKEMDUu6nLiGiWzsJWRkoqiHXrQBWK");
+    const PROGRAM_ID = new solanaWeb3.PublicKey("DQCwvnVHUzUuv23P6FBJESBn3h6X7XGKtZZ6W9nrVfNW");
     let connection, provider, walletPublicKey;
     window.currentEvent = null; // Globalne dane eventu
 
@@ -107,7 +107,6 @@
       const sectionTypeByte = new Uint8Array([section_type]);
       const rowsByte = new Uint8Array([rows]);
       const seatsByte = new Uint8Array([seats_per_row]);
-      // Konwersja ticket_price na BN i serializacja do u64
       const ticketPriceBytes = serializeU64(new BN(ticket_price));
       const totalLen = sectionNameBytes.length + sectionTypeByte.length + rowsByte.length + seatsByte.length + ticketPriceBytes.length;
       const buffer = new Uint8Array(totalLen);
@@ -120,32 +119,68 @@
       return buffer;
     }
 
-    // Dekodowanie EventNFT (pomijamy 8 bajtów dyskryminatora)
+    // Dekodowanie EventNFT – rozszerzone o event_date (UNIX timestamp)
     function decodeEventNFT(data) {
-      let offset = 8;
+      let offset = 8; // pomijamy 8 bajtowy discriminator
       const dv = new DataView(data.buffer, data.byteOffset, data.byteLength);
-      const eventIdLen = dv.getUint32(offset, true); offset += 4;
-      const eventIdBytes = data.slice(offset, offset + eventIdLen); offset += eventIdLen;
-      const event_id = new TextDecoder().decode(eventIdBytes);
+
+      function readString() {
+        if (offset + 4 > data.byteLength) return "";
+        const len = dv.getUint32(offset, true);
+        offset += 4;
+        if (offset + len > data.byteLength) return "";
+        const strBytes = data.slice(offset, offset + len);
+        offset += len;
+        return new TextDecoder().decode(strBytes);
+      }
+
+      const event_id = readString();
       const organizerBytes = data.slice(offset, offset + 32); offset += 32;
       const organizer = new solanaWeb3.PublicKey(organizerBytes).toBase58();
-      const nameLen = dv.getUint32(offset, true); offset += 4;
-      const nameBytes = data.slice(offset, offset + nameLen); offset += nameLen;
-      const name = new TextDecoder().decode(nameBytes);
-      const ticket_price = dv.getBigUint64(offset, true); offset += 8;
-      const available_tickets = dv.getBigUint64(offset, true); offset += 8;
-      const sold_tickets = dv.getBigUint64(offset, true); offset += 8;
-      const seating_type = dv.getUint8(offset); offset += 1;
-      const active = dv.getUint8(offset) !== 0; offset += 1;
+      const name = readString();
+      
+      // Odczytujemy event_date (8 bajtów, i64)
+      let event_date = 0;
+      if (offset + 8 <= data.byteLength) {
+        event_date = Number(dv.getBigUint64(offset, true));
+        offset += 8;
+      }
+      
+      let ticket_price = "0";
+      if (offset + 8 <= data.byteLength) {
+        ticket_price = dv.getBigUint64(offset, true).toString();
+        offset += 8;
+      }
+      let available_tickets = "0";
+      if (offset + 8 <= data.byteLength) {
+        available_tickets = dv.getBigUint64(offset, true).toString();
+        offset += 8;
+      }
+      let sold_tickets = "0";
+      if (offset + 8 <= data.byteLength) {
+        sold_tickets = dv.getBigUint64(offset, true).toString();
+        offset += 8;
+      }
+      let seating_type = 0;
+      if (offset + 1 <= data.byteLength) {
+        seating_type = dv.getUint8(offset);
+        offset += 1;
+      }
+      let active = false;
+      if (offset + 1 <= data.byteLength) {
+        active = dv.getUint8(offset) !== 0;
+        offset += 1;
+      }
       return {
         event_id,
         organizer,
         name,
-        ticket_price: ticket_price.toString(),
-        available_tickets: available_tickets.toString(),
-        sold_tickets: sold_tickets.toString(),
+        event_date,
+        ticket_price,
+        available_tickets,
+        sold_tickets,
         seating_type,
-        active
+        active,
       };
     }
 
@@ -247,11 +282,14 @@
     }
 
     function showEventInfo(eventData) {
+      // Konwersja daty z UNIX timestamp na czytelny format (np. dd.mm.yyyy)
+      const eventDateStr = new Date(eventData.event_date * 1000).toLocaleDateString();
       const ed = document.getElementById("eventDetails");
       ed.innerHTML = `
         <h2>Event: ${eventData.name}</h2>
         <p><b>EventID:</b> ${eventData.event_id}</p>
         <p><b>Organizer:</b> ${eventData.organizer}</p>
+        <p><b>Data:</b> ${eventDateStr}</p>
         <p><b>Ticket Price:</b> ${eventData.ticket_price} lamportów</p>
         <p><b>Available Tickets:</b> ${eventData.available_tickets}</p>
         <p><b>Sold Tickets:</b> ${eventData.sold_tickets}</p>
@@ -451,7 +489,6 @@
       }
     }
 
-    // Funkcja edycji sekcji siedzeniowej – dodano aktualizację ceny biletu
     async function editSection(sectionName) {
       if (!window.currentEvent) {
         alert("Najpierw wczytaj event!");
@@ -461,7 +498,6 @@
       let newRowsInput = prompt("Podaj nową liczbę wierszy (pozostaw puste, aby nie zmieniać):");
       let newSeatsInput = prompt("Podaj nową liczbę miejsc w wierszu (pozostaw puste, aby nie zmieniać):");
       let newTypeInput = prompt("Podaj nowy typ sekcji (1 = Numerowane, 0 = Stojące) (pozostaw puste, aby nie zmieniać):");
-      // Nowy prompt dla ceny biletu
       let newTicketPriceInput = prompt("Podaj nową cenę biletu (pozostaw puste, aby nie zmieniać):");
       
       const newRows = newRowsInput ? parseInt(newRowsInput) : null;
@@ -593,6 +629,8 @@
         alert("Błąd usuwania sekcji: " + err.message);
       }
     }
+
+    window.addEventListener("load", loadEvents);
   </script>
 </body>
 </html>
