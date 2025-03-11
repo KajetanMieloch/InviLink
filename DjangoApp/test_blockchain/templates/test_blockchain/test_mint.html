@@ -394,18 +394,20 @@
     }
 
     // Buduje dane instrukcji – pozostaje bez zmian
-    function buildInstructionData(event_id, event_name, section_name, row, seat) {
+    function buildInstructionData(event_id, event_name, section_name, row, seat, ipfs_uri) {
       const eventIdBytes = serializeString(event_id);
       const eventNameBytes = serializeString(event_name);
       const sectionNameBytes = serializeString(section_name);
       const rowByte = serializeU8(row);
       const seatByte = serializeU8(seat);
+      const ipfsUriBytes = serializeString(ipfs_uri); // nowy parametr IPFS
       const totalLength = MINT_TICKET_DISCRIMINATOR.length +
                           eventIdBytes.length +
                           eventNameBytes.length +
                           sectionNameBytes.length +
                           rowByte.length +
-                          seatByte.length;
+                          seatByte.length +
+                          ipfsUriBytes.length;
       let data = new Uint8Array(totalLength);
       let offset = 0;
       data.set(MINT_TICKET_DISCRIMINATOR, offset);
@@ -414,7 +416,8 @@
       data.set(eventNameBytes, offset); offset += eventNameBytes.length;
       data.set(sectionNameBytes, offset); offset += sectionNameBytes.length;
       data.set(rowByte, offset); offset += rowByte.length;
-      data.set(seatByte, offset);
+      data.set(seatByte, offset); offset += seatByte.length;
+      data.set(ipfsUriBytes, offset);
       return data;
     }
 
@@ -484,7 +487,7 @@
         Logger.info("Obliczony ATA: " + tokenAccount.toBase58());
         const metadataPDA = await getMetadataPDA(mintPDA);
         Logger.info("Obliczony metadata PDA: " + metadataPDA.toBase58());
-        const ixData = buildInstructionData(event_id, event_name, sectionName, row, seat);
+        const ixData = buildInstructionData(event_id, event_name, sectionName, row, seat, metadataURI);
         
         // Budujemy listę kont zgodnie z kontekstem MintTicketNft:
         const keys = [
