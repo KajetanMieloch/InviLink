@@ -10,6 +10,7 @@ from datetime import datetime
 import qrcode
 from io import BytesIO
 from PIL import Image
+import urllib.parse
 
 def init_org_pool(request):
     return render(request, 'test_blockchain/init_org_pool.html')
@@ -73,7 +74,10 @@ def generate_metadata(request):
             # 1. Generujemy QR code z instrukcją / linkiem do dezaktywacji biletu
             qr_url = (
                 f"https://invilink.bieda.it/test_blockchain/deactivate_ticket"
-                f"?eventId={event_id}&section={section}&row={row}&seat={seat}"
+                f"?eventId={urllib.parse.quote(str(event_id))}"
+                f"&section={section.replace(' ', '_')}"
+                f"&row={urllib.parse.quote(str(row))}"
+                f"&seat={urllib.parse.quote(str(seat))}"
             )
             qr_img = qrcode.make(qr_url).convert("RGBA")
 
