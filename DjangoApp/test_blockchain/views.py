@@ -64,7 +64,7 @@ def generate_metadata(request):
                 "name": f"InviLink Ticket - {event_id}",
                 "symbol": "INVI",
                 "description": "Bilet na event",
-                "image": "https://upload.wikimedia.org/wikipedia/commons/3/3a/Cat03.jpg",
+                "image": "https://upload.wikimedia.org/wikipedia/commons/8/88/Royle%27sPika-Ochotona_roylei-Tungnath-Uttarkhand-India-3thJune2013.jpg",
                 "attributes": [
                     {"trait_type": "Sekcja", "value": section},
                     {"trait_type": "Rząd", "value": row},

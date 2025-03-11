@@ -357,7 +357,7 @@
       const row = Math.floor(seatIndex / sectionData.seats_per_row);
       const seat = seatIndex % sectionData.seats_per_row;
       Logger.info(`Mint NFT dla sekcji "${sectionData.section_name}", row ${row}, seat ${seat}`);
-      processMintTicketNFT(sectionData.section_name, row, seat);
+      processMintTicketNFT(sectionData, row, seat);
     }
 
     async function buyStandingTicket(sectionName) {
@@ -393,19 +393,21 @@
       return eventPDA;
     }
 
-    // Buduje dane instrukcji – pozostaje bez zmian
-    function buildInstructionData(event_id, event_name, section_name, row, seat) {
+    // Buduje dane instrukcji – rozszerzona o parametr ipfs_uri
+    function buildInstructionData(event_id, event_name, section_name, row, seat, ipfs_uri) {
       const eventIdBytes = serializeString(event_id);
       const eventNameBytes = serializeString(event_name);
       const sectionNameBytes = serializeString(section_name);
       const rowByte = serializeU8(row);
       const seatByte = serializeU8(seat);
+      const ipfsUriBytes = serializeString(ipfs_uri); // nowy parametr IPFS
       const totalLength = MINT_TICKET_DISCRIMINATOR.length +
                           eventIdBytes.length +
                           eventNameBytes.length +
                           sectionNameBytes.length +
                           rowByte.length +
-                          seatByte.length;
+                          seatByte.length +
+                          ipfsUriBytes.length;
       let data = new Uint8Array(totalLength);
       let offset = 0;
       data.set(MINT_TICKET_DISCRIMINATOR, offset);
@@ -414,7 +416,8 @@
       data.set(eventNameBytes, offset); offset += eventNameBytes.length;
       data.set(sectionNameBytes, offset); offset += sectionNameBytes.length;
       data.set(rowByte, offset); offset += rowByte.length;
-      data.set(seatByte, offset);
+      data.set(seatByte, offset); offset += seatByte.length;
+      data.set(ipfsUriBytes, offset);
       return data;
     }
 
@@ -449,19 +452,28 @@
       }
     }
 
-
-    // Funkcja realizująca mint NFT – pozostaje bez zmian
+    // Funkcja realizująca mint NFT – z modyfikacjami dla IPFS
     async function processMintTicketNFT(sectionName, row, seat) {
       try {
-        if (!eventData) { Logger.error("Brak danych eventu!"); return; }
+        if (!eventData) { 
+          Logger.error("Brak danych eventu!"); 
+          return; 
+        }
         const event_id = eventData.event_id;
         const event_name = eventData.name;
         Logger.info(`Mint NFT: event_id=${event_id}, event_name=${event_name}, section=${sectionName}, row=${row}, seat=${seat}`);
+
         if (!eventData.active) { 
           Logger.error("Event nie jest aktywny!"); 
           alert("Event nie jest aktywny. Mintowanie niemożliwe."); 
           return; 
         }
+
+        // Wywołujemy endpoint backendu, który wygeneruje metadane (IPFS URI)
+        const metadataURI = await fetchMetadataUri(event_id, sectionName, row, seat, walletPublicKey.toBase58());
+        Logger.info("Wygenerowany metadata URI (IPFS): " + metadataURI);
+
+        // Następnie kontynuujemy mintowanie NFT tak jak wcześniej:
         const eventPDA = await getEventPDA(event_id);
         Logger.info("Obliczone Event PDA: " + eventPDA.toBase58());
         const seatingSeed1 = new TextEncoder().encode("seating_map");
@@ -474,7 +486,10 @@
         Logger.info("Obliczony ATA: " + tokenAccount.toBase58());
         const metadataPDA = await getMetadataPDA(mintPDA);
         Logger.info("Obliczony metadata PDA: " + metadataPDA.toBase58());
-        const ixData = buildInstructionData(event_id, event_name, sectionName, row, seat);
+        
+        // Budowanie instrukcji z dodatkowym parametrem IPFS URI
+        const ixData = buildInstructionData(event_id, event_name, sectionName, row, seat, metadataURI);
+        
         // Budujemy listę kont zgodnie z kontekstem MintTicketNft:
         const keys = [
           { pubkey: eventPDA, isSigner: false, isWritable: true },
@@ -492,11 +507,13 @@
           { pubkey: solanaWeb3.SystemProgram.programId, isSigner: false, isWritable: false },
           { pubkey: solanaWeb3.SYSVAR_RENT_PUBKEY, isSigner: false, isWritable: false }
         ];
+        
         const instruction = new solanaWeb3.TransactionInstruction({
           keys,
           programId: PROGRAM_ID,
           data: ixData,
         });
+        
         let transaction = new solanaWeb3.Transaction().add(instruction);
         transaction.feePayer = walletPublicKey;
         const { blockhash } = await connection.getLatestBlockhash();
@@ -515,7 +532,6 @@
         alert("Błąd mintowania NFT: " + err.message);
       }
     }
-
 
     // Obsługa przycisku Load Event
     document.getElementById("loadEventBtn").addEventListener("click", () => {
