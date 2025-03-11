@@ -357,7 +357,7 @@
       const row = Math.floor(seatIndex / sectionData.seats_per_row);
       const seat = seatIndex % sectionData.seats_per_row;
       Logger.info(`Mint NFT dla sekcji "${sectionData.section_name}", row ${row}, seat ${seat}`);
-      processMintTicketNFT(sectionData, row, seat);
+      processMintTicketNFT(sectionData.section_name, row, seat);
     }
 
     async function buyStandingTicket(sectionName) {
@@ -393,21 +393,19 @@
       return eventPDA;
     }
 
-    // Buduje dane instrukcji – rozszerzona o parametr ipfs_uri
-    function buildInstructionData(event_id, event_name, section_name, row, seat, ipfs_uri) {
+    // Buduje dane instrukcji – pozostaje bez zmian
+    function buildInstructionData(event_id, event_name, section_name, row, seat) {
       const eventIdBytes = serializeString(event_id);
       const eventNameBytes = serializeString(event_name);
       const sectionNameBytes = serializeString(section_name);
       const rowByte = serializeU8(row);
       const seatByte = serializeU8(seat);
-      const ipfsUriBytes = serializeString(ipfs_uri); // nowy parametr IPFS
       const totalLength = MINT_TICKET_DISCRIMINATOR.length +
                           eventIdBytes.length +
                           eventNameBytes.length +
                           sectionNameBytes.length +
                           rowByte.length +
-                          seatByte.length +
-                          ipfsUriBytes.length;
+                          seatByte.length;
       let data = new Uint8Array(totalLength);
       let offset = 0;
       data.set(MINT_TICKET_DISCRIMINATOR, offset);
@@ -416,8 +414,7 @@
       data.set(eventNameBytes, offset); offset += eventNameBytes.length;
       data.set(sectionNameBytes, offset); offset += sectionNameBytes.length;
       data.set(rowByte, offset); offset += rowByte.length;
-      data.set(seatByte, offset); offset += seatByte.length;
-      data.set(ipfsUriBytes, offset);
+      data.set(seatByte, offset);
       return data;
     }
 
@@ -452,7 +449,8 @@
       }
     }
 
-    // Funkcja realizująca mint NFT – z modyfikacjami dla IPFS
+
+    // Funkcja realizująca mint NFT – pozostaje bez zmian
     async function processMintTicketNFT(sectionName, row, seat) {
       try {
         if (!eventData) { 
@@ -469,7 +467,7 @@
           return; 
         }
 
-        // Wywołujemy endpoint backendu, który wygeneruje metadane (IPFS URI)
+        // Wywołujemy endpoint backendu, który wygeneruje metadane i doda je do IPFS
         const metadataURI = await fetchMetadataUri(event_id, sectionName, row, seat, walletPublicKey.toBase58());
         Logger.info("Wygenerowany metadata URI (IPFS): " + metadataURI);
 
@@ -486,9 +484,7 @@
         Logger.info("Obliczony ATA: " + tokenAccount.toBase58());
         const metadataPDA = await getMetadataPDA(mintPDA);
         Logger.info("Obliczony metadata PDA: " + metadataPDA.toBase58());
-        
-        // Budowanie instrukcji z dodatkowym parametrem IPFS URI
-        const ixData = buildInstructionData(event_id, event_name, sectionName, row, seat, metadataURI);
+        const ixData = buildInstructionData(event_id, event_name, sectionName, row, seat);
         
         // Budujemy listę kont zgodnie z kontekstem MintTicketNft:
         const keys = [
@@ -532,6 +528,7 @@
         alert("Błąd mintowania NFT: " + err.message);
       }
     }
+
 
     // Obsługa przycisku Load Event
     document.getElementById("loadEventBtn").addEventListener("click", () => {
