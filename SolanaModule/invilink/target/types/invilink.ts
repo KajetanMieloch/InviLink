@@ -713,6 +713,10 @@ export type Invilink = {
         {
           "name": "seat",
           "type": "u8"
+        },
+        {
+          "name": "ipfsUri",
+          "type": "string"
         }
       ]
     },
@@ -1131,6 +1135,16 @@ export type Invilink = {
       "code": 6019,
       "name": "eventCannotDeactivate",
       "msg": "Event cannot be deactivated because tickets have been sold."
+    },
+    {
+      "code": 6020,
+      "name": "eventAlreadyOccurred",
+      "msg": "Event has already occurred."
+    },
+    {
+      "code": 6021,
+      "name": "ticketsSoldOut",
+      "msg": "Tickets for this event are sold out."
     }
   ],
   "types": [

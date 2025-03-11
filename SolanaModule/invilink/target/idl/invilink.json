@@ -707,6 +707,10 @@
         {
           "name": "seat",
           "type": "u8"
+        },
+        {
+          "name": "ipfs_uri",
+          "type": "string"
         }
       ]
     },
@@ -1125,6 +1129,16 @@
       "code": 6019,
       "name": "EventCannotDeactivate",
       "msg": "Event cannot be deactivated because tickets have been sold."
+    },
+    {
+      "code": 6020,
+      "name": "EventAlreadyOccurred",
+      "msg": "Event has already occurred."
+    },
+    {
+      "code": 6021,
+      "name": "TicketsSoldOut",
+      "msg": "Tickets for this event are sold out."
     }
   ],
   "types": [

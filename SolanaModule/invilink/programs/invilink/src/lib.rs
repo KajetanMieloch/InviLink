@@ -438,6 +438,7 @@ pub mod invilink {
         section_name: String,
         row: u8,
         seat: u8,
+        ipfs_uri: String, // nowy parametr – dynamiczne URI z IPFS
     ) -> Result<()> {
         // 1. Sprawdzenie, czy konto SeatingMap zawiera właściwy event_id
         require!(
@@ -448,6 +449,12 @@ pub mod invilink {
         require!(
             ctx.accounts.event.active,
             ErrorCode::EventNotActive
+        );
+        // 2a. Sprawdzenie, czy wydarzenie nie minęło (zakaz zakupu biletu po dacie wydarzenia)
+        let clock = Clock::get()?;
+        require!(
+            clock.unix_timestamp < ctx.accounts.event.event_date,
+            ErrorCode::EventAlreadyOccurred
         );
         // 3. Sprawdzenie, czy miejsce w danej sekcji istnieje
         let seating_section = &mut ctx.accounts.seating_section;
@@ -468,10 +475,10 @@ pub mod invilink {
             seating_section.seat_status[seat_index] == 0,
             ErrorCode::SeatAlreadyTaken
         );
+
     
         // Pobieramy cenę biletu z konta sekcji
         let price = seating_section.ticket_price;
-        // Sprawdzamy, czy kupujący ma wystarczająco środków
         if ctx.accounts.buyer.lamports() < price {
             return Err(ErrorCode::InsufficientFunds.into());
         }
@@ -517,7 +524,7 @@ pub mod invilink {
         let cpi_ctx = CpiContext::new(ctx.accounts.token_program.to_account_info(), cpi_accounts);
         token::mint_to(cpi_ctx, 1)?;
     
-        // Generacja ticket_id przy użyciu funkcji pomocniczej
+        // Generacja ticket_id przy użyciu funkcji pomocniczej (niezmieniona)
         let ticket_id = generate_ticket_id(
             ctx.accounts.buyer.key,
             &event_id,
@@ -527,12 +534,10 @@ pub mod invilink {
             seat,
         );
     
-        // Ustalamy metadata – dodajemy informację o dacie eventu
-        // Możemy w tytule lub URI uwzględnić event_date; poniżej przykład, gdzie event_date jest pobierany z konta event.
+        // Ustalamy metadane – dynamicznie pobieramy URI przekazane przez parametr ipfs_uri
         let title = format!("Invilink Ticket");
-        let symbol = "TEST".to_string();
-        let uri = "ipfs://QmPanHSRRQZq5B9xFjtsDEFT6mwHcaAjko1A6yAesSjbAq".to_string();
-
+        let symbol = "INVI".to_string();
+        let uri = ipfs_uri; // TU używamy przekazanego dynamicznego URI
     
         let creators = vec![mpl_token_metadata::types::Creator {
             address: ctx.accounts.buyer.key(),
@@ -908,4 +913,6 @@ pub enum ErrorCode {
     InvalidEventId,
     #[msg("Event cannot be deactivated because tickets have been sold.")]
     EventCannotDeactivate,
+    #[msg("Event has already occurred.")]
+    EventAlreadyOccurred,
 }
