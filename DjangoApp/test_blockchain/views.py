@@ -66,7 +66,7 @@ def generate_metadata(request):
 
             if raw_date is not None:
                 event_date = datetime.utcfromtimestamp(raw_date)
-                human_readable_date = event_date.strftime("%Y-%m-%d %H:%M:%S")
+                human_readable_date = event_date.strftime("%Y-%m-%d")
             else:
                 human_readable_date = "Unknown"
 
