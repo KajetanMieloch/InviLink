@@ -70,11 +70,7 @@ def generate_metadata(request):
             else:
                 human_readable_date = "Unknown"
 
-            # -----------------------------
             # 1. Generujemy QR code z instrukcją / linkiem
-            # -----------------------------
-            # W URL-u możesz zawrzeć parametry pozwalające na dezaktywację biletu
-            # (np. dedykowany endpoint "deactivate_ticket").
             qr_url = (
                 f"https://invilink.bieda.it/test_blockchain/deactivate_ticket"
                 f"?eventId={event_id}&section={section}&row={row}&seat={seat}"
@@ -101,9 +97,7 @@ def generate_metadata(request):
             # Link do obrazka w IPFS
             qr_ipfs_link = f"ipfs://{cid_qr}"
 
-            # -----------------------------
             # 2. Tworzymy metadane
-            # -----------------------------
             metadata = {
                 "name": f"InviLink Ticket - {event_id}",
                 "symbol": "INVI",
@@ -130,9 +124,7 @@ def generate_metadata(request):
             with open(metadata_filename, "w") as f:
                 json.dump(metadata, f)
 
-            # -----------------------------
             # 3. Dodajemy plik metadanych do IPFS
-            # -----------------------------
             result_metadata = subprocess.run(["ipfs", "add", metadata_filename], capture_output=True, text=True)
             # Usuwamy plik z dysku
             os.remove(metadata_filename)
