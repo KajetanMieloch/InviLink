@@ -15,4 +15,5 @@ urlpatterns = [
     path('user_event/', views.user_event, name='user_event'),
     path('event_detail/<str:event_id>/', views.event_detail, name='event_detail'),
     path('test_mint/', views.test_mint, name='test_mint'),
+    path("generate_metadata/", views.generate_metadata, name="generate_metadata"),
 ]
