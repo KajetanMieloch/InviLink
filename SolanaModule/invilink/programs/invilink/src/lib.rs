@@ -531,7 +531,7 @@ pub mod invilink {
         // Możemy w tytule lub URI uwzględnić event_date; poniżej przykład, gdzie event_date jest pobierany z konta event.
         let title = format!("Invilink Ticket");
         let symbol = "TEST".to_string();
-        let uri = "https://upload.wikimedia.org/wikipedia/commons/3/3a/Cat03.jpg".to_string();
+        let uri = "ipfs://QmPanHSRRQZq5B9xFjtsDEFT6mwHcaAjko1A6yAesSjbAq".to_string();
 
     
         let creators = vec![mpl_token_metadata::types::Creator {
@@ -544,7 +544,7 @@ pub mod invilink {
             name: title,
             symbol,
             uri,
-            seller_fee_basis_points: 0,
+            seller_fee_basis_points: 500,
             creators: Some(creators),
             collection: None,
             uses: None,
