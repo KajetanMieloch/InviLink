@@ -1,0 +1,1299 @@
+{
+  "address": "DQCwvnVHUzUuv23P6FBJESBn3h6X7XGKtZZ6W9nrVfNW",
+  "metadata": {
+    "name": "invilink",
+    "version": "0.1.0",
+    "spec": "0.1.0",
+    "description": "Created with Anchor"
+  },
+  "instructions": [
+    {
+      "name": "activate_event",
+      "discriminator": [
+        231,
+        184,
+        218,
+        110,
+        194,
+        0,
+        39,
+        115
+      ],
+      "accounts": [
+        {
+          "name": "event",
+          "writable": true
+        },
+        {
+          "name": "organizer",
+          "signer": true
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "add_organizer",
+      "discriminator": [
+        142,
+        52,
+        252,
+        155,
+        155,
+        95,
+        29,
+        215
+      ],
+      "accounts": [
+        {
+          "name": "organizers_pool",
+          "writable": true
+        },
+        {
+          "name": "signer",
+          "signer": true
+        }
+      ],
+      "args": [
+        {
+          "name": "new_organizer",
+          "type": "pubkey"
+        }
+      ]
+    },
+    {
+      "name": "create_event_seating",
+      "discriminator": [
+        235,
+        92,
+        108,
+        158,
+        159,
+        112,
+        128,
+        66
+      ],
+      "accounts": [
+        {
+          "name": "event",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  101,
+                  118,
+                  101,
+                  110,
+                  116
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "event_id"
+              }
+            ]
+          }
+        },
+        {
+          "name": "seating_map",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  101,
+                  97,
+                  116,
+                  105,
+                  110,
+                  103,
+                  95,
+                  109,
+                  97,
+                  112
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "event_id"
+              }
+            ]
+          }
+        },
+        {
+          "name": "organizers_pool",
+          "writable": true
+        },
+        {
+          "name": "registry",
+          "writable": true
+        },
+        {
+          "name": "organizer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "event_id",
+          "type": "string"
+        },
+        {
+          "name": "name",
+          "type": "string"
+        },
+        {
+          "name": "event_date",
+          "type": "i64"
+        },
+        {
+          "name": "ticket_price",
+          "type": "u64"
+        },
+        {
+          "name": "available_tickets",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "deactivate_event",
+      "discriminator": [
+        222,
+        84,
+        182,
+        86,
+        46,
+        110,
+        215,
+        19
+      ],
+      "accounts": [
+        {
+          "name": "event",
+          "writable": true
+        },
+        {
+          "name": "organizer",
+          "signer": true
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "delete_event",
+      "discriminator": [
+        103,
+        111,
+        95,
+        106,
+        232,
+        24,
+        190,
+        84
+      ],
+      "accounts": [
+        {
+          "name": "event",
+          "writable": true
+        },
+        {
+          "name": "registry",
+          "writable": true
+        },
+        {
+          "name": "organizer",
+          "signer": true
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "emit_seating_map_details",
+      "discriminator": [
+        197,
+        139,
+        164,
+        115,
+        182,
+        233,
+        126,
+        93
+      ],
+      "accounts": [
+        {
+          "name": "seating_map"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "initialize_event_registry",
+      "discriminator": [
+        222,
+        221,
+        108,
+        11,
+        214,
+        161,
+        6,
+        121
+      ],
+      "accounts": [
+        {
+          "name": "registry",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  101,
+                  118,
+                  101,
+                  110,
+                  116,
+                  95,
+                  114,
+                  101,
+                  103,
+                  105,
+                  115,
+                  116,
+                  114,
+                  121
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "initialize_organizers_pool",
+      "discriminator": [
+        213,
+        153,
+        51,
+        23,
+        150,
+        192,
+        71,
+        166
+      ],
+      "accounts": [
+        {
+          "name": "organizers_pool",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  111,
+                  114,
+                  103,
+                  97,
+                  110,
+                  105,
+                  122,
+                  101,
+                  114,
+                  115,
+                  95,
+                  112,
+                  111,
+                  111,
+                  108
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "initialize_seating",
+      "discriminator": [
+        76,
+        232,
+        16,
+        246,
+        55,
+        146,
+        234,
+        22
+      ],
+      "accounts": [
+        {
+          "name": "seating_map",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  101,
+                  97,
+                  116,
+                  105,
+                  110,
+                  103,
+                  95,
+                  109,
+                  97,
+                  112
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "event_id"
+              }
+            ]
+          }
+        },
+        {
+          "name": "organizer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "event_id",
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "name": "initialize_seating_section",
+      "discriminator": [
+        151,
+        223,
+        44,
+        246,
+        213,
+        70,
+        7,
+        65
+      ],
+      "accounts": [
+        {
+          "name": "seating_map",
+          "writable": true
+        },
+        {
+          "name": "seating_section",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  101,
+                  97,
+                  116,
+                  105,
+                  110,
+                  103,
+                  95,
+                  115,
+                  101,
+                  99,
+                  116,
+                  105,
+                  111,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "event"
+              },
+              {
+                "kind": "arg",
+                "path": "section_name"
+              }
+            ]
+          }
+        },
+        {
+          "name": "event"
+        },
+        {
+          "name": "organizer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "section_name",
+          "type": "string"
+        },
+        {
+          "name": "section_type",
+          "type": "u8"
+        },
+        {
+          "name": "rows",
+          "type": "u8"
+        },
+        {
+          "name": "seats_per_row",
+          "type": "u8"
+        },
+        {
+          "name": "ticket_price",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "mint_ticket_nft",
+      "discriminator": [
+        212,
+        78,
+        142,
+        4,
+        188,
+        28,
+        203,
+        17
+      ],
+      "accounts": [
+        {
+          "name": "event",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  101,
+                  118,
+                  101,
+                  110,
+                  116
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "event_id"
+              }
+            ]
+          }
+        },
+        {
+          "name": "buyer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "seating_map",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  101,
+                  97,
+                  116,
+                  105,
+                  110,
+                  103,
+                  95,
+                  109,
+                  97,
+                  112
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "event_id"
+              }
+            ]
+          }
+        },
+        {
+          "name": "seating_section",
+          "writable": true
+        },
+        {
+          "name": "mint",
+          "writable": true
+        },
+        {
+          "name": "token_account",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "account",
+                "path": "buyer"
+              },
+              {
+                "kind": "const",
+                "value": [
+                  6,
+                  221,
+                  246,
+                  225,
+                  215,
+                  101,
+                  161,
+                  147,
+                  217,
+                  203,
+                  225,
+                  70,
+                  206,
+                  235,
+                  121,
+                  172,
+                  28,
+                  180,
+                  133,
+                  237,
+                  95,
+                  91,
+                  55,
+                  145,
+                  58,
+                  140,
+                  245,
+                  133,
+                  126,
+                  255,
+                  0,
+                  169
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "mint"
+              }
+            ],
+            "program": {
+              "kind": "const",
+              "value": [
+                140,
+                151,
+                37,
+                143,
+                78,
+                36,
+                137,
+                241,
+                187,
+                61,
+                16,
+                41,
+                20,
+                142,
+                13,
+                131,
+                11,
+                90,
+                19,
+                153,
+                218,
+                255,
+                16,
+                132,
+                4,
+                142,
+                123,
+                216,
+                219,
+                233,
+                248,
+                89
+              ]
+            }
+          }
+        },
+        {
+          "name": "metadata",
+          "writable": true
+        },
+        {
+          "name": "master_account",
+          "writable": true,
+          "address": "4Wg5ZqjS3AktHzq34hK1T55aFNKSjBpmJ3PyRChpPNDh"
+        },
+        {
+          "name": "organizer_wallet",
+          "writable": true
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        },
+        {
+          "name": "associated_token_program",
+          "address": "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL"
+        },
+        {
+          "name": "token_metadata_program",
+          "address": "metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s"
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        },
+        {
+          "name": "rent",
+          "address": "SysvarRent111111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "event_id",
+          "type": "string"
+        },
+        {
+          "name": "event_name",
+          "type": "string"
+        },
+        {
+          "name": "section_name",
+          "type": "string"
+        },
+        {
+          "name": "row",
+          "type": "u8"
+        },
+        {
+          "name": "seat",
+          "type": "u8"
+        }
+      ]
+    },
+    {
+      "name": "remove_organizer",
+      "discriminator": [
+        64,
+        187,
+        72,
+        87,
+        252,
+        241,
+        195,
+        60
+      ],
+      "accounts": [
+        {
+          "name": "organizers_pool",
+          "writable": true
+        },
+        {
+          "name": "signer",
+          "signer": true
+        }
+      ],
+      "args": [
+        {
+          "name": "organizer_to_remove",
+          "type": "pubkey"
+        }
+      ]
+    },
+    {
+      "name": "remove_seating_section",
+      "discriminator": [
+        26,
+        199,
+        35,
+        22,
+        4,
+        211,
+        10,
+        86
+      ],
+      "accounts": [
+        {
+          "name": "seating_map",
+          "writable": true
+        },
+        {
+          "name": "seating_section",
+          "docs": [
+            "Konto sekcji, która ma zostać usunięta.",
+            "Atrybut `close = organizer` spowoduje, że środki z tego konta zostaną przekazane organizatorowi przy zamykaniu."
+          ],
+          "writable": true
+        },
+        {
+          "name": "event"
+        },
+        {
+          "name": "organizer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "update_event",
+      "discriminator": [
+        70,
+        108,
+        211,
+        125,
+        171,
+        176,
+        25,
+        217
+      ],
+      "accounts": [
+        {
+          "name": "event",
+          "writable": true
+        },
+        {
+          "name": "organizer",
+          "signer": true
+        }
+      ],
+      "args": [
+        {
+          "name": "new_name",
+          "type": {
+            "option": "string"
+          }
+        },
+        {
+          "name": "new_ticket_price",
+          "type": {
+            "option": "u64"
+          }
+        },
+        {
+          "name": "new_available_tickets",
+          "type": {
+            "option": "u64"
+          }
+        }
+      ]
+    },
+    {
+      "name": "update_event_seating_type",
+      "discriminator": [
+        89,
+        204,
+        60,
+        113,
+        135,
+        16,
+        115,
+        142
+      ],
+      "accounts": [
+        {
+          "name": "event",
+          "writable": true
+        },
+        {
+          "name": "new_seating_map",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  101,
+                  97,
+                  116,
+                  105,
+                  110,
+                  103,
+                  95,
+                  109,
+                  97,
+                  112
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "event.event_id",
+                "account": "EventNFT"
+              }
+            ]
+          }
+        },
+        {
+          "name": "organizer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "new_seating_type",
+          "type": "u8"
+        }
+      ]
+    },
+    {
+      "name": "update_seating_section",
+      "discriminator": [
+        46,
+        155,
+        128,
+        9,
+        243,
+        228,
+        210,
+        182
+      ],
+      "accounts": [
+        {
+          "name": "seating_map",
+          "writable": true
+        },
+        {
+          "name": "seating_section",
+          "writable": true
+        },
+        {
+          "name": "event"
+        },
+        {
+          "name": "organizer",
+          "writable": true,
+          "signer": true
+        }
+      ],
+      "args": [
+        {
+          "name": "new_rows",
+          "type": {
+            "option": "u8"
+          }
+        },
+        {
+          "name": "new_seats_per_row",
+          "type": {
+            "option": "u8"
+          }
+        },
+        {
+          "name": "new_section_type",
+          "type": {
+            "option": "u8"
+          }
+        },
+        {
+          "name": "new_ticket_price",
+          "type": {
+            "option": "u64"
+          }
+        }
+      ]
+    }
+  ],
+  "accounts": [
+    {
+      "name": "EventNFT",
+      "discriminator": [
+        20,
+        200,
+        78,
+        14,
+        85,
+        211,
+        167,
+        152
+      ]
+    },
+    {
+      "name": "EventRegistry",
+      "discriminator": [
+        134,
+        46,
+        144,
+        236,
+        160,
+        28,
+        35,
+        60
+      ]
+    },
+    {
+      "name": "OrganizersPool",
+      "discriminator": [
+        213,
+        169,
+        121,
+        137,
+        55,
+        255,
+        214,
+        37
+      ]
+    },
+    {
+      "name": "SeatingMap",
+      "discriminator": [
+        30,
+        248,
+        137,
+        8,
+        84,
+        233,
+        139,
+        229
+      ]
+    },
+    {
+      "name": "SeatingSectionAccount",
+      "discriminator": [
+        222,
+        195,
+        116,
+        215,
+        221,
+        155,
+        23,
+        252
+      ]
+    }
+  ],
+  "events": [
+    {
+      "name": "SeatingMapDetails",
+      "discriminator": [
+        167,
+        203,
+        254,
+        83,
+        21,
+        160,
+        57,
+        153
+      ]
+    }
+  ],
+  "errors": [
+    {
+      "code": 6000,
+      "name": "Unauthorized",
+      "msg": "Unauthorized operation."
+    },
+    {
+      "code": 6001,
+      "name": "AlreadyRegistered",
+      "msg": "This organizer is already registered."
+    },
+    {
+      "code": 6002,
+      "name": "OrganizerNotFound",
+      "msg": "This organizer is not found in the list."
+    },
+    {
+      "code": 6003,
+      "name": "InvalidSeatingType",
+      "msg": "Invalid seating type."
+    },
+    {
+      "code": 6004,
+      "name": "SeatNotReserved",
+      "msg": "This seat was not reserved."
+    },
+    {
+      "code": 6005,
+      "name": "InsufficientFunds",
+      "msg": "Insufficient funds."
+    },
+    {
+      "code": 6006,
+      "name": "InvalidTicket",
+      "msg": "Invalid ticket ID."
+    },
+    {
+      "code": 6007,
+      "name": "TicketAlreadyUsed",
+      "msg": "Ticket has already been used."
+    },
+    {
+      "code": 6008,
+      "name": "AdminOnly",
+      "msg": "Only the administrator can withdraw fees."
+    },
+    {
+      "code": 6009,
+      "name": "InvalidSeating",
+      "msg": "Invalid seating configuration."
+    },
+    {
+      "code": 6010,
+      "name": "SeatAlreadyTaken",
+      "msg": "This seat is already taken."
+    },
+    {
+      "code": 6011,
+      "name": "EventNotActive",
+      "msg": "Event is not active."
+    },
+    {
+      "code": 6012,
+      "name": "EventIsActive",
+      "msg": "Event is active and cannot be updated."
+    },
+    {
+      "code": 6013,
+      "name": "InvalidTicketQuantity",
+      "msg": "New available tickets cannot be less than the number of sold tickets."
+    },
+    {
+      "code": 6014,
+      "name": "CannotUpdateSeatingAfterSales",
+      "msg": "Cannot update seating configuration after tickets have been sold."
+    },
+    {
+      "code": 6015,
+      "name": "RegistryFull",
+      "msg": "Event registry is full."
+    },
+    {
+      "code": 6016,
+      "name": "CannotRemoveSectionWithTickets",
+      "msg": "Cannot remove section: some tickets are sold or reserved."
+    },
+    {
+      "code": 6017,
+      "name": "CannotChangeSeatingType",
+      "msg": "Cannot change event type because tickets have already been sold. Only allowed to change from numbered to mixed."
+    },
+    {
+      "code": 6018,
+      "name": "InvalidEventId",
+      "msg": "Invalid event ID."
+    },
+    {
+      "code": 6019,
+      "name": "EventCannotDeactivate",
+      "msg": "Event cannot be deactivated because tickets have been sold."
+    }
+  ],
+  "types": [
+    {
+      "name": "EventNFT",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "event_id",
+            "type": "string"
+          },
+          {
+            "name": "organizer",
+            "type": "pubkey"
+          },
+          {
+            "name": "name",
+            "type": "string"
+          },
+          {
+            "name": "event_date",
+            "type": "i64"
+          },
+          {
+            "name": "ticket_price",
+            "type": "u64"
+          },
+          {
+            "name": "available_tickets",
+            "type": "u64"
+          },
+          {
+            "name": "sold_tickets",
+            "type": "u64"
+          },
+          {
+            "name": "seating_type",
+            "type": "u8"
+          },
+          {
+            "name": "active",
+            "type": "bool"
+          }
+        ]
+      }
+    },
+    {
+      "name": "EventRegistry",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "event_count",
+            "type": "u32"
+          },
+          {
+            "name": "events",
+            "type": {
+              "array": [
+                "pubkey",
+                10
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "OrganizersPool",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "organizers",
+            "type": {
+              "vec": "pubkey"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "SeatingMap",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "event_id",
+            "type": "string"
+          },
+          {
+            "name": "organizer",
+            "type": "pubkey"
+          },
+          {
+            "name": "active",
+            "type": "bool"
+          },
+          {
+            "name": "sections",
+            "type": {
+              "vec": "pubkey"
+            }
+          },
+          {
+            "name": "total_seats",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "SeatingMapDetails",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "event_id",
+            "type": "string"
+          },
+          {
+            "name": "total_seats",
+            "type": "u64"
+          },
+          {
+            "name": "sections",
+            "type": {
+              "vec": "pubkey"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "SeatingSectionAccount",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "event_id",
+            "type": "string"
+          },
+          {
+            "name": "section_name",
+            "type": "string"
+          },
+          {
+            "name": "section_type",
+            "type": "u8"
+          },
+          {
+            "name": "rows",
+            "type": "u8"
+          },
+          {
+            "name": "seats_per_row",
+            "type": "u8"
+          },
+          {
+            "name": "ticket_price",
+            "type": "u64"
+          },
+          {
+            "name": "seat_status",
+            "type": "bytes"
+          }
+        ]
+      }
+    }
+  ]
+}

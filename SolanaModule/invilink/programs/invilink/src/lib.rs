@@ -136,7 +136,7 @@ pub mod invilink {
             seeds = [b"event", event_id.as_bytes()],
             bump,
             // zwiększamy space np. do 1200
-            space = 4096 
+            space = 1024
         )]
         pub event: Account<'info, EventNFT>,
         #[account(
@@ -531,15 +531,8 @@ pub mod invilink {
         // Możemy w tytule lub URI uwzględnić event_date; poniżej przykład, gdzie event_date jest pobierany z konta event.
         let title = format!("Invilink Ticket");
         let symbol = "TEST".to_string();
-        let uri = format!(
-            "https://example.com/metadata/{}-{}-{}-{}-{}-{}",
-            event_id,
-            event_name,
-            section_name,
-            row,
-            seat,
-            ctx.accounts.event.event_date
-        );
+        let uri = "https://upload.wikimedia.org/wikipedia/commons/3/3a/Cat03.jpg".to_string();
+
     
         let creators = vec![mpl_token_metadata::types::Creator {
             address: ctx.accounts.buyer.key(),

@@ -1,0 +1,1 @@
+{"rustc":3303995886684151841,"features":"","declared_features":"","target":0,"profile":0,"path":0,"deps":[[6946689283190175495,"build_script_build",false,124187655852329150]],"local":[{"RerunIfChanged":{"output":"debug/build/wasm-bindgen-c7e828cd9cd90521/output","paths":["build.rs"]}}],"rustflags":["--cfg","procmacro2_semver_exempt"],"config":0,"compile_kind":0}
