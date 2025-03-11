@@ -357,7 +357,7 @@
       const row = Math.floor(seatIndex / sectionData.seats_per_row);
       const seat = seatIndex % sectionData.seats_per_row;
       Logger.info(`Mint NFT dla sekcji "${sectionData.section_name}", row ${row}, seat ${seat}`);
-      processMintTicketNFT(sectionData, seatIndex, sectionData.section_name, row, seat);
+      processMintTicketNFT(sectionData.section_name, row, seat);
     }
 
     async function buyStandingTicket(sectionName) {
@@ -373,7 +373,7 @@
         const randomIndex = freeIndices[Math.floor(Math.random() * freeIndices.length)];
         const { row, seat } = validateSeatCoordinates(sectionData, randomIndex);
         Logger.info(`Kupuję bilet dla sekcji stojącej "${sectionName}" – row: ${row}, seat: ${seat}`);
-        processMintTicketNFT(sectionData, randomIndex, sectionName, row, seat);
+        processMintTicketNFT(sectionName, row, seat);
       } catch (err) {
         Logger.error("Błąd kupowania biletu: " + err.message);
         alert("Błąd kupowania biletu: " + err.message);
@@ -419,7 +419,7 @@
     }
 
     // Funkcja realizująca mint NFT – pozostaje bez zmian
-    async function processMintTicketNFT(sectionData, seatIndex, sectionName, row, seat) {
+    async function processMintTicketNFT(sectionName, row, seat) {
       try {
         if (!eventData) { Logger.error("Brak danych eventu!"); return; }
         const event_id = eventData.event_id;
