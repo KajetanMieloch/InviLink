@@ -9,6 +9,7 @@ import os
 from datetime import datetime
 import qrcode
 from io import BytesIO
+from PIL import Image
 
 def init_org_pool(request):
     return render(request, 'test_blockchain/init_org_pool.html')
@@ -63,41 +64,51 @@ def generate_metadata(request):
             name = data.get("name")
             raw_date = data.get("date")
 
-            # Konwersja timestampa na datę
             if raw_date is not None:
                 event_date = datetime.utcfromtimestamp(raw_date)
                 human_readable_date = event_date.strftime("%Y-%m-%d %H:%M:%S")
             else:
                 human_readable_date = "Unknown"
 
-            # 1. Generujemy QR code z instrukcją / linkiem
+            # 1. Generujemy QR code z instrukcją / linkiem do dezaktywacji biletu
             qr_url = (
                 f"https://invilink.bieda.it/test_blockchain/deactivate_ticket"
                 f"?eventId={event_id}&section={section}&row={row}&seat={seat}"
             )
+            qr_img = qrcode.make(qr_url).convert("RGBA")
 
-            # Tworzymy obrazek w pamięci
-            qr_img = qrcode.make(qr_url)
-            qr_filename = f"qr_{event_id}_{section}_{row}_{seat}.png"
-            qr_img.save(qr_filename)
+            base_dir = os.path.dirname(os.path.abspath(__file__))
+            background_path = os.path.join(base_dir, "BiletInvilink.png")
+            background = Image.open(background_path).convert("RGBA")
 
-            # Dodajemy plik QR do IPFS
-            result_qr = subprocess.run(["ipfs", "add", qr_filename], capture_output=True, text=True)
-            if result_qr.returncode != 0:
-                # Błąd w dodawaniu do IPFS
-                os.remove(qr_filename)
-                return JsonResponse({"error": "Nie udało się dodać QR do IPFS"}, status=500)
+            # Ustalone wymiary przezroczystego obszaru (prostokąta) w tle:
+            rect_min_x = 136
+            rect_min_y = 24
+            rect_width = 754 
+            rect_height = 677
 
-            # Wyciągamy CID z wyniku "ipfs add"
-            parts_qr = result_qr.stdout.split()
-            cid_qr = parts_qr[1] if len(parts_qr) >= 2 else ""
-            # Można od razu usunąć plik lokalny QR
-            os.remove(qr_filename)
+            # Skalujemy kod QR, by pasował do przezroczystego obszaru
+            qr_resized = qr_img.resize((rect_width, rect_height))
 
-            # Link do obrazka w IPFS
-            qr_ipfs_link = f"ipfs://{cid_qr}"
+            # Wklejamy kod QR do obrazu tła – jako, że QR ma przezroczyste tło, używamy go jako maski
+            background.paste(qr_resized, (rect_min_x, rect_min_y), qr_resized)
 
-            # 2. Tworzymy metadane
+            # Zapisujemy wynikowy obraz biletu do tymczasowego pliku
+            ticket_filename = f"ticket_{event_id}_{row}_{seat}.png"
+            background.save(ticket_filename)
+
+            # Dodajemy plik biletu do IPFS
+            result_ticket = subprocess.run(["ipfs", "add", ticket_filename], capture_output=True, text=True)
+            if result_ticket.returncode != 0:
+                os.remove(ticket_filename)
+                return JsonResponse({"error": "Nie udało się dodać biletu do IPFS"}, status=500)
+
+            parts_ticket = result_ticket.stdout.split()
+            cid_ticket = parts_ticket[1] if len(parts_ticket) >= 2 else ""
+            os.remove(ticket_filename)
+            ticket_ipfs_link = f"ipfs://{cid_ticket}"
+
+            # 2. Tworzymy metadane z obrazem ustawionym na wynikowy bilet (z wklejonym QR code)
             metadata = {
                 "name": f"InviLink Ticket - {event_id}",
                 "symbol": "INVI",
@@ -109,8 +120,7 @@ def generate_metadata(request):
                     "it to another person. Even used and after event it might have some value. "
                     "(even higher than the original price ;) ). And most important - HAVE A GREAT TIME AT THE EVENT!"
                 ),
-                # Zamiast losowego obrazka – link do wygenerowanego kodu QR w IPFS
-                "image": qr_ipfs_link,
+                "image": ticket_ipfs_link,
                 "attributes": [
                     {"trait_type": "Section", "value": section},
                     {"trait_type": "Row", "value": row},
@@ -119,16 +129,14 @@ def generate_metadata(request):
                 ]
             }
 
-            # Zapisujemy metadane do pliku
+            # Zapisujemy metadane do pliku tymczasowego
             metadata_filename = f"metadata_{event_id}_{row}_{seat}.json"
             with open(metadata_filename, "w") as f:
                 json.dump(metadata, f)
 
-            # 3. Dodajemy plik metadanych do IPFS
+            # Dodajemy plik metadanych do IPFS
             result_metadata = subprocess.run(["ipfs", "add", metadata_filename], capture_output=True, text=True)
-            # Usuwamy plik z dysku
             os.remove(metadata_filename)
-
             if result_metadata.returncode == 0:
                 parts = result_metadata.stdout.split()
                 cid_metadata = parts[1] if len(parts) >= 2 else ""
