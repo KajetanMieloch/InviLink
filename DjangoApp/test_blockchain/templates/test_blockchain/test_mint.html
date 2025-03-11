@@ -453,25 +453,15 @@
     // Funkcja realizująca mint NFT – pozostaje bez zmian
     async function processMintTicketNFT(sectionName, row, seat) {
       try {
-        if (!eventData) { 
-          Logger.error("Brak danych eventu!"); 
-          return; 
-        }
+        if (!eventData) { Logger.error("Brak danych eventu!"); return; }
         const event_id = eventData.event_id;
         const event_name = eventData.name;
         Logger.info(`Mint NFT: event_id=${event_id}, event_name=${event_name}, section=${sectionName}, row=${row}, seat=${seat}`);
-
         if (!eventData.active) { 
           Logger.error("Event nie jest aktywny!"); 
           alert("Event nie jest aktywny. Mintowanie niemożliwe."); 
           return; 
         }
-
-        // Wywołujemy endpoint backendu, który wygeneruje metadane i doda je do IPFS
-        const metadataURI = await fetchMetadataUri(event_id, sectionName, row, seat, walletPublicKey.toBase58());
-        Logger.info("Wygenerowany metadata URI (IPFS): " + metadataURI);
-
-        // Następnie kontynuujemy mintowanie NFT tak jak wcześniej:
         const eventPDA = await getEventPDA(event_id);
         Logger.info("Obliczone Event PDA: " + eventPDA.toBase58());
         const seatingSeed1 = new TextEncoder().encode("seating_map");
@@ -485,7 +475,6 @@
         const metadataPDA = await getMetadataPDA(mintPDA);
         Logger.info("Obliczony metadata PDA: " + metadataPDA.toBase58());
         const ixData = buildInstructionData(event_id, event_name, sectionName, row, seat);
-        
         // Budujemy listę kont zgodnie z kontekstem MintTicketNft:
         const keys = [
           { pubkey: eventPDA, isSigner: false, isWritable: true },
@@ -503,13 +492,11 @@
           { pubkey: solanaWeb3.SystemProgram.programId, isSigner: false, isWritable: false },
           { pubkey: solanaWeb3.SYSVAR_RENT_PUBKEY, isSigner: false, isWritable: false }
         ];
-        
         const instruction = new solanaWeb3.TransactionInstruction({
           keys,
           programId: PROGRAM_ID,
           data: ixData,
         });
-        
         let transaction = new solanaWeb3.Transaction().add(instruction);
         transaction.feePayer = walletPublicKey;
         const { blockhash } = await connection.getLatestBlockhash();
