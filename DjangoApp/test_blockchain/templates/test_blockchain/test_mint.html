@@ -421,7 +421,7 @@
       return data;
     }
 
-    async function fetchMetadataUri(eventId, section, row, seat, owner) {
+    async function fetchMetadataUri(eventId, section, row, seat, date, name) {
       try {
         const baseUrl = window.location.origin; // Pobiera aktualną domenę
         const apiEndpoint = baseUrl + "/test_blockchain/generate_metadata/"; // Dynamiczna ścieżka - AKTUALNIE TAKI JEST ENDPOINT
@@ -436,7 +436,8 @@
             section: section,
             row: row,
             seat: seat,
-            owner: owner
+            date: date,
+            name: name
           })
         });
 
@@ -471,7 +472,7 @@
         }
 
         // Wywołujemy endpoint backendu, który wygeneruje metadane i doda je do IPFS
-        const metadataURI = await fetchMetadataUri(event_id, sectionName, row, seat, walletPublicKey.toBase58());
+        const metadataURI = await fetchMetadataUri(event_id, sectionName, row, seat, eventData.event_date, eventData.name);
         Logger.info("Wygenerowany metadata URI (IPFS): " + metadataURI);
 
         // Następnie kontynuujemy mintowanie NFT tak jak wcześniej:

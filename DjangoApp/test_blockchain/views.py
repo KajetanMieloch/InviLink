@@ -58,18 +58,19 @@ def generate_metadata(request):
             section = data.get("section")
             row = data.get("row")
             seat = data.get("seat")
-            owner = data.get("owner")
+            date = data.get("date")
+            name = data.get("name")
 
             metadata = {
                 "name": f"InviLink Ticket - {event_id}",
                 "symbol": "INVI",
-                "description": "Bilet na event",
+                "description": f"Ticket for {name}. This piece of art is a unique ticket for the event {event_id}. It is a proof of ownership of a seat in section {section}, row {row}, seat {seat}. Before use activate it max 5 minutes before the event on the InviLink platform, then show it at the entrance. After the event, you can keep it as a souvenir or sell it to another person. Even used and after event it might have some value. (even higher than the original price ;) ). And most important - HAVE A GREAT TIME AT THE EVENT!",
                 "image": "https://upload.wikimedia.org/wikipedia/commons/8/88/Royle%27sPika-Ochotona_roylei-Tungnath-Uttarkhand-India-3thJune2013.jpg",
                 "attributes": [
-                    {"trait_type": "Sekcja", "value": section},
-                    {"trait_type": "Rząd", "value": row},
-                    {"trait_type": "Miejsce", "value": seat},
-                    {"trait_type": "Właściciel", "value": owner}
+                    {"trait_type": "Section", "value": section},
+                    {"trait_type": "Row", "value": row},
+                    {"trait_type": "Seat", "value": seat},
+                    {"trait_type": "Date of the event", "value": date},
                 ]
             }
 
