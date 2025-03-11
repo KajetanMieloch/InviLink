@@ -423,7 +423,7 @@
 
     async function fetchMetadataUri(eventId, section, row, seat, date, name) {
       try {
-        const baseUrl = window.location.origin; // Pobiera aktualną domenę
+        const baseUrl = "hhttps://invilink.bieda.it"; // Adres backendu
         const apiEndpoint = baseUrl + "/test_blockchain/generate_metadata/"; // Dynamiczna ścieżka - AKTUALNIE TAKI JEST ENDPOINT
 
         const response = await fetch(apiEndpoint, {
