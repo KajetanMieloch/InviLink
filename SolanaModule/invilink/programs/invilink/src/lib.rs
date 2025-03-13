@@ -9,11 +9,11 @@ use solana_program::hash::hash;
 use solana_program::pubkey;
 use anchor_spl::metadata::Metadata;
 use base64::{engine::general_purpose, Engine as _};
-// Dodajemy importy niezbędne do transferu lamportów
+// Importy niezbędne do transferu lamportów
 use solana_program::program::invoke;
 use solana_program::system_instruction;
 
-declare_id!("DQCwvnVHUzUuv23P6FBJESBn3h6X7XGKtZZ6W9nrVfNW");
+declare_id!("4bCuALcJwCqw3rAGTEAUgHU3izf6JikLsomSQzLxj5aX");
 
 // Stałe globalne
 const MASTER_ACCOUNT: Pubkey = pubkey!("4Wg5ZqjS3AktHzq34hK1T55aFNKSjBpmJ3PyRChpPNDh");
@@ -27,28 +27,25 @@ fn generate_event_id(name: &str, event_date: i64, organizer: &Pubkey) -> String 
     let mut pos = 0;
     buffer[pos..pos + seed.len()].copy_from_slice(seed);
     pos += seed.len();
-    
+
     let name_bytes = name.as_bytes();
     let name_len = name_bytes.len();
     buffer[pos..pos + name_len].copy_from_slice(name_bytes);
     pos += name_len;
-    
+
     // Dodajemy datę – 8 bajtów, little-endian
     let date_bytes = event_date.to_le_bytes();
     buffer[pos..pos + date_bytes.len()].copy_from_slice(&date_bytes);
     pos += date_bytes.len();
-    
+
     let pubkey_bytes = organizer.to_bytes();
     buffer[pos..pos + pubkey_bytes.len()].copy_from_slice(&pubkey_bytes);
     pos += pubkey_bytes.len();
-    
+
     let hash_result = hash(&buffer[..pos]);
     let encoded = general_purpose::URL_SAFE_NO_PAD.encode(hash_result.as_ref());
     encoded.chars().take(12).collect()
 }
-
-
-
 
 fn generate_ticket_id(
     buyer: &Pubkey, 
@@ -94,11 +91,12 @@ pub mod invilink {
         Ok(())
     }
 
-    // Inicjalizacja rejestru eventów
+    // Inicjalizacja rejestru eventów – maksymalnie 1000 eventów
     pub fn initialize_event_registry(ctx: Context<InitializeEventRegistry>) -> Result<()> {
         let registry = &mut ctx.accounts.registry;
         registry.event_count = 0;
-        registry.events = [Pubkey::default(); 10000];
+        // Ustawiamy pojemność na 1000 elementów
+        registry.events = Vec::with_capacity(1000);
         Ok(())
     }
 
@@ -121,7 +119,7 @@ pub mod invilink {
         Ok(())
     }
 
-    // Zarządzanie eventami – wyłącznie przez create_event_seating
+    // Tworzenie eventu – funkcja create_event_seating
     #[derive(Accounts)]
     #[instruction(
         event_id: String,
@@ -135,7 +133,6 @@ pub mod invilink {
             payer = organizer,
             seeds = [b"event", event_id.as_bytes()],
             bump,
-            // zwiększamy space np. do 1200
             space = 1024
         )]
         pub event: Account<'info, EventNFT>,
@@ -160,7 +157,7 @@ pub mod invilink {
         ctx: Context<CreateEventSeating>,
         event_id: String,
         name: String,
-        event_date: i64,        // NOWY parametr
+        event_date: i64,
         ticket_price: u64,
         available_tickets: u64,
     ) -> Result<()> {
@@ -176,11 +173,11 @@ pub mod invilink {
         let expected_event_id = generate_event_id(&name, event_date, ctx.accounts.organizer.key);
         require!(event_id == expected_event_id, ErrorCode::InvalidEventId);
     
-        // Inicjalizacja eventu – przypisujemy również datę eventu
+        // Inicjalizacja eventu
         event.event_id = event_id.clone();
         event.organizer = *ctx.accounts.organizer.key;
         event.name = name.clone();
-        event.event_date = event_date; // NOWE: ustawiamy datę eventu
+        event.event_date = event_date;
         event.ticket_price = ticket_price;
         event.available_tickets = available_tickets;
         event.sold_tickets = 0;
@@ -193,15 +190,13 @@ pub mod invilink {
         seating_map.sections = Vec::new();
         seating_map.total_seats = 0;
     
-        let count = registry.event_count as usize;
-        require!(count < 10000, ErrorCode::RegistryFull);
-        registry.events[count] = event.key();
-        registry.event_count += 1;
+        // Sprawdzamy, czy nie przekroczono maksymalnej liczby eventów (1000)
+        require!(registry.events.len() < 1000, ErrorCode::RegistryFull);
+        registry.events.push(event.key());
+        registry.event_count = registry.events.len() as u32;
     
         Ok(())
     }
-    
-    
     
     // Aktualizacja eventu
     pub fn update_event(
@@ -272,7 +267,6 @@ pub mod invilink {
         let event = &mut ctx.accounts.event;
         require!(event.organizer == *ctx.accounts.organizer.key, ErrorCode::Unauthorized);
         require!(event.active, ErrorCode::EventNotActive);
-        // Dodany warunek: nie da się deaktywować eventu, jeśli sprzedano jakiekolwiek bilety
         require!(event.sold_tickets == 0, ErrorCode::EventCannotDeactivate);
         event.active = false;
         Ok(())
@@ -283,6 +277,7 @@ pub mod invilink {
         let registry = &mut ctx.accounts.registry;
         require!(event.organizer == *ctx.accounts.organizer.key, ErrorCode::Unauthorized);
         let pos = registry.events.iter().position(|&x| x == event.key()).ok_or(ErrorCode::InvalidTicket)?;
+        // Przesuwamy eventy w tablicy
         for i in pos..((registry.event_count as usize) - 1) {
             registry.events[i] = registry.events[i + 1];
         }
@@ -307,7 +302,7 @@ pub mod invilink {
         section_type: u8,
         rows: u8,
         seats_per_row: u8,
-        ticket_price: u64, // NOWY parametr - cena w danej sekcji niezależna od ceny eventu
+        ticket_price: u64,
     ) -> Result<()> {
         let seating_map = &mut ctx.accounts.seating_map;
         let section_account = &mut ctx.accounts.seating_section;
@@ -329,7 +324,7 @@ pub mod invilink {
         section_account.section_type = section_type;
         section_account.rows = rows;
         section_account.seats_per_row = seats_per_row;
-        section_account.ticket_price = ticket_price; // Ustawiamy cenę sekcji
+        section_account.ticket_price = ticket_price;
         section_account.seat_status = vec![0; (rows as usize) * (seats_per_row as usize)];
     
         seating_map.sections.push(section_account.key());
@@ -343,7 +338,7 @@ pub mod invilink {
         new_rows: Option<u8>,
         new_seats_per_row: Option<u8>,
         new_section_type: Option<u8>,
-        new_ticket_price: Option<u64>, // NOWY parametr
+        new_ticket_price: Option<u64>,
     ) -> Result<()> {
         let seating_map = &mut ctx.accounts.seating_map;
         let section = &mut ctx.accounts.seating_section;
@@ -377,7 +372,6 @@ pub mod invilink {
         if let Some(t) = new_section_type {
             section.section_type = t;
         }
-        // Aktualizacja ceny – jeśli podano nową cenę, zmieniamy
         if let Some(new_price) = new_ticket_price {
             section.ticket_price = new_price;
         }
@@ -430,7 +424,6 @@ pub mod invilink {
         Ok(())
     }
     
- 
     pub fn mint_ticket_nft(
         ctx: Context<MintTicketNft>,
         event_id: String,
@@ -438,25 +431,21 @@ pub mod invilink {
         section_name: String,
         row: u8,
         seat: u8,
-        ipfs_uri: String, // nowy parametr – dynamiczne URI z IPFS
+        ipfs_uri: String,
     ) -> Result<()> {
-        // 1. Sprawdzenie, czy konto SeatingMap zawiera właściwy event_id
         require!(
             ctx.accounts.seating_map.event_id == event_id,
             ErrorCode::InvalidEventId
         );
-        // 2. Sprawdzenie, czy event jest aktywny
         require!(
             ctx.accounts.event.active,
             ErrorCode::EventNotActive
         );
-        // 2a. Sprawdzenie, czy wydarzenie nie minęło (zakaz zakupu biletu po dacie wydarzenia)
         let clock = Clock::get()?;
         require!(
             clock.unix_timestamp < ctx.accounts.event.event_date,
             ErrorCode::EventAlreadyOccurred
         );
-        // 3. Sprawdzenie, czy miejsce w danej sekcji istnieje
         let seating_section = &mut ctx.accounts.seating_section;
         require!(
             (row as usize) < (seating_section.rows as usize),
@@ -475,14 +464,11 @@ pub mod invilink {
             seating_section.seat_status[seat_index] == 0,
             ErrorCode::SeatAlreadyTaken
         );
-
     
-        // Pobieramy cenę biletu z konta sekcji
         let price = seating_section.ticket_price;
         if ctx.accounts.buyer.lamports() < price {
             return Err(ErrorCode::InsufficientFunds.into());
         }
-        // Obliczamy opłatę (5%) i kwotę dla organizatora (95%)
         let fee = price.checked_mul(FEE_PERCENTAGE).unwrap().checked_div(100).unwrap();
         let organizer_amount = price.checked_sub(fee).unwrap();
     
@@ -492,7 +478,6 @@ pub mod invilink {
             let master_info = ctx.accounts.master_account.to_account_info();
             let system_program_info = ctx.accounts.system_program.to_account_info();
     
-            // Transfer 95% ceny do organizatora
             let ix_to_organizer = system_instruction::transfer(
                 buyer_info.key,
                 organizer_info.key,
@@ -503,7 +488,6 @@ pub mod invilink {
                 &[buyer_info.clone(), organizer_info.clone(), system_program_info.clone()],
             )?;
     
-            // Transfer 5% ceny do MASTER_ACCOUNT
             let ix_to_master = system_instruction::transfer(
                 buyer_info.key,
                 master_info.key,
@@ -515,7 +499,6 @@ pub mod invilink {
             )?;
         }
     
-        // Mintujemy NFT – mintujemy 1 jednostkę tokena
         let cpi_accounts = MintTo {
             mint: ctx.accounts.mint.to_account_info(),
             to: ctx.accounts.token_account.to_account_info(),
@@ -524,7 +507,6 @@ pub mod invilink {
         let cpi_ctx = CpiContext::new(ctx.accounts.token_program.to_account_info(), cpi_accounts);
         token::mint_to(cpi_ctx, 1)?;
     
-        // Generacja ticket_id przy użyciu funkcji pomocniczej (niezmieniona)
         let ticket_id = generate_ticket_id(
             ctx.accounts.buyer.key,
             &event_id,
@@ -534,10 +516,9 @@ pub mod invilink {
             seat,
         );
     
-        // Ustalamy metadane – dynamicznie pobieramy URI przekazane przez parametr ipfs_uri
         let title = format!("Invilink Ticket");
         let symbol = "INVI".to_string();
-        let uri = ipfs_uri; // TU używamy przekazanego dynamicznego URI
+        let uri = ipfs_uri;
     
         let creators = vec![mpl_token_metadata::types::Creator {
             address: ctx.accounts.buyer.key(),
@@ -568,17 +549,11 @@ pub mod invilink {
         let cpi_ctx_meta = CpiContext::new(ctx.accounts.token_metadata_program.to_account_info(), cpi_accounts_meta);
         create_metadata_accounts_v3(cpi_ctx_meta, data_v2, true, true, None)?;
     
-        // Aktualizacja stanu miejsca – oznaczamy miejsce jako zajęte
         seating_section.seat_status[seat_index] = 1;
-        // Aktualizacja liczby sprzedanych biletów
         ctx.accounts.event.sold_tickets = ctx.accounts.event.sold_tickets.checked_add(1)
             .ok_or(ErrorCode::InvalidTicket)?;
         Ok(())
     }
-    
-    
-    
-    
 }
 
 // ---------------- KONTEKSTY (ACCOUNTS) ----------------
@@ -594,7 +569,8 @@ pub struct InitializeOrganizersPool<'info> {
 
 #[derive(Accounts)]
 pub struct InitializeEventRegistry<'info> {
-    #[account(init, payer = payer, space = 10240, seeds = [b"event_registry"], bump)]
+    // Używamy space = 3216, aby mieć pewność (3216 = 8 + 4 + 4 + (1000 * 32))
+    #[account(init, payer = payer, space = 3216, seeds = [b"event_registry"], bump)]
     pub registry: Account<'info, EventRegistry>,
     #[account(mut)]
     pub payer: Signer<'info>,
@@ -723,7 +699,6 @@ pub struct RemoveSeatingSection<'info> {
     pub system_program: Program<'info, System>,
 }
 
-
 #[derive(Accounts)]
 pub struct EmitSeatingMapDetails<'info> {
     pub seating_map: Account<'info, SeatingMap>,
@@ -734,8 +709,7 @@ pub struct CloseTargetAccount<'info> {
     /// CHECK: To konto musi być MASTER_ACCOUNT. Sprawdzamy to ręcznie w kodzie.
     #[account(signer)]
     pub authority: Signer<'info>,
-    /// CHECK: To konto jest zamykane, a jego bezpieczeństwo wynika z faktu, że cały proces zamykania
-    /// jest kontrolowany przez MASTER_ACCOUNT, więc nie ma potrzeby dodatkowej walidacji.
+    /// CHECK: Konto jest zamykane – kontrola odbywa się w kodzie.
     #[account(mut)]
     pub closable_account: AccountInfo<'info>,
 }
@@ -791,8 +765,6 @@ pub struct MintTicketNft<'info> {
     pub rent: Sysvar<'info, Rent>,
 }
 
-
-
 // ---------------- STRUKTURY KONTA ----------------
 
 #[account]
@@ -809,7 +781,7 @@ pub struct OrganizersPool {
 #[account]
 pub struct EventRegistry {
     pub event_count: u32,
-    pub events: [Pubkey; 10000],
+    pub events: Vec<Pubkey>,
 }
 
 #[account]
@@ -817,15 +789,13 @@ pub struct EventNFT {
     pub event_id: String,
     pub organizer: Pubkey,
     pub name: String,
-    pub event_date: i64, // NOWE pole: data eventu (np. UNIX timestamp)
+    pub event_date: i64, // data eventu (np. UNIX timestamp)
     pub ticket_price: u64,
     pub available_tickets: u64,
     pub sold_tickets: u64,
     pub seating_type: u8,
     pub active: bool,
 }
-
-
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone)]
 pub struct SeatingSection {
@@ -838,8 +808,8 @@ pub struct SeatingSection {
 #[account]
 pub struct SeatingMap {
     pub event_id: String,
-    pub organizer: Pubkey, // adres organizatora, pobieramy go przy tworzeniu eventu
-    pub active: bool,      // stan eventu – true, gdy event jest aktywny
+    pub organizer: Pubkey,
+    pub active: bool,
     pub sections: Vec<Pubkey>,
     pub total_seats: u64,
 }
@@ -858,7 +828,7 @@ pub struct SeatingSectionAccount {
     pub section_type: u8,
     pub rows: u8,
     pub seats_per_row: u8,
-    pub ticket_price: u64, // NOWE – cena biletu dla tej sekcji
+    pub ticket_price: u64,
     pub seat_status: Vec<u8>,
 }
 
@@ -868,8 +838,6 @@ pub struct SeatingSectionInput {
     pub rows: u8,
     pub seats_per_row: u8,
 }
-
-// ---------------- ERROR CODE ----------------
 
 #[error_code]
 pub enum ErrorCode {

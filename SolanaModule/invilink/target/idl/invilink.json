@@ -1,5 +1,5 @@
 {
-  "address": "DQCwvnVHUzUuv23P6FBJESBn3h6X7XGKtZZ6W9nrVfNW",
+  "address": "4bCuALcJwCqw3rAGTEAUgHU3izf6JikLsomSQzLxj5aX",
   "metadata": {
     "name": "invilink",
     "version": "0.1.0",
@@ -1134,11 +1134,6 @@
       "code": 6020,
       "name": "EventAlreadyOccurred",
       "msg": "Event has already occurred."
-    },
-    {
-      "code": 6021,
-      "name": "TicketsSoldOut",
-      "msg": "Tickets for this event are sold out."
     }
   ],
   "types": [
@@ -1198,10 +1193,7 @@
           {
             "name": "events",
             "type": {
-              "array": [
-                "pubkey",
-                10
-              ]
+              "vec": "pubkey"
             }
           }
         ]
