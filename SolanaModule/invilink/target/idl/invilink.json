@@ -61,6 +61,35 @@
       ]
     },
     {
+      "name": "add_validator",
+      "discriminator": [
+        250,
+        113,
+        53,
+        54,
+        141,
+        117,
+        215,
+        185
+      ],
+      "accounts": [
+        {
+          "name": "event",
+          "writable": true
+        },
+        {
+          "name": "organizer",
+          "signer": true
+        }
+      ],
+      "args": [
+        {
+          "name": "validator",
+          "type": "pubkey"
+        }
+      ]
+    },
+    {
       "name": "create_event_seating",
       "discriminator": [
         235,
@@ -654,6 +683,36 @@
           }
         },
         {
+          "name": "ticket_status",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  116,
+                  105,
+                  99,
+                  107,
+                  101,
+                  116,
+                  95,
+                  115,
+                  116,
+                  97,
+                  116,
+                  117,
+                  115
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "mint"
+              }
+            ]
+          }
+        },
+        {
           "name": "metadata",
           "writable": true
         },
@@ -762,10 +821,6 @@
         },
         {
           "name": "seating_section",
-          "docs": [
-            "Konto sekcji, która ma zostać usunięta.",
-            "Atrybut `close = organizer` spowoduje, że środki z tego konta zostaną przekazane organizatorowi przy zamykaniu."
-          ],
           "writable": true
         },
         {
@@ -822,6 +877,12 @@
           "name": "new_available_tickets",
           "type": {
             "option": "u64"
+          }
+        },
+        {
+          "name": "new_event_date",
+          "type": {
+            "option": "i64"
           }
         }
       ]
@@ -945,6 +1006,63 @@
           }
         }
       ]
+    },
+    {
+      "name": "validate_ticket",
+      "discriminator": [
+        222,
+        125,
+        246,
+        215,
+        10,
+        163,
+        159,
+        200
+      ],
+      "accounts": [
+        {
+          "name": "event",
+          "writable": true
+        },
+        {
+          "name": "ticket_status",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  116,
+                  105,
+                  99,
+                  107,
+                  101,
+                  116,
+                  95,
+                  115,
+                  116,
+                  97,
+                  116,
+                  117,
+                  115
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "ticket_mint"
+              }
+            ]
+          }
+        },
+        {
+          "name": "validator",
+          "signer": true
+        },
+        {
+          "name": "ticket_mint"
+        }
+      ],
+      "args": []
     }
   ],
   "accounts": [
@@ -1012,6 +1130,19 @@
         23,
         252
       ]
+    },
+    {
+      "name": "TicketStatus",
+      "discriminator": [
+        215,
+        5,
+        228,
+        182,
+        186,
+        89,
+        179,
+        187
+      ]
     }
   ],
   "events": [
@@ -1026,6 +1157,19 @@
         160,
         57,
         153
+      ]
+    },
+    {
+      "name": "TicketValidated",
+      "discriminator": [
+        246,
+        125,
+        206,
+        252,
+        107,
+        101,
+        131,
+        246
       ]
     }
   ],
@@ -1134,6 +1278,16 @@
       "code": 6020,
       "name": "EventAlreadyOccurred",
       "msg": "Event has already occurred."
+    },
+    {
+      "code": 6021,
+      "name": "ValidatorAlreadyAdded",
+      "msg": "Validator already added."
+    },
+    {
+      "code": 6022,
+      "name": "NotValidator",
+      "msg": "Caller is not a validator for this event."
     }
   ],
   "types": [
@@ -1177,6 +1331,12 @@
           {
             "name": "active",
             "type": "bool"
+          },
+          {
+            "name": "validators",
+            "type": {
+              "vec": "pubkey"
+            }
           }
         ]
       }
@@ -1297,6 +1457,50 @@
           {
             "name": "seat_status",
             "type": "bytes"
+          }
+        ]
+      }
+    },
+    {
+      "name": "TicketStatus",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "event",
+            "type": "pubkey"
+          },
+          {
+            "name": "ticket_mint",
+            "type": "pubkey"
+          },
+          {
+            "name": "used",
+            "type": "bool"
+          }
+        ]
+      }
+    },
+    {
+      "name": "TicketValidated",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "event",
+            "type": "pubkey"
+          },
+          {
+            "name": "ticket_mint",
+            "type": "pubkey"
+          },
+          {
+            "name": "validator",
+            "type": "pubkey"
+          },
+          {
+            "name": "timestamp",
+            "type": "i64"
           }
         ]
       }
