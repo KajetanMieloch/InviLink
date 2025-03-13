@@ -98,7 +98,7 @@ pub mod invilink {
     pub fn initialize_event_registry(ctx: Context<InitializeEventRegistry>) -> Result<()> {
         let registry = &mut ctx.accounts.registry;
         registry.event_count = 0;
-        registry.events = [Pubkey::default(); 10];
+        registry.events = [Pubkey::default(); 10000];
         Ok(())
     }
 
@@ -194,7 +194,7 @@ pub mod invilink {
         seating_map.total_seats = 0;
     
         let count = registry.event_count as usize;
-        require!(count < 10, ErrorCode::RegistryFull);
+        require!(count < 10000, ErrorCode::RegistryFull);
         registry.events[count] = event.key();
         registry.event_count += 1;
     
@@ -809,7 +809,7 @@ pub struct OrganizersPool {
 #[account]
 pub struct EventRegistry {
     pub event_count: u32,
-    pub events: [Pubkey; 10],
+    pub events: [Pubkey; 10000],
 }
 
 #[account]
