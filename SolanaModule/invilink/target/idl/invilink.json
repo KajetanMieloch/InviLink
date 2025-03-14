@@ -1,5 +1,5 @@
 {
-  "address": "4bCuALcJwCqw3rAGTEAUgHU3izf6JikLsomSQzLxj5aX",
+  "address": "2XgNYDqbBZGiNHEk4PW3FCyPKHBaijnbQTR2bKFd2fxj",
   "metadata": {
     "name": "invilink",
     "version": "0.1.0",
@@ -1353,7 +1353,10 @@
           {
             "name": "events",
             "type": {
-              "vec": "pubkey"
+              "array": [
+                "pubkey",
+                10
+              ]
             }
           }
         ]

@@ -90,11 +90,11 @@ pub mod invilink {
         Ok(())
     }
 
-    // Inicjalizacja rejestru eventów – maksymalnie 1000 eventów
+    // Inicjalizacja rejestru eventów – maksymalnie 10 eventów
     pub fn initialize_event_registry(ctx: Context<InitializeEventRegistry>) -> Result<()> {
         let registry = &mut ctx.accounts.registry;
         registry.event_count = 0;
-        registry.events = Vec::with_capacity(1000);
+        registry.events = [Pubkey::default(); 10];
         Ok(())
     }
 
@@ -115,6 +115,7 @@ pub mod invilink {
         Ok(())
     }
 
+    
     // Tworzenie eventu – funkcja create_event_seating
     #[derive(Accounts)]
     #[instruction(
@@ -129,7 +130,7 @@ pub mod invilink {
             payer = organizer,
             seeds = [b"event", event_id.as_bytes()],
             bump,
-            space = 1024
+            space = 1400
         )]
         pub event: Account<'info, EventNFT>,
         #[account(
@@ -185,9 +186,10 @@ pub mod invilink {
         seating_map.sections = Vec::new();
         seating_map.total_seats = 0;
     
-        require!(registry.events.len() < 1000, ErrorCode::RegistryFull);
-        registry.events.push(event.key());
-        registry.event_count = registry.events.len() as u32;
+        let count = registry.event_count as usize;
+        require!(count < 10, ErrorCode::RegistryFull);
+        registry.events[count] = event.key();
+        registry.event_count += 1;
     
         Ok(())
     }
@@ -830,7 +832,7 @@ pub struct OrganizersPool {
 #[account]
 pub struct EventRegistry {
     pub event_count: u32,
-    pub events: Vec<Pubkey>,
+    pub events: [Pubkey; 10],
 }
 
 #[account]
