@@ -13,7 +13,7 @@ use base64::{engine::general_purpose, Engine as _};
 use solana_program::program::invoke;
 use solana_program::system_instruction;
 
-declare_id!("4bCuALcJwCqw3rAGTEAUgHU3izf6JikLsomSQzLxj5aX");
+declare_id!("2XgNYDqbBZGiNHEk4PW3FCyPKHBaijnbQTR2bKFd2fxj");
 
 // Stałe globalne
 const MASTER_ACCOUNT: Pubkey = pubkey!("4Wg5ZqjS3AktHzq34hK1T55aFNKSjBpmJ3PyRChpPNDh");
