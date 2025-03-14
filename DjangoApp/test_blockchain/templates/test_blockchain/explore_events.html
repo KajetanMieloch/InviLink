@@ -38,7 +38,7 @@
 
   <script>
     // Ustawienia
-    const PROGRAM_ID = new solanaWeb3.PublicKey("4bCuALcJwCqw3rAGTEAUgHU3izf6JikLsomSQzLxj5aX");
+    const PROGRAM_ID = new solanaWeb3.PublicKey("2XgNYDqbBZGiNHEk4PW3FCyPKHBaijnbQTR2bKFd2fxj");
     const REGISTRY_SEED = "event_registry";
     const DEFAULT_PUBKEY = "11111111111111111111111111111111";
 
@@ -53,22 +53,24 @@
 
     // Dekodowanie konta rejestru eventów
     function decodeRegistry(data) {
-      let offset = 8; // Pomijamy 8 bajtowy discriminator
+      let offset = 8; // pomijamy 8-bajtowy discriminator
       const dv = new DataView(data.buffer, data.byteOffset, data.byteLength);
       const eventCount = dv.getUint32(offset, true);
       offset += 4;
-      // Odczytujemy długość dynamicznego wektora (u32)
-      const vecLen = dv.getUint32(offset, true);
-      offset += 4;
       const events = [];
-      for (let i = 0; i < vecLen; i++) {
+      // Przebiegamy przez 10 pozycji (bo rejestr ma stałą tablicę 10 elementów)
+      for (let i = 0; i < 10; i++) {
         const pubkeyBytes = data.slice(offset, offset + 32);
         const pubkey = new solanaWeb3.PublicKey(pubkeyBytes).toBase58();
         offset += 32;
-        events.push(pubkey);
+        // Dodajemy tylko jeśli nie jest domyślnym pubkey
+        if (pubkey !== "11111111111111111111111111111111") {
+          events.push(pubkey);
+        }
       }
       return { eventCount, events };
     }
+
 
 
     // Dekodowanie konta eventu zgodnie z formatem Anchor, uwzględniające nowe pole event_date
