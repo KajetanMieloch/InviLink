@@ -1,5 +1,5 @@
 {
-  "address": "C4eXHraEykzQhCrWbURNjGJae1wgiFpURMxeMorNT6Zi",
+  "address": "754nBR6LkC7nMFMFjXQTyrz75FwmPUgeb8KbtH8ccF3j",
   "metadata": {
     "name": "invilink",
     "version": "0.1.0",
@@ -56,6 +56,35 @@
       "args": [
         {
           "name": "new_organizer",
+          "type": "pubkey"
+        }
+      ]
+    },
+    {
+      "name": "add_validator",
+      "discriminator": [
+        250,
+        113,
+        53,
+        54,
+        141,
+        117,
+        215,
+        185
+      ],
+      "accounts": [
+        {
+          "name": "event",
+          "writable": true
+        },
+        {
+          "name": "organizer",
+          "signer": true
+        }
+      ],
+      "args": [
+        {
+          "name": "validator",
           "type": "pubkey"
         }
       ]
@@ -945,6 +974,51 @@
           }
         }
       ]
+    },
+    {
+      "name": "validate_ticket",
+      "discriminator": [
+        222,
+        125,
+        246,
+        215,
+        10,
+        163,
+        159,
+        200
+      ],
+      "accounts": [
+        {
+          "name": "event",
+          "writable": true
+        },
+        {
+          "name": "ticket_status",
+          "writable": true
+        },
+        {
+          "name": "validator",
+          "signer": true
+        }
+      ],
+      "args": [
+        {
+          "name": "event_id",
+          "type": "string"
+        },
+        {
+          "name": "section",
+          "type": "string"
+        },
+        {
+          "name": "row",
+          "type": "u8"
+        },
+        {
+          "name": "seat",
+          "type": "u8"
+        }
+      ]
     }
   ],
   "accounts": [
@@ -1012,6 +1086,19 @@
         23,
         252
       ]
+    },
+    {
+      "name": "TicketStatus",
+      "discriminator": [
+        215,
+        5,
+        228,
+        182,
+        186,
+        89,
+        179,
+        187
+      ]
     }
   ],
   "events": [
@@ -1026,6 +1113,19 @@
         160,
         57,
         153
+      ]
+    },
+    {
+      "name": "TicketValidated",
+      "discriminator": [
+        246,
+        125,
+        206,
+        252,
+        107,
+        101,
+        131,
+        246
       ]
     }
   ],
@@ -1134,6 +1234,16 @@
       "code": 6020,
       "name": "EventAlreadyOccurred",
       "msg": "Event has already occurred."
+    },
+    {
+      "code": 6021,
+      "name": "ValidatorAlreadyAdded",
+      "msg": "Validator already added."
+    },
+    {
+      "code": 6022,
+      "name": "NotValidator",
+      "msg": "Caller is not a validator for this event."
     }
   ],
   "types": [
@@ -1177,6 +1287,12 @@
           {
             "name": "active",
             "type": "bool"
+          },
+          {
+            "name": "validators",
+            "type": {
+              "vec": "pubkey"
+            }
           }
         ]
       }
@@ -1297,6 +1413,42 @@
           {
             "name": "seat_status",
             "type": "bytes"
+          }
+        ]
+      }
+    },
+    {
+      "name": "TicketStatus",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "event",
+            "type": "pubkey"
+          },
+          {
+            "name": "used",
+            "type": "bool"
+          }
+        ]
+      }
+    },
+    {
+      "name": "TicketValidated",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "event",
+            "type": "pubkey"
+          },
+          {
+            "name": "validator",
+            "type": "pubkey"
+          },
+          {
+            "name": "timestamp",
+            "type": "i64"
           }
         ]
       }

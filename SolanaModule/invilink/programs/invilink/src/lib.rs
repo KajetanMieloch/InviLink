@@ -13,7 +13,7 @@ use base64::{engine::general_purpose, Engine as _};
 use solana_program::program::invoke;
 use solana_program::system_instruction;
 
-declare_id!("C4eXHraEykzQhCrWbURNjGJae1wgiFpURMxeMorNT6Zi");
+declare_id!("754nBR6LkC7nMFMFjXQTyrz75FwmPUgeb8KbtH8ccF3j");
 
 // Stałe globalne
 const MASTER_ACCOUNT: Pubkey = pubkey!("4Wg5ZqjS3AktHzq34hK1T55aFNKSjBpmJ3PyRChpPNDh");
@@ -46,9 +46,6 @@ fn generate_event_id(name: &str, event_date: i64, organizer: &Pubkey) -> String 
     let encoded = general_purpose::URL_SAFE_NO_PAD.encode(hash_result.as_ref());
     encoded.chars().take(12).collect()
 }
-
-
-
 
 fn generate_ticket_id(
     buyer: &Pubkey, 
@@ -110,7 +107,17 @@ pub mod invilink {
         organizers.organizers.push(new_organizer);
         Ok(())
     }
-
+    // Dodanie nowego walidatora
+    pub fn add_validator(ctx: Context<AddValidator>, validator: Pubkey) -> Result<()> {
+        let event = &mut ctx.accounts.event;
+        require!(event.organizer == *ctx.accounts.organizer.key, ErrorCode::Unauthorized);
+        if event.validators.contains(&validator) {
+            return Err(ErrorCode::ValidatorAlreadyAdded.into());
+        }
+        event.validators.push(validator);
+        Ok(())
+    }
+    
     // Usunięcie organizatora
     pub fn remove_organizer(ctx: Context<RemoveOrganizer>, organizer_to_remove: Pubkey) -> Result<()> {
         let organizers = &mut ctx.accounts.organizers_pool;
@@ -135,8 +142,7 @@ pub mod invilink {
             payer = organizer,
             seeds = [b"event", event_id.as_bytes()],
             bump,
-            // zwiększamy space np. do 1200
-            space = 1024
+            space = 1400
         )]
         pub event: Account<'info, EventNFT>,
         #[account(
@@ -186,6 +192,7 @@ pub mod invilink {
         event.sold_tickets = 0;
         event.seating_type = 1;
         event.active = false;
+        event.validators = Vec::new();
     
         // Inicjalizacja mapy miejsc
         seating_map.event_id = event.event_id.clone();
@@ -197,8 +204,6 @@ pub mod invilink {
         registry.event_count = registry.events.len() as u32;    
         Ok(())
     }
-    
-    
     
     // Aktualizacja eventu
     pub fn update_event(
@@ -427,7 +432,6 @@ pub mod invilink {
         Ok(())
     }
     
- 
     pub fn mint_ticket_nft(
         ctx: Context<MintTicketNft>,
         event_id: String,
@@ -475,7 +479,6 @@ pub mod invilink {
             ErrorCode::SeatAlreadyTaken
         );
 
-    
         // Pobieramy cenę biletu z konta sekcji
         let price = seating_section.ticket_price;
         if ctx.accounts.buyer.lamports() < price {
@@ -575,9 +578,46 @@ pub mod invilink {
         Ok(())
     }
     
-    
-    
-    
+    // ---------------- WALIDACJA BILETU BEZ ticket_mint ----------------
+    // Walidacja oparta na: event_id, section, row, seat (np. przekazywane z URL)
+    #[derive(Accounts)]
+    #[instruction(event_id: String, section: String, row: u8, seat: u8)]
+    pub struct ValidateTicket<'info> {
+        #[account(mut)]
+        pub event: Account<'info, EventNFT>,
+        #[account(
+            mut,
+            seeds = [b"ticket_status", event_id.as_bytes(), section.as_bytes(), &[row], &[seat]],
+            bump,
+        )]
+        pub ticket_status: Account<'info, TicketStatus>,
+        #[account(signer)]
+        /// CHECK: Konto walidatora; walidujemy je w programie, porównując klucz.
+        pub validator: AccountInfo<'info>,
+    }
+
+    pub fn validate_ticket(ctx: Context<ValidateTicket>, event_id: String, section: String, row: u8, seat: u8) -> Result<()> {
+        let event = &ctx.accounts.event;
+        let validator = ctx.accounts.validator.key();
+        // Sprawdzamy, czy walidator jest na liście walidatorów eventu.
+        require!(event.validators.contains(&validator), ErrorCode::NotValidator);
+        
+        // Pobieramy konto biletu (TicketStatus) i sprawdzamy, czy bilet nie był wcześniej użyty.
+        let ticket_status = &mut ctx.accounts.ticket_status;
+        require!(!ticket_status.used, ErrorCode::TicketAlreadyUsed);
+        
+        // Oznaczamy bilet jako użyty, aby nie można było go wykorzystać ponownie.
+        ticket_status.used = true;
+        
+        // Emitujemy event, aby poinformować o walidacji biletu.
+        emit!(TicketValidated {
+            event: event.key(),
+            validator,
+            timestamp: Clock::get()?.unix_timestamp,
+        });
+        
+        Ok(())
+    }
 }
 
 // ---------------- KONTEKSTY (ACCOUNTS) ----------------
@@ -640,6 +680,15 @@ pub struct DeactivateEvent<'info> {
     #[account(signer)]
     /// CHECK: Konto organizatora jest walidowane poprzez porównanie klucza z polem event.organizer.
     pub organizer: AccountInfo<'info>,
+}
+
+#[derive(Accounts)]
+pub struct AddValidator<'info> {
+    #[account(mut)]
+    pub event: Account<'info, EventNFT>,
+    #[account(signer)]
+    /// CHECK: Konto organizatora – jego klucz jest porównywany z event.organizer.
+    pub organizer: Signer<'info>,
 }
 
 #[derive(Accounts)]
@@ -722,7 +771,6 @@ pub struct RemoveSeatingSection<'info> {
     pub system_program: Program<'info, System>,
 }
 
-
 #[derive(Accounts)]
 pub struct EmitSeatingMapDetails<'info> {
     pub seating_map: Account<'info, SeatingMap>,
@@ -790,8 +838,6 @@ pub struct MintTicketNft<'info> {
     pub rent: Sysvar<'info, Rent>,
 }
 
-
-
 // ---------------- STRUKTURY KONTA ----------------
 
 #[account]
@@ -816,15 +862,14 @@ pub struct EventNFT {
     pub event_id: String,
     pub organizer: Pubkey,
     pub name: String,
-    pub event_date: i64, // NOWE pole: data eventu (np. UNIX timestamp)
+    pub event_date: i64, // np. UNIX timestamp
     pub ticket_price: u64,
     pub available_tickets: u64,
     pub sold_tickets: u64,
     pub seating_type: u8,
     pub active: bool,
+    pub validators: Vec<Pubkey>,
 }
-
-
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone)]
 pub struct SeatingSection {
@@ -866,6 +911,19 @@ pub struct SeatingSectionInput {
     pub section_type: u8,
     pub rows: u8,
     pub seats_per_row: u8,
+}
+
+#[account]
+pub struct TicketStatus {
+    pub event: Pubkey,
+    pub used: bool,
+}
+
+#[event]
+pub struct TicketValidated {
+    pub event: Pubkey,
+    pub validator: Pubkey,
+    pub timestamp: i64,
 }
 
 // ---------------- ERROR CODE ----------------
@@ -914,4 +972,8 @@ pub enum ErrorCode {
     EventCannotDeactivate,
     #[msg("Event has already occurred.")]
     EventAlreadyOccurred,
+    #[msg("Validator already added.")]
+    ValidatorAlreadyAdded,
+    #[msg("Caller is not a validator for this event.")]
+    NotValidator,
 }
