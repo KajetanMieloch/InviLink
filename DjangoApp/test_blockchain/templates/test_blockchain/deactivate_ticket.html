@@ -39,13 +39,15 @@
       console.log(message);
     }
 
-    // Pobieranie parametrów z URL
+    // Pobieranie parametrów z URL z zamianą "!(_)!" na spację
     function getQueryParams() {
       const params = {};
       window.location.search.substring(1).split("&").forEach(pair => {
         const [key, value] = pair.split("=");
         if (key) {
-          params[decodeURIComponent(key)] = decodeURIComponent(value);
+          // Zamieniamy ciąg "!(_)!" na spację
+          const decodedValue = decodeURIComponent(value).replace(/!\(_\)!/g, " ");
+          params[decodeURIComponent(key)] = decodedValue;
         }
       });
       return params;
