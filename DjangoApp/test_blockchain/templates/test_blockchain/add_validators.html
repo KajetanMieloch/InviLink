@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+  <meta charset="UTF-8">
+  <title>Dodaj Walidatora - InviLink</title>
+  <!-- Solana Web3 -->
+  <script src="https://cdn.jsdelivr.net/npm/@solana/web3.js@latest/lib/index.iife.min.js"></script>
+  <style>
+    body { font-family: Arial, sans-serif; padding: 20px; }
+    input, button { padding: 8px; margin: 5px; }
+    #log { margin-top: 20px; padding: 10px; border: 1px solid #ccc; width: 90%; white-space: pre-wrap; }
+  </style>
+</head>
+<body>
+  <h1>Dodaj Walidatora do Eventu</h1>
+  <label>
+    Event ID:
+    <input type="text" id="eventIdInput" placeholder="Podaj Event ID">
+  </label>
+  <br>
+  <label>
+    PublicKey walidatora:
+    <input type="text" id="validatorInput" placeholder="Podaj PublicKey walidatora">
+  </label>
+  <br>
+  <button id="addValidatorBtn">Dodaj Walidatora</button>
+  <div id="log"></div>
+
+  <script>
+    const PROGRAM_ID = new solanaWeb3.PublicKey("C52SCZxVqGpjKkLpSng6iuYMKupA4zmFpXCqSYaXJFr9");
+    const ADD_VALIDATOR_DISCRIMINATOR = new Uint8Array([250, 113, 53, 54, 141, 117, 215, 185]);
+    
+    function logMessage(msg) {
+      const logDiv = document.getElementById("log");
+      logDiv.textContent += msg + "\n";
+      console.log(msg);
+    }
+    
+    async function addValidator() {
+      const eventId = document.getElementById("eventIdInput").value.trim();
+      const validatorStr = document.getElementById("validatorInput").value.trim();
+      
+      if (!eventId || !validatorStr) {
+        alert("Podaj zarówno Event ID, jak i PublicKey walidatora.");
+        return;
+      }
+      
+      let validatorPubkey;
+      try {
+        validatorPubkey = new solanaWeb3.PublicKey(validatorStr);
+      } catch (err) {
+        alert("Niepoprawny format PublicKey walidatora!");
+        return;
+      }
+      
+      // Połączenie z Phantom
+      if (!window.phantom || !window.phantom.solana) {
+        alert("Phantom Wallet jest wymagany!");
+        return;
+      }
+      const provider = window.phantom.solana;
+      if (!provider.isConnected) await provider.connect();
+      const walletPublicKey = provider.publicKey;
+      const connection = new solanaWeb3.Connection("https://api.devnet.solana.com", "confirmed");
+      
+      // Obliczamy PDA eventu: seeds: ["event", eventId]
+      const [eventPDA] = await solanaWeb3.PublicKey.findProgramAddress(
+        [new TextEncoder().encode("event"), new TextEncoder().encode(eventId)],
+        PROGRAM_ID
+      );
+      logMessage("Obliczone Event PDA: " + eventPDA.toBase58());
+      
+      // Budujemy dane instrukcji: ADD_VALIDATOR_DISCRIMINATOR + 32 bajty walidatora
+      const data = new Uint8Array(ADD_VALIDATOR_DISCRIMINATOR.length + 32);
+      data.set(ADD_VALIDATOR_DISCRIMINATOR, 0);
+      data.set(validatorPubkey.toBytes(), ADD_VALIDATOR_DISCRIMINATOR.length);
+      
+      const instruction = new solanaWeb3.TransactionInstruction({
+        keys: [
+          { pubkey: eventPDA, isWritable: true, isSigner: false },
+          { pubkey: walletPublicKey, isWritable: false, isSigner: true }
+        ],
+        programId: PROGRAM_ID,
+        data: data
+      });
+      
+      const transaction = new solanaWeb3.Transaction().add(instruction);
+      transaction.feePayer = walletPublicKey;
+      const { blockhash } = await connection.getLatestBlockhash();
+      transaction.recentBlockhash = blockhash;
+      
+      try {
+        const signedTx = await provider.signTransaction(transaction);
+        const txSig = await connection.sendRawTransaction(signedTx.serialize());
+        await connection.confirmTransaction(txSig, "confirmed");
+        logMessage("Walidator dodany! Signature: " + txSig);
+      } catch (err) {
+        logMessage("Błąd dodawania walidatora: " + err.message);
+        console.error(err);
+      }
+    }
+    
+    document.getElementById("addValidatorBtn").addEventListener("click", addValidator);
+  </script>
+</body>
+</html>

@@ -51,6 +51,9 @@ def event_detail(request, event_id):
 def test_mint(request):
     return render(request, 'test_blockchain/test_mint.html')
 
+def add_validators(request):
+    return render(request, 'test_blockchain/add_validators.html')
+
 
 @csrf_exempt
 def generate_metadata(request):
@@ -75,7 +78,7 @@ def generate_metadata(request):
             qr_url = (
                 f"https://invilink.bieda.it/test_blockchain/deactivate_ticket"
                 f"?eventId={urllib.parse.quote(str(event_id))}"
-                f"&section={section.replace(' ', '_')}"
+                f"&section={section.replace(' ', '!(_)!')}"
                 f"&row={urllib.parse.quote(str(row))}"
                 f"&seat={urllib.parse.quote(str(seat))}"
             )
@@ -153,3 +156,20 @@ def generate_metadata(request):
             return JsonResponse({"error": str(e)}, status=500)
     else:
         return JsonResponse({"error": "Tylko metoda POST jest obsługiwana"}, status=405)
+    
+
+@csrf_exempt
+def deactivate_ticket(request):
+    event_id = request.GET.get('eventId', 'Nie podano')
+    section = request.GET.get('section', 'Nie podano')
+    section = section.replace('!(_)!', ' ')
+    row = request.GET.get('row', 'Nie podano')
+    seat = request.GET.get('seat', 'Nie podano')
+
+    context = {
+        'event_id': event_id,
+        'section': section,
+        'row': row,
+        'seat': seat,
+    }
+    return render(request, 'test_blockchain/deactivate_ticket.html', context)

@@ -16,4 +16,6 @@ urlpatterns = [
     path('event_detail/<str:event_id>/', views.event_detail, name='event_detail'),
     path('test_mint/', views.test_mint, name='test_mint'),
     path("generate_metadata/", views.generate_metadata, name="generate_metadata"),
+    path('add_validators/', views.add_validators, name='add_validators'),
+    path('deactivate_ticket/', views.deactivate_ticket, name='deactivate_ticket'),
 ]

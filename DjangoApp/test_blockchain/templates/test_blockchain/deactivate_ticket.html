@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+  <meta charset="UTF-8">
+  <title>Walidacja Biletu - InviLink</title>
+  <!-- Solana Web3 -->
+  <script src="https://cdn.jsdelivr.net/npm/@solana/web3.js@latest/lib/index.iife.min.js"></script>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 20px; }
+    h1 { color: #333; }
+    .ticket-info { margin-top: 20px; font-size: 18px; }
+    .btn { margin-top: 30px; padding: 15px 30px; font-size: 20px; }
+    #log { margin-top: 20px; white-space: pre-wrap; }
+  </style>
+</head>
+<body>
+  <h1>Walidacja Biletu</h1>
+  <div class="ticket-info">
+    <p><strong>Event ID:</strong> <span id="eventId"></span></p>
+    <p><strong>Sekcja:</strong> <span id="section"></span></p>
+    <p><strong>Wiersz:</strong> <span id="row"></span></p>
+    <p><strong>Miejsce:</strong> <span id="seat"></span></p>
+    <p><strong>Ticket Mint:</strong> <span id="ticketMint"></span></p>
+  </div>
+  <button class="btn" onclick="validateTicket()">Waliduj Bilet</button>
+  <div id="log"></div>
+
+  <script>
+    // Adres naszego kontraktu
+    const PROGRAM_ID = new solanaWeb3.PublicKey("C52SCZxVqGpjKkLpSng6iuYMKupA4zmFpXCqSYaXJFr9");
+    // Discriminator dla funkcji validate_ticket (zgodny z IDL)
+    const VALIDATE_TICKET_DISCRIMINATOR = new Uint8Array([222, 125, 246, 215, 10, 163, 159, 200]);
+
+    let connection, provider, walletPublicKey;
+
+    // Funkcja pomocnicza: parsowanie parametrów z URL
+    function getQueryParams() {
+      const params = {};
+      window.location.search.substring(1).split("&").forEach(pair => {
+        const [key, value] = pair.split("=");
+        if (key) {
+          params[decodeURIComponent(key)] = decodeURIComponent(value);
+        }
+      });
+      return params;
+    }
+
+    const params = getQueryParams();
+    // Uzupełniamy dane biletu – ticketMint musi być przekazany, by można było określić konto biletu
+    document.getElementById("eventId").textContent = params.eventId || "Brak danych";
+    document.getElementById("section").textContent = params.section || "Brak danych";
+    document.getElementById("row").textContent = params.row || "Brak danych";
+    document.getElementById("seat").textContent = params.seat || "Brak danych";
+    document.getElementById("ticketMint").textContent = params.ticketMint || "Brak danych";
+
+    async function initConnection() {
+      if (!window.phantom || !window.phantom.solana) {
+        alert("Phantom Wallet jest wymagany!");
+        throw new Error("Phantom Wallet nie jest dostępny");
+      }
+      provider = window.phantom.solana;
+      if (!provider.isConnected) await provider.connect();
+      walletPublicKey = provider.publicKey;
+      connection = new solanaWeb3.Connection("https://api.devnet.solana.com", "confirmed");
+      log("Połączono z Phantom. Wallet: " + walletPublicKey.toBase58());
+    }
+
+    function log(message) {
+      const logEl = document.getElementById("log");
+      logEl.textContent += message + "\n";
+      console.log(message);
+    }
+
+    async function validateTicket() {
+      try {
+        await initConnection();
+        // Derwujemy konto eventu przy użyciu seeda ["event", eventId]
+        const eventSeed = [new TextEncoder().encode("event"), new TextEncoder().encode(params.eventId)];
+        const [eventPDA] = await solanaWeb3.PublicKey.findProgramAddress(eventSeed, PROGRAM_ID);
+
+        // Ticket mint pobieramy z query string (ticketMint)
+        if (!params.ticketMint) {
+          alert("Brak informacji o ticketMint!");
+          return;
+        }
+        const ticketMint = new solanaWeb3.PublicKey(params.ticketMint);
+
+        // Derwujemy konto TicketStatus przy użyciu seeda ["ticket_status", ticketMint]
+        const ticketStatusSeed = [new TextEncoder().encode("ticket_status"), ticketMint.toBuffer()];
+        const [ticketStatusPDA] = await solanaWeb3.PublicKey.findProgramAddress(ticketStatusSeed, PROGRAM_ID);
+
+        // Budujemy instrukcję dla validate_ticket – dane to tylko discriminator
+        const data = VALIDATE_TICKET_DISCRIMINATOR;
+
+        // Lista kont (zgodnie z kontami w ValidateTicket)
+        const keys = [
+          { pubkey: eventPDA, isWritable: true, isSigner: false },
+          { pubkey: ticketStatusPDA, isWritable: true, isSigner: false },
+          { pubkey: walletPublicKey, isWritable: false, isSigner: true },
+          { pubkey: ticketMint, isWritable: false, isSigner: false },
+        ];
+
+        const instruction = new solanaWeb3.TransactionInstruction({
+          keys: keys,
+          programId: PROGRAM_ID,
+          data: data,
+        });
+
+        let transaction = new solanaWeb3.Transaction().add(instruction);
+        transaction.feePayer = walletPublicKey;
+        let { blockhash } = await connection.getLatestBlockhash();
+        transaction.recentBlockhash = blockhash;
+        log("Transakcja przygotowana, podpisuję...");
+        const signedTx = await provider.signTransaction(transaction);
+        log("Transakcja podpisana, wysyłam...");
+        const txSig = await connection.sendRawTransaction(signedTx.serialize());
+        log("Transakcja wysłana. Signature: " + txSig);
+        await connection.confirmTransaction(txSig, "confirmed");
+        log("Bilet został pomyślnie zweryfikowany!");
+        alert("Bilet zweryfikowany! Tx Sig: " + txSig);
+      } catch (err) {
+        console.error(err);
+        log("Błąd podczas walidacji biletu: " + err.message);
+        alert("Błąd: " + err.message);
+      }
+    }
+
+    window.onload = () => {
+      // Inicjalizacja po załadowaniu strony – opcjonalnie
+      initConnection().catch(console.error);
+    };
+  </script>
+</body>
+</html>
