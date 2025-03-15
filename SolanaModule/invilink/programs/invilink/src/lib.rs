@@ -13,7 +13,7 @@ use base64::{engine::general_purpose, Engine as _};
 use solana_program::program::invoke;
 use solana_program::system_instruction;
 
-declare_id!("DQCwvnVHUzUuv23P6FBJESBn3h6X7XGKtZZ6W9nrVfNW");
+declare_id!("C4eXHraEykzQhCrWbURNjGJae1wgiFpURMxeMorNT6Zi");
 
 // Stałe globalne
 const MASTER_ACCOUNT: Pubkey = pubkey!("4Wg5ZqjS3AktHzq34hK1T55aFNKSjBpmJ3PyRChpPNDh");
@@ -98,7 +98,7 @@ pub mod invilink {
     pub fn initialize_event_registry(ctx: Context<InitializeEventRegistry>) -> Result<()> {
         let registry = &mut ctx.accounts.registry;
         registry.event_count = 0;
-        registry.events = [Pubkey::default(); 10];
+        registry.events = Vec::new();
         Ok(())
     }
 
@@ -193,11 +193,8 @@ pub mod invilink {
         seating_map.sections = Vec::new();
         seating_map.total_seats = 0;
     
-        let count = registry.event_count as usize;
-        require!(count < 10, ErrorCode::RegistryFull);
-        registry.events[count] = event.key();
-        registry.event_count += 1;
-    
+        registry.events.push(event.key());
+        registry.event_count = registry.events.len() as u32;    
         Ok(())
     }
     
@@ -452,10 +449,12 @@ pub mod invilink {
         );
         // 2a. Sprawdzenie, czy wydarzenie nie minęło (zakaz zakupu biletu po dacie wydarzenia)
         let clock = Clock::get()?;
+        let adjusted_timestamp = clock.unix_timestamp - 86400; // odejmujemy 1 dzień (86400 sekund)
         require!(
-            clock.unix_timestamp < ctx.accounts.event.event_date,
+            adjusted_timestamp < ctx.accounts.event.event_date,
             ErrorCode::EventAlreadyOccurred
         );
+        
         // 3. Sprawdzenie, czy miejsce w danej sekcji istnieje
         let seating_section = &mut ctx.accounts.seating_section;
         require!(
@@ -809,7 +808,7 @@ pub struct OrganizersPool {
 #[account]
 pub struct EventRegistry {
     pub event_count: u32,
-    pub events: [Pubkey; 10],
+    pub events: Vec<Pubkey>,
 }
 
 #[account]
