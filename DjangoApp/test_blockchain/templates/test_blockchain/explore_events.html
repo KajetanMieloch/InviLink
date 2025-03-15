@@ -38,7 +38,7 @@
 
   <script>
     // Ustawienia
-    const PROGRAM_ID = new solanaWeb3.PublicKey("3u21BRacojRb9V5JDy2bXeRckoK7fPmKzmAs87AabDLS");
+    const PROGRAM_ID = new solanaWeb3.PublicKey("C4eXHraEykzQhCrWbURNjGJae1wgiFpURMxeMorNT6Zi");
     const REGISTRY_SEED = "event_registry";
     const DEFAULT_PUBKEY = "11111111111111111111111111111111";
 
@@ -47,24 +47,24 @@
     const DEACTIVATE_EVENT_DISCRIMINATOR = new Uint8Array([222, 84, 182, 86, 46, 110, 215, 19]);
     const DELETE_EVENT_DISCRIMINATOR    = new Uint8Array([103, 111, 95, 106, 232, 24, 190, 84]);
     const UPDATE_EVENT_DISCRIMINATOR    = new Uint8Array([70, 108, 211, 125, 171, 176, 25, 217]);
-    // Zmieniono: usunięto UPDATE_EVENT_SEATING_TYPE_DISCRIMINATOR
 
     let connection, provider, walletPublicKey;
 
-    // Dekodowanie konta rejestru eventów
+    // Funkcja dekodująca rejestr eventów – teraz czyta dynamiczny wektor:
     function decodeRegistry(data) {
-      let offset = 8;
+      let offset = 8; // pomijamy 8-bajtowy discriminator
       const dv = new DataView(data.buffer, data.byteOffset, data.byteLength);
       const eventCount = dv.getUint32(offset, true);
       offset += 4;
+      // Odczytujemy długość wektora (u32)
+      const vecLen = dv.getUint32(offset, true);
+      offset += 4;
       const events = [];
-      for (let i = 0; i < 10; i++) {
+      for (let i = 0; i < vecLen; i++) {
         const pubkeyBytes = data.slice(offset, offset + 32);
         const pubkey = new solanaWeb3.PublicKey(pubkeyBytes).toBase58();
         offset += 32;
-        if (pubkey !== DEFAULT_PUBKEY) {
-          events.push(pubkey);
-        }
+        events.push(pubkey);
       }
       return { eventCount, events };
     }
@@ -84,62 +84,44 @@
         return new TextDecoder().decode(strBytes);
       }
 
-      // Odczyt event_id
       const event_id = readString();
-
-      // Odczyt organizatora (32 bajty)
       let organizer = "";
       if (offset + 32 <= data.byteLength) {
         const orgBytes = data.slice(offset, offset + 32);
         organizer = new solanaWeb3.PublicKey(orgBytes).toBase58();
         offset += 32;
       }
-
-      // Odczyt nazwy eventu
       const name = readString();
-
-      // Odczyt daty eventu (i64, UNIX timestamp)
       let event_date = 0;
       if (offset + 8 <= data.byteLength) {
         event_date = Number(dv.getBigUint64(offset, true));
         offset += 8;
       }
-
-      // Odczyt ticket_price
       let ticket_price = "0";
       if (offset + 8 <= data.byteLength) {
         ticket_price = dv.getBigUint64(offset, true).toString();
         offset += 8;
       }
-
-      // Odczyt available_tickets
       let available_tickets = "0";
       if (offset + 8 <= data.byteLength) {
         available_tickets = dv.getBigUint64(offset, true).toString();
         offset += 8;
       }
-
-      // Odczyt sold_tickets
       let sold_tickets = "0";
       if (offset + 8 <= data.byteLength) {
         sold_tickets = dv.getBigUint64(offset, true).toString();
         offset += 8;
       }
-
-      // Odczyt seating_type – może nie być zapisany w starszej wersji
       let seating_type = 0;
       if (offset + 1 <= data.byteLength) {
         seating_type = dv.getUint8(offset);
         offset += 1;
       }
-
-      // Odczyt pola active – ustalamy domyślnie false, jeśli nie ma
       let active = false;
       if (offset + 1 <= data.byteLength) {
         active = dv.getUint8(offset) !== 0;
         offset += 1;
       }
-
       return {
         event_id,
         organizer,
@@ -157,30 +139,6 @@
       const logEl = document.getElementById("log");
       logEl.textContent += msg + "\n";
       console.log(msg);
-    }
-
-    // Pomocnicze funkcje do serializacji opcji (dla update_event)
-    function encodeOptionString(str) {
-      if (!str) return new Uint8Array([0]);
-      const encoder = new TextEncoder();
-      const strBytes = encoder.encode(str);
-      const lengthBytes = new Uint8Array(4);
-      new DataView(lengthBytes.buffer).setUint32(0, strBytes.length, true);
-      const result = new Uint8Array(1 + 4 + strBytes.length);
-      result[0] = 1;
-      result.set(lengthBytes, 1);
-      result.set(strBytes, 5);
-      return result;
-    }
-
-    function encodeOptionU64(val) {
-      if (val === null || val === undefined || val === "") return new Uint8Array([0]);
-      let bnVal = new BN(val.toString());
-      const buf = bnVal.toArrayLike(Uint8Array, 'le', 8);
-      const result = new Uint8Array(1 + 8);
-      result[0] = 1;
-      result.set(buf, 1);
-      return result;
     }
 
     async function loadEvents() {
@@ -213,7 +171,6 @@
           const eventAcc = await connection.getAccountInfo(eventPubkey);
           if (eventAcc) {
             const eventData = decodeEvent(eventAcc.data);
-            // Konwersja daty na czytelny format
             const eventDateStr = new Date(eventData.event_date * 1000).toLocaleDateString();
 
             const tr = document.createElement("tr");
@@ -236,8 +193,6 @@
                 btnUpdate.textContent = "Aktualizuj";
                 btnUpdate.onclick = () => updateEvent(eventPubkey);
                 actionTd.appendChild(btnUpdate);
-
-                // Usunięto przycisk "Zmień typ miejsc"
 
                 const btnActivate = document.createElement("button");
                 btnActivate.textContent = "Aktywuj";
@@ -272,12 +227,11 @@
         const encodedName = encodeOptionString(newName);
         const encodedTicketPrice = encodeOptionU64(newTicketPrice);
         const encodedAvailable = encodeOptionU64(newAvailableTickets);
-        const updateData = new Uint8Array(
-          UPDATE_EVENT_DISCRIMINATOR.length +
-          encodedName.length +
-          encodedTicketPrice.length +
-          encodedAvailable.length
-        );
+        const totalLength = UPDATE_EVENT_DISCRIMINATOR.length +
+                            encodedName.length +
+                            encodedTicketPrice.length +
+                            encodedAvailable.length;
+        const updateData = new Uint8Array(totalLength);
         let offset = 0;
         updateData.set(UPDATE_EVENT_DISCRIMINATOR, offset);
         offset += UPDATE_EVENT_DISCRIMINATOR.length;
