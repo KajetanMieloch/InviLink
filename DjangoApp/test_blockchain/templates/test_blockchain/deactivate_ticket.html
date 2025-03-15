@@ -5,6 +5,8 @@
   <title>Walidacja Biletu - InviLink</title>
   <!-- Solana Web3 -->
   <script src="https://cdn.jsdelivr.net/npm/@solana/web3.js@latest/lib/index.iife.min.js"></script>
+  <!-- Borsh do serializacji danych -->
+  <script src="https://cdn.jsdelivr.net/npm/borsh@0.7.0/lib/index.min.js"></script>
   <style>
     body { font-family: Arial, sans-serif; margin: 20px; }
     h1 { color: #333; }
@@ -20,7 +22,6 @@
     <p><strong>Sekcja:</strong> <span id="section"></span></p>
     <p><strong>Wiersz:</strong> <span id="row"></span></p>
     <p><strong>Miejsce:</strong> <span id="seat"></span></p>
-    <p><strong>Ticket Mint:</strong> <span id="ticketMint"></span></p>
   </div>
   <button class="btn" onclick="validateTicket()">Waliduj Bilet</button>
   <div id="log"></div>
@@ -28,7 +29,7 @@
   <script>
     // Adres naszego kontraktu
     const PROGRAM_ID = new solanaWeb3.PublicKey("C52SCZxVqGpjKkLpSng6iuYMKupA4zmFpXCqSYaXJFr9");
-    // Discriminator dla funkcji validate_ticket (zgodny z IDL)
+    // Dyskryminator dla funkcji validate_ticket (zgodny z IDL kontraktu)
     const VALIDATE_TICKET_DISCRIMINATOR = new Uint8Array([222, 125, 246, 215, 10, 163, 159, 200]);
 
     let connection, provider, walletPublicKey;
@@ -46,12 +47,11 @@
     }
 
     const params = getQueryParams();
-    // Uzupełniamy dane biletu – ticketMint musi być przekazany, by można było określić konto biletu
+    // Uzupełniamy dane biletu – brak już ticketMint
     document.getElementById("eventId").textContent = params.eventId || "Brak danych";
     document.getElementById("section").textContent = params.section || "Brak danych";
     document.getElementById("row").textContent = params.row || "Brak danych";
     document.getElementById("seat").textContent = params.seat || "Brak danych";
-    document.getElementById("ticketMint").textContent = params.ticketMint || "Brak danych";
 
     async function initConnection() {
       if (!window.phantom || !window.phantom.solana) {
@@ -71,33 +71,58 @@
       console.log(message);
     }
 
+    // Klasa i schemat Borsh dla argumentów walidacji
+    class ValidateTicketArgs {
+      constructor(fields) {
+        this.event_id = fields.event_id;
+        this.section = fields.section;
+        this.row = fields.row;
+        this.seat = fields.seat;
+      }
+    }
+    const ValidateTicketSchema = new Map([
+      [ValidateTicketArgs, { kind: 'struct', fields: [['event_id', 'string'], ['section', 'string'], ['row', 'u8'], ['seat', 'u8']] }]
+    ]);
+
     async function validateTicket() {
       try {
         await initConnection();
-        // Derwujemy konto eventu przy użyciu seeda ["event", eventId]
-        const eventSeed = [new TextEncoder().encode("event"), new TextEncoder().encode(params.eventId)];
+
+        // Wyznaczamy konto eventu przy użyciu seeda ["event", eventId]
+        const eventSeed = [
+          new TextEncoder().encode("event"),
+          new TextEncoder().encode(params.eventId)
+        ];
         const [eventPDA] = await solanaWeb3.PublicKey.findProgramAddress(eventSeed, PROGRAM_ID);
 
-        // Ticket mint pobieramy z query string (ticketMint)
-        if (!params.ticketMint) {
-          alert("Brak informacji o ticketMint!");
-          return;
-        }
-        const ticketMint = new solanaWeb3.PublicKey(params.ticketMint);
-
-        // Derwujemy konto TicketStatus przy użyciu seeda ["ticket_status", ticketMint]
-        const ticketStatusSeed = [new TextEncoder().encode("ticket_status"), ticketMint.toBuffer()];
+        // Wyznaczamy konto TicketStatus na podstawie seeda:
+        // ["ticket_status", eventId, section, row, seat]
+        const ticketStatusSeed = [
+          new TextEncoder().encode("ticket_status"),
+          new TextEncoder().encode(params.eventId),
+          new TextEncoder().encode(params.section),
+          new Uint8Array([parseInt(params.row)]),
+          new Uint8Array([parseInt(params.seat)])
+        ];
         const [ticketStatusPDA] = await solanaWeb3.PublicKey.findProgramAddress(ticketStatusSeed, PROGRAM_ID);
 
-        // Budujemy instrukcję dla validate_ticket – dane to tylko discriminator
-        const data = VALIDATE_TICKET_DISCRIMINATOR;
+        // Serializujemy argumenty walidacji przy użyciu Borsh
+        const args = new ValidateTicketArgs({
+          event_id: params.eventId,
+          section: params.section,
+          row: parseInt(params.row),
+          seat: parseInt(params.seat)
+        });
+        const serializedArgs = borsh.serialize(ValidateTicketSchema, args);
 
-        // Lista kont (zgodnie z kontami w ValidateTicket)
+        // Łączymy dyskryminator z serializowanymi argumentami
+        const data = new Uint8Array([...VALIDATE_TICKET_DISCRIMINATOR, ...serializedArgs]);
+
+        // Lista kont (zgodnie z kontekstem ValidateTicket w kontrakcie)
         const keys = [
           { pubkey: eventPDA, isWritable: true, isSigner: false },
           { pubkey: ticketStatusPDA, isWritable: true, isSigner: false },
-          { pubkey: walletPublicKey, isWritable: false, isSigner: true },
-          { pubkey: ticketMint, isWritable: false, isSigner: false },
+          { pubkey: walletPublicKey, isWritable: false, isSigner: true }
         ];
 
         const instruction = new solanaWeb3.TransactionInstruction({
