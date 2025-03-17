@@ -1,5 +1,5 @@
 {
-  "address": "754nBR6LkC7nMFMFjXQTyrz75FwmPUgeb8KbtH8ccF3j",
+  "address": "2Yh2Jud5p81cVVM5Si2S53YcmtgErkuCTsX8RBhZ91ab",
   "metadata": {
     "name": "invilink",
     "version": "0.1.0",
@@ -544,6 +544,22 @@
         }
       ],
       "args": [
+        {
+          "name": "event_id",
+          "type": "string"
+        },
+        {
+          "name": "section",
+          "type": "string"
+        },
+        {
+          "name": "row",
+          "type": "u8"
+        },
+        {
+          "name": "seat",
+          "type": "u8"
+        },
         {
           "name": "event",
           "type": "pubkey"

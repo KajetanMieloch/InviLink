@@ -13,7 +13,7 @@ use base64::{engine::general_purpose, Engine as _};
 use solana_program::program::invoke;
 use solana_program::system_instruction;
 
-declare_id!("754nBR6LkC7nMFMFjXQTyrz75FwmPUgeb8KbtH8ccF3j");
+declare_id!("2Yh2Jud5p81cVVM5Si2S53YcmtgErkuCTsX8RBhZ91ab");
 
 // Stałe globalne
 const MASTER_ACCOUNT: Pubkey = pubkey!("4Wg5ZqjS3AktHzq34hK1T55aFNKSjBpmJ3PyRChpPNDh");
@@ -581,36 +581,36 @@ pub mod invilink {
     // ---------------- WALIDACJA BILETU BEZ ticket_mint ----------------
     // Walidacja oparta na: event_id, section, row, seat (np. przekazywane z URL)
 
-
     #[derive(Accounts)]
-    #[instruction(event_id: String, section: String, row: u8, seat: u8)]
+    #[instruction(event_id: String, section: String, row: u8, seat: u8, event: Pubkey)]
     pub struct InitializeTicketStatus<'info> {
-        // Inicjalizacja konta TicketStatus jako PDA o seedach powiązanych z danymi biletu.
         #[account(
-            init_if_needed, // Inicjalizujemy tylko jeśli nie istnieje
+            init_if_needed,
             payer = payer,
             seeds = [b"ticket_status", event_id.as_bytes(), section.as_bytes(), &[row], &[seat]],
             bump,
-            space = 8 + 32 + 1 // 8 bajtów na discriminator, 32 na Pubkey eventu, 1 na flagę used
+            space = 41 // tylko discriminator, brak danych
         )]
         pub ticket_status: Account<'info, TicketStatus>,
         #[account(mut)]
         pub payer: Signer<'info>,
         pub system_program: Program<'info, System>,
     }
-
+    
     pub fn initialize_ticket_status(
         ctx: Context<InitializeTicketStatus>,
+        event_id: String,
+        section: String,
+        row: u8,
+        seat: u8,
         event: Pubkey,
     ) -> Result<()> {
         let ticket_status = &mut ctx.accounts.ticket_status;
-        // Ustawiamy event, do którego bilet się odnosi
         ticket_status.event = event;
-        // Na początku bilet nie został użyty
         ticket_status.used = false;
         Ok(())
     }
-
+    
 
     #[derive(Accounts)]
     #[instruction(event_id: String, section: String, row: u8, seat: u8)]
