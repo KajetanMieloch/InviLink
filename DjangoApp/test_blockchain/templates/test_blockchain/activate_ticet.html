@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+  <meta charset="UTF-8">
+  <title>Panel NFT - Aktywacja Ticketów</title>
+  <!-- Solana Web3 -->
+  <script src="https://cdn.jsdelivr.net/npm/@solana/web3.js@latest/lib/index.iife.min.js"></script>
+  <!-- BN.js (jeśli potrzebne) -->
+  <script src="https://cdn.jsdelivr.net/npm/bn.js@5.2.0/lib/bn.min.js"></script>
+  <style>
+    body { font-family: Arial, sans-serif; padding: 20px; }
+    h1 { text-align: center; }
+    .container { display: flex; flex-wrap: wrap; gap: 20px; justify-content: center; }
+    .nft-card { border: 1px solid #ccc; padding: 10px; width: 300px; border-radius: 4px; }
+    .nft-card h3 { margin: 0 0 5px; }
+    .nft-card p { margin: 5px 0; }
+    .timer { font-weight: bold; color: green; margin-top: 10px; }
+    button { padding: 8px 12px; margin-top: 10px; cursor: pointer; }
+    #log { margin: 20px auto; padding: 10px; border: 1px solid #ccc; width: 90%; white-space: pre-wrap; }
+  </style>
+</head>
+<body>
+  <h1>Panel NFT - Aktywacja Ticketów</h1>
+  <div id="log"></div>
+  <div id="nftContainer" class="container"></div>
+
+  <script>
+    // Globalne ustawienia
+    const PROGRAM_ID = new solanaWeb3.PublicKey("2Yh2Jud5p81cVVM5Si2S53YcmtgErkuCTsX8RBhZ91ab");
+    const connection = new solanaWeb3.Connection("https://api.devnet.solana.com", "confirmed");
+    let provider, walletPublicKey;
+
+    // Dyskryminator dla konta EventNFT (zgodnie z Twoim IDL)
+    const EVENT_NFT_DISCRIMINATOR = new Uint8Array([20, 200, 78, 14, 85, 211, 167, 152]);
+    // Dyskryminator dla instrukcji activate_ticket (zgodnie z IDL)
+    const ACTIVATE_TICKET_DISCRIMINATOR = new Uint8Array([110, 8, 92, 34, 61, 23, 0, 151]);
+
+    // Obiekt przechowujący lokalnie stan aktywacji ticketów
+    // Kluczem jest string reprezentujący PDA konta TicketStatus (lub pubkey eventu)
+    const ticketActivations = {};
+
+    // Logger
+    function logMessage(msg) {
+      console.log(msg);
+      const logEl = document.getElementById("log");
+      logEl.textContent += `[${new Date().toLocaleTimeString()}] ${msg}\n`;
+    }
+
+    // Inicjalizacja połączenia z Phantom
+    async function initConnection() {
+      if (!window.phantom || !window.phantom.solana) {
+        alert("Phantom Wallet jest wymagany!");
+        return;
+      }
+      provider = window.phantom.solana;
+      if (!provider.isConnected) await provider.connect();
+      walletPublicKey = provider.publicKey;
+      logMessage("Połączono z Phantom: " + walletPublicKey.toBase58());
+    }
+
+    // Serializacja stringa zgodnie z Borsh: [4 bajty długości LE + UTF-8]
+    function serializeString(str) {
+      const encoder = new TextEncoder();
+      const strBytes = encoder.encode(str);
+      const lenBuffer = new Uint8Array(4);
+      new DataView(lenBuffer.buffer).setUint32(0, strBytes.length, true);
+      const result = new Uint8Array(4 + strBytes.length);
+      result.set(lenBuffer, 0);
+      result.set(strBytes, 4);
+      return result;
+    }
+    // Serializacja u8 (1 bajt)
+    function serializeU8(val) {
+      return new Uint8Array([val]);
+    }
+
+    // Budowanie danych instrukcji dla activate_ticket:
+    // Struktura: [8 bajtów dyskryminatora] + serializeString(event_id) + serializeString(section) + serializeU8(row) + serializeU8(seat)
+    function buildActivateTicketData(event_id, section, row, seat) {
+      const disc = ACTIVATE_TICKET_DISCRIMINATOR;
+      const eventIdBytes = serializeString(event_id);
+      const sectionBytes = serializeString(section);
+      const rowByte = serializeU8(row);
+      const seatByte = serializeU8(seat);
+      const totalLen = disc.length + eventIdBytes.length + sectionBytes.length + rowByte.length + seatByte.length;
+      const buffer = new Uint8Array(totalLen);
+      let offset = 0;
+      buffer.set(disc, offset); offset += disc.length;
+      buffer.set(eventIdBytes, offset); offset += eventIdBytes.length;
+      buffer.set(sectionBytes, offset); offset += sectionBytes.length;
+      buffer.set(rowByte, offset); offset += rowByte.length;
+      buffer.set(seatByte, offset);
+      return buffer;
+    }
+
+    // Obliczanie PDA dla konta TicketStatus
+    // Seed: ["ticket_status", event_id, section, [row], [seat]]
+    async function getTicketStatusPDA(event_id, section, row, seat) {
+      const encoder = new TextEncoder();
+      const seed1 = encoder.encode("ticket_status");
+      const seed2 = encoder.encode(event_id);
+      const seed3 = encoder.encode(section);
+      const seed4 = new Uint8Array([row]);
+      const seed5 = new Uint8Array([seat]);
+      const [pda, bump] = await solanaWeb3.PublicKey.findProgramAddress(
+        [seed1, seed2, seed3, seed4, seed5],
+        PROGRAM_ID
+      );
+      return pda;
+    }
+
+    // Dekodowanie konta EventNFT (zgodnie z formatem Anchor z Twojego programu)
+    function decodeEventNFT(data) {
+      // Sprawdzamy discriminator – jeśli się nie zgadza, zwracamy null
+      const disc = data.slice(0, 8);
+      for (let i = 0; i < 8; i++) {
+        if (disc[i] !== EVENT_NFT_DISCRIMINATOR[i]) return null;
+      }
+      let offset = 8;
+      const dv = new DataView(data.buffer, data.byteOffset, data.byteLength);
+      try {
+        // event_id: string
+        const eventIdLen = dv.getUint32(offset, true); offset += 4;
+        const eventIdBytes = data.slice(offset, offset + eventIdLen); offset += eventIdLen;
+        const event_id = new TextDecoder().decode(eventIdBytes);
+        // organizer: Pubkey (32 bajtów)
+        const orgBytes = data.slice(offset, offset + 32); offset += 32;
+        const organizer = new solanaWeb3.PublicKey(orgBytes).toBase58();
+        // name: string
+        const nameLen = dv.getUint32(offset, true); offset += 4;
+        const nameBytes = data.slice(offset, offset + nameLen); offset += nameLen;
+        const name = new TextDecoder().decode(nameBytes);
+        // event_date: i64
+        let event_date = 0;
+        if (offset + 8 <= data.byteLength) {
+          event_date = Number(dv.getBigUint64(offset, true)); offset += 8;
+        }
+        // ticket_price: u64
+        let ticket_price = "0";
+        if (offset + 8 <= data.byteLength) {
+          ticket_price = dv.getBigUint64(offset, true).toString(); offset += 8;
+        }
+        // available_tickets: u64
+        let available_tickets = "0";
+        if (offset + 8 <= data.byteLength) {
+          available_tickets = dv.getBigUint64(offset, true).toString(); offset += 8;
+        }
+        // sold_tickets: u64
+        let sold_tickets = "0";
+        if (offset + 8 <= data.byteLength) {
+          sold_tickets = dv.getBigUint64(offset, true).toString(); offset += 8;
+        }
+        // seating_type: u8
+        let seating_type = 0;
+        if (offset + 1 <= data.byteLength) {
+          seating_type = dv.getUint8(offset); offset += 1;
+        }
+        // active: bool (1 bajt)
+        let active = false;
+        if (offset + 1 <= data.byteLength) {
+          active = dv.getUint8(offset) !== 0; offset += 1;
+        }
+        return {
+          event_id,
+          organizer,
+          name,
+          event_date,
+          ticket_price,
+          available_tickets,
+          sold_tickets,
+          seating_type,
+          active,
+          pubkey: null // zostanie ustawione przy ładowaniu
+        };
+      } catch (e) {
+        console.error("Błąd dekodowania EventNFT:", e);
+        return null;
+      }
+    }
+
+    // Ładowanie eventów z blockchaina – pobieramy wszystkie konta programu,
+    // filtrujemy te, które mają poprawny discriminator (czyli EventNFT) i event_date >= początek dzisiejszego dnia.
+    async function loadEventNFTs() {
+      try {
+        const accounts = await connection.getProgramAccounts(PROGRAM_ID);
+        const events = [];
+        const now = Math.floor(Date.now() / 1000);
+        const startOfToday = new Date(); 
+        startOfToday.setHours(0, 0, 0, 0);
+        const startOfTodayTs = Math.floor(startOfToday.getTime() / 1000);
+        for (const acct of accounts) {
+          const event = decodeEventNFT(acct.account.data);
+          if (event) {
+            event.pubkey = acct.pubkey;
+            if (event.event_date >= startOfTodayTs) {
+              events.push(event);
+            }
+          }
+        }
+        renderNFTs(events);
+      } catch (err) {
+        console.error("Błąd ładowania eventów:", err);
+        logMessage("Błąd ładowania eventów: " + err.message);
+      }
+    }
+
+    // Renderowanie kart eventów
+    function renderNFTs(events) {
+      const container = document.getElementById("nftContainer");
+      container.innerHTML = "";
+      events.forEach(event => {
+        const card = document.createElement("div");
+        card.className = "nft-card";
+        // Używamy pubkey eventu jako ID karty
+        card.id = event.pubkey.toBase58();
+        const eventDateStr = new Date(event.event_date * 1000).toLocaleString();
+        card.innerHTML = `
+          <h3>${event.name}</h3>
+          <p><strong>Event ID:</strong> ${event.event_id}</p>
+          <p><strong>Organizator:</strong> ${event.organizer}</p>
+          <p><strong>Data:</strong> ${eventDateStr}</p>
+        `;
+        const actionDiv = document.createElement("div");
+        // Sprawdzamy lokalnie, czy mamy aktywację dla tego eventu (dla domyślnego biletu: section "default", row 0, seat 0)
+        const ticketKey = event.pubkey.toBase58(); // używamy pubkey eventu jako klucza
+        if (ticketActivations[ticketKey] && ticketActivations[ticketKey].activated) {
+          const timerDiv = document.createElement("div");
+          timerDiv.className = "timer";
+          timerDiv.id = ticketKey + "-timer";
+          actionDiv.appendChild(timerDiv);
+          updateTimer(event);
+        } else {
+          const btn = document.createElement("button");
+          btn.innerText = "Aktywuj Ticket";
+          btn.onclick = () => activateTicket(event);
+          actionDiv.appendChild(btn);
+        }
+        card.appendChild(actionDiv);
+        container.appendChild(card);
+      });
+    }
+
+    // Funkcja wysyłająca transakcję aktywacji ticketu na łańcuchu
+    // Używamy domyślnych parametrów: section = "default", row = 0, seat = 0
+    async function activateTicket(event) {
+      try {
+        logMessage("Aktywacja ticketu dla eventu: " + event.event_id);
+        const event_id = event.event_id;
+        const section = "default";
+        const row = 0;
+        const seat = 0;
+        // Obliczamy PDA dla konta TicketStatus
+        const ticketStatusPDA = await getTicketStatusPDA(event_id, section, row, seat);
+        logMessage("TicketStatus PDA: " + ticketStatusPDA.toBase58());
+        // Budujemy dane instrukcji dla activate_ticket
+        const ixData = buildActivateTicketData(event_id, section, row, seat);
+        const keys = [
+          { pubkey: ticketStatusPDA, isSigner: false, isWritable: true },
+          { pubkey: walletPublicKey, isSigner: true, isWritable: false }
+        ];
+        const instruction = new solanaWeb3.TransactionInstruction({
+          keys,
+          programId: PROGRAM_ID,
+          data: ixData
+        });
+        let transaction = new solanaWeb3.Transaction().add(instruction);
+        transaction.feePayer = walletPublicKey;
+        const { blockhash } = await connection.getLatestBlockhash();
+        transaction.recentBlockhash = blockhash;
+        logMessage("Podpisuję transakcję aktywacji...");
+        const signedTx = await provider.signTransaction(transaction);
+        logMessage("Wysyłam transakcję aktywacji...");
+        const txSig = await connection.sendRawTransaction(signedTx.serialize());
+        logMessage("Transakcja wysłana. Signature: " + txSig);
+        await connection.confirmTransaction(txSig, "confirmed");
+        logMessage("Transakcja potwierdzona.");
+        // Po potwierdzeniu zapisujemy lokalnie stan aktywacji (dla klucza ticketStatusPDA)
+        const keyStr = ticketStatusPDA.toBase58();
+        ticketActivations[keyStr] = {
+          activated: true,
+          activationTimestamp: Math.floor(Date.now() / 1000)
+        };
+        // Odświeżamy listę eventów
+        loadEventNFTs();
+      } catch (err) {
+        console.error("Błąd aktywacji ticketu:", err);
+        logMessage("Błąd aktywacji ticketu: " + err.message);
+        alert("Błąd aktywacji ticketu: " + err.message);
+      }
+    }
+
+    // Aktualizacja timera dla aktywowanego ticketu – aktywacja ważna przez 300 sekund (5 minut)
+    function updateTimer(event) {
+      // Używamy PDA ticketu (obliczonej przy aktywacji) jako klucza – tutaj przyjmujemy, że ticketKey = event.pubkey.toBase58()
+      const ticketKey = event.pubkey.toBase58();
+      const timerDiv = document.getElementById(ticketKey + "-timer");
+      if (!timerDiv) return;
+      const now = Math.floor(Date.now() / 1000);
+      const activation = ticketActivations[ticketKey];
+      const elapsed = now - activation.activationTimestamp;
+      const remaining = 300 - elapsed;
+      if (remaining > 0) {
+        timerDiv.innerText = "Pozostały czas aktywacji: " + remaining + " s";
+        setTimeout(() => updateTimer(event), 1000);
+      } else {
+        // Aktywacja wygasła – usuwamy stan i odświeżamy widok
+        delete ticketActivations[ticketKey];
+        loadEventNFTs();
+      }
+    }
+
+    // Inicjalizacja – ładujemy eventy po połączeniu z Phantom
+    window.addEventListener("load", async () => {
+      await initConnection();
+      loadEventNFTs();
+    });
+  </script>
+</body>
+</html>

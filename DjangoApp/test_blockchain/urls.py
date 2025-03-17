@@ -18,4 +18,5 @@ urlpatterns = [
     path("generate_metadata/", views.generate_metadata, name="generate_metadata"),
     path('add_validators/', views.add_validators, name='add_validators'),
     path('deactivate_ticket/', views.deactivate_ticket, name='deactivate_ticket'),
+    path('activate_ticket/', views.activate_ticket, name='activate_ticket'),
 ]
