@@ -539,7 +539,7 @@
     // Budujemy dane instrukcji dla initialize_ticket_status:
     // Dyskryminator dla funkcji: [228, 37, 235, 14, 223, 66, 40, 21]
     const initDiscriminator = new Uint8Array([228, 37, 235, 14, 223, 66, 40, 21]);
-    const ixDataInit = buildInitTicketStatusData(event_id, sectionName, row, seat);
+    const ixDataInit = buildInitTicketStatusData(eventPDA);
 
     // Tworzymy instrukcję dla initialize_ticket_status
     const initTicketStatusIx = new solanaWeb3.TransactionInstruction({
