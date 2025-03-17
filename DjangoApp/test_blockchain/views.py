@@ -54,9 +54,6 @@ def test_mint(request):
 def add_validators(request):
     return render(request, 'test_blockchain/add_validators.html')
 
-def activate_ticket(request):
-    return render(request, 'test_blockchain/activate_ticket.html')
-
 
 @csrf_exempt
 def generate_metadata(request):
