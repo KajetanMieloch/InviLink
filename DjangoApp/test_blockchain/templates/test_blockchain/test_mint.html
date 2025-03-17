@@ -468,34 +468,25 @@
   }
 
 
-    // Funkcja budująca dane instrukcji dla initialize_ticket_status
-  function buildInitTicketStatusData(event_id, section, row, seat) {
+  // Funkcja budująca dane instrukcji dla initialize_ticket_status,
+  // która przekazuje tylko Pubkey eventu (32 bajty) obok dyskryminatora (8 bajtów)
+  function buildInitTicketStatusData(eventPubkey) {
     // Dyskryminator dla funkcji initialize_ticket_status
     const discriminator = new Uint8Array([228, 37, 235, 14, 223, 66, 40, 21]);
-    // Serializacja parametrów
-    const eventIdBytes = serializeString(event_id);
-    const sectionBytes = serializeString(section);
-    const rowByte = serializeU8(row);
-    const seatByte = serializeU8(seat);
-
-    // Obliczenie łącznej długości
-    const totalLength = discriminator.length + eventIdBytes.length + sectionBytes.length + rowByte.length + seatByte.length;
-    const buffer = new Uint8Array(totalLength);
-    let offset = 0;
+    // Konwersja Pubkey (np. eventPDA) do bajtów
+    const eventBytes = eventPubkey.toBuffer();
     
-    // Łączenie wszystkich bajtów
-    buffer.set(discriminator, offset);
-    offset += discriminator.length;
-    buffer.set(eventIdBytes, offset);
-    offset += eventIdBytes.length;
-    buffer.set(sectionBytes, offset);
-    offset += sectionBytes.length;
-    buffer.set(rowByte, offset);
-    offset += rowByte.length;
-    buffer.set(seatByte, offset);
+    // Łączna długość = 8 + 32 bajty
+    const totalLength = discriminator.length + eventBytes.length;
+    const buffer = new Uint8Array(totalLength);
+    
+    // Łączymy bajty
+    buffer.set(discriminator, 0);
+    buffer.set(new Uint8Array(eventBytes), discriminator.length);
     
     return buffer;
   }
+
 
 
 
