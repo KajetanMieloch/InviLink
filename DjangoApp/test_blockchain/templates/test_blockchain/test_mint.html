@@ -501,7 +501,7 @@
         const initTicketStatusIx = new solanaWeb3.TransactionInstruction({
           keys: [
             { pubkey: ticketStatusPDA, isSigner: false, isWritable: true },
-            { pubkey: walletPublicKey, isSigner: true, isWritable: true },
+            { pubkey: walletPublicKey, isSigner: false, isWritable: true },
             { pubkey: solanaWeb3.SystemProgram.programId, isSigner: false, isWritable: false }
           ],
           programId: PROGRAM_ID,
