@@ -529,7 +529,7 @@
         data: ixDataInit,
       });
       
-      // Budujemy listę kont dla mint NFT
+      // Budujemy listę kont dla mint NFT (tak jak wcześniej)
       const mintKeys = [
         { pubkey: eventPDA, isSigner: false, isWritable: true },
         { pubkey: walletPublicKey, isSigner: true, isWritable: true },
@@ -552,28 +552,45 @@
         programId: PROGRAM_ID,
         data: ixDataMint,
       });
-      
-      // Łączymy obie instrukcje w jedną transakcję – obie zostaną podpisane jednorazowo
-      let transaction = new solanaWeb3.Transaction().add(initTicketStatusIx).add(mintTicketIx);
-      transaction.feePayer = walletPublicKey;
-      const { blockhash } = await connection.getLatestBlockhash();
-      transaction.recentBlockhash = blockhash;
-      
-      // Podpisujemy transakcję tylko raz
-      const signedTx = await provider.signTransaction(transaction);
-      Logger.info("Transakcja podpisana, wysyłam...");
-      const txSignature = await connection.sendRawTransaction(signedTx.serialize());
-      Logger.info("Transakcja wysłana. Signature: " + txSignature);
-      await connection.confirmTransaction(txSignature, "confirmed");
-      Logger.info("NFT zostało mintowane!");
-      alert("NFT mintowane! Tx Sig: " + txSignature);
+
+      // --- TRANSAKCJA 1: Inicjalizacja TicketStatus ---
+      let initTransaction = new solanaWeb3.Transaction();
+      initTransaction.add(initTicketStatusIx);
+      initTransaction.feePayer = walletPublicKey;
+      const initBlockhash = (await connection.getLatestBlockhash()).blockhash;
+      initTransaction.recentBlockhash = initBlockhash;
+
+      Logger.info("Podpisuję transakcję inicjalizacji TicketStatus...");
+      const signedInitTx = await provider.signTransaction(initTransaction);
+      Logger.info("Wysyłam transakcję inicjalizacji TicketStatus...");
+      const initTxSignature = await connection.sendRawTransaction(signedInitTx.serialize());
+      Logger.info("Transakcja inicjalizacji wysłana. Signature: " + initTxSignature);
+      await connection.confirmTransaction(initTxSignature, "confirmed");
+      Logger.info("Transakcja inicjalizacji TicketStatus potwierdzona.");
+
+      // --- TRANSAKCJA 2: Mint NFT ---
+      let mintTransaction = new solanaWeb3.Transaction();
+      mintTransaction.add(mintTicketIx);
+      mintTransaction.feePayer = walletPublicKey;
+      const mintBlockhash = (await connection.getLatestBlockhash()).blockhash;
+      mintTransaction.recentBlockhash = mintBlockhash;
+
+      Logger.info("Podpisuję transakcję mint NFT...");
+      const signedMintTx = await provider.signTransaction(mintTransaction);
+      Logger.info("Wysyłam transakcję mint NFT...");
+      const mintTxSignature = await connection.sendRawTransaction(signedMintTx.serialize());
+      Logger.info("Transakcja mint NFT wysłana. Signature: " + mintTxSignature);
+      await connection.confirmTransaction(mintTxSignature, "confirmed");
+      Logger.info("Transakcja mint NFT potwierdzona.");
+
+      alert("NFT mintowane! Tx Sig: " + mintTxSignature);
       loadEvent();
     } catch (err) {
       Logger.error("Błąd mintowania NFT: " + err.message);
-      if (err.message.includes("already in use")) loadEvent();
       alert("Błąd mintowania NFT: " + err.message);
     }
   }
+
 
 
 
