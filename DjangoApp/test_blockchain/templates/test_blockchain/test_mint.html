@@ -467,25 +467,38 @@
     return ticketStatusPDA;
   }
 
+    // Funkcja budująca dane instrukcji dla initialize_ticket_status,
+    // która serializuje 4 parametry: event_id, section, row, seat.
+    // Ostateczny bufor ma postać:
+    // [8 bajtów dyskryminatora] + [serializeString(event_id)] + [serializeString(section)] + [serializeU8(row)] + [serializeU8(seat)]
+    function buildInitTicketStatusData(event_id, section, row, seat) {
+      // Dyskryminator dla funkcji initialize_ticket_status (8 bajtów)
+      const discriminator = new Uint8Array([228, 37, 235, 14, 223, 66, 40, 21]);
+      const eventIdBytes = serializeString(event_id);
+      const sectionBytes = serializeString(section);
+      const rowByte = serializeU8(row);
+      const seatByte = serializeU8(seat);
 
-  // Funkcja budująca dane instrukcji dla initialize_ticket_status,
-  // która przekazuje tylko Pubkey eventu (32 bajty) obok dyskryminatora (8 bajtów)
-  function buildInitTicketStatusData(eventPubkey) {
-    // Dyskryminator dla funkcji initialize_ticket_status
-    const discriminator = new Uint8Array([228, 37, 235, 14, 223, 66, 40, 21]);
-    // Konwersja Pubkey (np. eventPDA) do bajtów
-    const eventBytes = eventPubkey.toBuffer();
-    
-    // Łączna długość = 8 + 32 bajty
-    const totalLength = discriminator.length + eventBytes.length;
-    const buffer = new Uint8Array(totalLength);
-    
-    // Łączymy bajty
-    buffer.set(discriminator, 0);
-    buffer.set(new Uint8Array(eventBytes), discriminator.length);
-    
-    return buffer;
-  }
+      const totalLength = discriminator.length + eventIdBytes.length + sectionBytes.length + rowByte.length + seatByte.length;
+      const buffer = new Uint8Array(totalLength);
+      let offset = 0;
+      
+      buffer.set(discriminator, offset);
+      offset += discriminator.length;
+      
+      buffer.set(eventIdBytes, offset);
+      offset += eventIdBytes.length;
+      
+      buffer.set(sectionBytes, offset);
+      offset += sectionBytes.length;
+      
+      buffer.set(rowByte, offset);
+      offset += rowByte.length;
+      
+      buffer.set(seatByte, offset);
+      
+      return buffer;
+    }
 
 
 
@@ -537,9 +550,7 @@
     const ticketStatusPDA = await getTicketStatusPDA(event_id, sectionName, row, seat);
 
     // Budujemy dane instrukcji dla initialize_ticket_status:
-    // Dyskryminator dla funkcji: [228, 37, 235, 14, 223, 66, 40, 21]
-    const initDiscriminator = new Uint8Array([228, 37, 235, 14, 223, 66, 40, 21]);
-    const ixDataInit = buildInitTicketStatusData(eventPDA);
+    const ixDataInit = buildInitTicketStatusData(event_id, sectionName, row, seat);
 
     // Tworzymy instrukcję dla initialize_ticket_status
     const initTicketStatusIx = new solanaWeb3.TransactionInstruction({
