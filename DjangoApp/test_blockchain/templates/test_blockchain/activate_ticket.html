@@ -5,8 +5,8 @@
   <title>Kolekcja NFT - INVI</title>
   <!-- Solana Web3 -->
   <script src="https://cdn.jsdelivr.net/npm/@solana/web3.js@latest/lib/index.iife.min.js"></script>
-  <!-- Metaplex JS (umożliwia pobranie metadanych NFT) -->
-  <script src="https://unpkg.com/@metaplex/js/dist/metaplex.umd.js"></script>
+  <!-- Metaplex JS (UMD) - używamy konkretnej wersji, aby upewnić się, że globalny obiekt zostanie załadowany -->
+  <script src="https://unpkg.com/@metaplex/js@9.4.0/dist/metaplex.umd.js"></script>
   <style>
     body { font-family: Arial, sans-serif; padding: 20px; }
     #nftContainer { display: flex; flex-wrap: wrap; gap: 20px; margin-top: 20px; }
@@ -31,8 +31,7 @@
     }
 
     // Inicjalizacja połączenia z Solaną
-    const connection = new solanaWeb3.Connection("https://api.devnet.solana.com", "confirmed");
-    // Stałe: Token Program i Metadane (Metaplex)
+    const connection = new solanaWeb3.Connection("https://api.mainnet-beta.solana.com", "confirmed");
     const TOKEN_PROGRAM_ID = new solanaWeb3.PublicKey("TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA");
     const METADATA_PROGRAM_ID = new solanaWeb3.PublicKey("metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s");
 
@@ -58,6 +57,13 @@
     // Funkcja pobierająca NFT z portfela i filtrująca według symbolu "INVI"
     async function fetchNFTs() {
       if (!walletPublicKey) return;
+
+      // Sprawdzenie, czy biblioteka Metaplex została załadowana
+      if (!window.metaplex || !window.metaplex.programs || !window.metaplex.programs.metadata) {
+        log("Błąd: Biblioteka Metaplex nie została poprawnie załadowana. Sprawdź, czy skrypt metaplex.umd.js został załadowany.");
+        return;
+      }
+
       try {
         // Pobieramy token accounts użytkownika
         const tokenAccounts = await connection.getParsedTokenAccountsByOwner(
@@ -83,7 +89,6 @@
               );
               // Ładujemy konto metadanych
               const metadataAccount = await window.metaplex.programs.metadata.Metadata.load(connection, metadataPDA);
-              // Odczytujemy dane – struktura: { name, symbol, uri, ... }
               const metadataData = metadataAccount.data.data;
               // Sprawdzamy, czy symbol NFT to "INVI"
               if (metadataData.symbol === "INVI") {
@@ -111,7 +116,6 @@
       }
     }
 
-    // Obsługa przycisku do połączenia z portfelem
     document.getElementById("connectBtn").addEventListener("click", connectWallet);
   </script>
 </body>
