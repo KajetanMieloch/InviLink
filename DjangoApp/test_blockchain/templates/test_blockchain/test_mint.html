@@ -468,6 +468,36 @@
   }
 
 
+    // Funkcja budująca dane instrukcji dla initialize_ticket_status
+  function buildInitTicketStatusData(event_id, section, row, seat) {
+    // Dyskryminator dla funkcji initialize_ticket_status
+    const discriminator = new Uint8Array([228, 37, 235, 14, 223, 66, 40, 21]);
+    // Serializacja parametrów
+    const eventIdBytes = serializeString(event_id);
+    const sectionBytes = serializeString(section);
+    const rowByte = serializeU8(row);
+    const seatByte = serializeU8(seat);
+
+    // Obliczenie łącznej długości
+    const totalLength = discriminator.length + eventIdBytes.length + sectionBytes.length + rowByte.length + seatByte.length;
+    const buffer = new Uint8Array(totalLength);
+    let offset = 0;
+    
+    // Łączenie wszystkich bajtów
+    buffer.set(discriminator, offset);
+    offset += discriminator.length;
+    buffer.set(eventIdBytes, offset);
+    offset += eventIdBytes.length;
+    buffer.set(sectionBytes, offset);
+    offset += sectionBytes.length;
+    buffer.set(rowByte, offset);
+    offset += rowByte.length;
+    buffer.set(seatByte, offset);
+    
+    return buffer;
+  }
+
+
 
     // Funkcja realizująca mint NFT
     async function processMintTicketNFT(sectionName, row, seat) {
@@ -518,11 +548,9 @@
     // Budujemy dane instrukcji dla initialize_ticket_status:
     // Dyskryminator dla funkcji: [228, 37, 235, 14, 223, 66, 40, 21]
     const initDiscriminator = new Uint8Array([228, 37, 235, 14, 223, 66, 40, 21]);
-    const ixDataInit = initDiscriminator; // przekazujemy tylko dyskryminator
+    const ixDataInit = buildInitTicketStatusData(event_id, sectionName, row, seat);
 
-
-    // Tworzymy instrukcję dla initialize_ticket_status.
-    // Ponieważ to konto jest PDA, nie wymaga podpisu (isSigner: false).
+    // Tworzymy instrukcję dla initialize_ticket_status
     const initTicketStatusIx = new solanaWeb3.TransactionInstruction({
       keys: [
         { pubkey: ticketStatusPDA, isSigner: false, isWritable: true },
@@ -532,6 +560,7 @@
       programId: PROGRAM_ID,
       data: ixDataInit,
     });
+
 
     // Budujemy instrukcję dla mint NFT
     const mintKeys = [
