@@ -49,7 +49,7 @@
     Logger.info("Logger uruchomiony.");
 
     // Stałe – adresy programu i inne
-    const PROGRAM_ID = new solanaWeb3.PublicKey("754nBR6LkC7nMFMFjXQTyrz75FwmPUgeb8KbtH8ccF3j");
+    const PROGRAM_ID = new solanaWeb3.PublicKey("2Yh2Jud5p81cVVM5Si2S53YcmtgErkuCTsX8RBhZ91ab");
     const MINT_TICKET_DISCRIMINATOR = new Uint8Array([212, 78, 142, 4, 188, 28, 203, 17]);
     const METADATA_PROGRAM_ID = new solanaWeb3.PublicKey("metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s");
     const TOKEN_PROGRAM_ID = new solanaWeb3.PublicKey("TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA");
@@ -517,7 +517,7 @@
 
     // Budujemy dane instrukcji dla initialize_ticket_status:
     // Dyskryminator dla funkcji: [228, 37, 235, 14, 223, 66, 40, 21]
-    const initDiscriminator = new Uint8Array([228, 37, 235, 14, 223, 66, 40, 21]);
+    const initDiscriminator = new Uint8Array([151, 223, 44, 246, 213, 70, 7, 65]);
     const ixDataInit = initDiscriminator; // przekazujemy tylko dyskryminator
 
 
