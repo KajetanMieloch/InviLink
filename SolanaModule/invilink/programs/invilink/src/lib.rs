@@ -580,6 +580,38 @@ pub mod invilink {
     
     // ---------------- WALIDACJA BILETU BEZ ticket_mint ----------------
     // Walidacja oparta na: event_id, section, row, seat (np. przekazywane z URL)
+
+
+    #[derive(Accounts)]
+    #[instruction(event_id: String, section: String, row: u8, seat: u8)]
+    pub struct InitializeTicketStatus<'info> {
+        // Inicjalizacja konta TicketStatus jako PDA o seedach powiązanych z danymi biletu.
+        #[account(
+            init_if_needed, // Inicjalizujemy tylko jeśli nie istnieje
+            payer = payer,
+            seeds = [b"ticket_status", event_id.as_bytes(), section.as_bytes(), &[row], &[seat]],
+            bump,
+            space = 8 + 32 + 1 // 8 bajtów na discriminator, 32 na Pubkey eventu, 1 na flagę used
+        )]
+        pub ticket_status: Account<'info, TicketStatus>,
+        #[account(mut)]
+        pub payer: Signer<'info>,
+        pub system_program: Program<'info, System>,
+    }
+
+    pub fn initialize_ticket_status(
+        ctx: Context<InitializeTicketStatus>,
+        event: Pubkey,
+    ) -> Result<()> {
+        let ticket_status = &mut ctx.accounts.ticket_status;
+        // Ustawiamy event, do którego bilet się odnosi
+        ticket_status.event = event;
+        // Na początku bilet nie został użyty
+        ticket_status.used = false;
+        Ok(())
+    }
+
+
     #[derive(Accounts)]
     #[instruction(event_id: String, section: String, row: u8, seat: u8)]
     pub struct ValidateTicket<'info> {
