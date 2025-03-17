@@ -451,8 +451,25 @@
       }
     }
 
+  // Funkcja pomocnicza do obliczenia PDA dla konta TicketStatus
+  async function getTicketStatusPDA(event_id, sectionName, row, seat) {
+    const encoder = new TextEncoder();
+    const seed1 = encoder.encode("ticket_status");
+    const seed2 = encoder.encode(event_id);
+    const seed3 = encoder.encode(sectionName);
+    const seed4 = new Uint8Array([row]);
+    const seed5 = new Uint8Array([seat]);
+    const [ticketStatusPDA, bump] = await solanaWeb3.PublicKey.findProgramAddress(
+      [seed1, seed2, seed3, seed4, seed5],
+      PROGRAM_ID
+    );
+    Logger.info("Obliczony TicketStatus PDA: " + ticketStatusPDA.toBase58() + " (bump: " + bump + ")");
+    return ticketStatusPDA;
+  }
 
-    // Funkcja realizująca mint NFT – pozostaje bez zmian
+
+
+    // Funkcja realizująca mint NFT
     async function processMintTicketNFT(sectionName, row, seat) {
   try {
     if (!eventData) { 
@@ -495,15 +512,11 @@
     // Budujemy dane instrukcji dla mint NFT
     const ixDataMint = buildInstructionData(event_id, event_name, sectionName, row, seat, metadataURI);
 
-    // Obliczamy (lub generujemy) PDA dla konta TicketStatus.
-    // Teraz nie używamy seedów – funkcja initialize_ticket_status tworzy zwykłe konto.
-    // Dlatego przyjmujemy, że adres TicketStatus jest przekazywany z frontendu lub generowany inaczej.
-    // Dla przykładu, możemy utworzyć nowe konto kluczem losowym (to tylko przykład):
-    const ticketStatusKeypair = solanaWeb3.Keypair.generate();
-    Logger.info("Nowe TicketStatus konto: " + ticketStatusKeypair.publicKey.toBase58());
+    // Wyliczamy PDA dla TicketStatus używając seedów
+    const ticketStatusPDA = await getTicketStatusPDA(event_id, sectionName, row, seat);
 
-    // Budujemy instrukcję dla initialize_ticket_status
-    // Dyskryminator: [228, 37, 235, 14, 223, 66, 40, 21]
+    // Budujemy dane instrukcji dla initialize_ticket_status:
+    // Dyskryminator dla funkcji: [228, 37, 235, 14, 223, 66, 40, 21]
     const initDiscriminator = new Uint8Array([228, 37, 235, 14, 223, 66, 40, 21]);
     // Jako argument przekazujemy np. eventPDA (32 bajty)
     const eventBuffer = eventPDA.toBuffer();
@@ -511,16 +524,17 @@
     ixDataInit.set(initDiscriminator, 0);
     ixDataInit.set(new Uint8Array(eventBuffer), initDiscriminator.length);
 
+    // Tworzymy instrukcję dla initialize_ticket_status.
+    // Ponieważ to konto jest PDA, nie wymaga podpisu (isSigner: false).
     const initTicketStatusIx = new solanaWeb3.TransactionInstruction({
       keys: [
-        { pubkey: ticketStatusKeypair.publicKey, isSigner: true, isWritable: true }, // Zmieniono na isSigner: true
+        { pubkey: ticketStatusPDA, isSigner: false, isWritable: true },
         { pubkey: walletPublicKey, isSigner: true, isWritable: true },
         { pubkey: solanaWeb3.SystemProgram.programId, isSigner: false, isWritable: false }
       ],
       programId: PROGRAM_ID,
       data: ixDataInit,
     });
-
 
     // Budujemy instrukcję dla mint NFT
     const mintKeys = [
@@ -554,9 +568,6 @@
     transaction.recentBlockhash = blockhash;
     
     Logger.info("Transakcja łączona – podpisuję...");
-    // Jeśli inicjalizacja konta TicketStatus wymaga podpisania przez właściciela nowego konta,
-    // należy dodać klucz ticketStatusKeypair jako signer do transakcji.
-    transaction.partialSign(ticketStatusKeypair);
     const signedTx = await provider.signTransaction(transaction);
     Logger.info("Transakcja podpisana, wysyłam...");
     const txSignature = await connection.sendRawTransaction(signedTx.serialize());
@@ -570,9 +581,6 @@
     alert("Błąd mintowania NFT: " + err.message);
   }
 }
-
-
-
 
 
     // Obsługa przycisku Load Event
