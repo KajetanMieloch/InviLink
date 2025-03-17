@@ -471,34 +471,41 @@
     // która serializuje 4 parametry: event_id, section, row, seat.
     // Ostateczny bufor ma postać:
     // [8 bajtów dyskryminatora] + [serializeString(event_id)] + [serializeString(section)] + [serializeU8(row)] + [serializeU8(seat)]
-    function buildInitTicketStatusData(event_id, section, row, seat) {
-      // Dyskryminator dla funkcji initialize_ticket_status (8 bajtów)
-      const discriminator = new Uint8Array([228, 37, 235, 14, 223, 66, 40, 21]);
-      const eventIdBytes = serializeString(event_id);
-      const sectionBytes = serializeString(section);
-      const rowByte = serializeU8(row);
-      const seatByte = serializeU8(seat);
+    function buildInitTicketStatusData(event_id, section, row, seat, eventPubkey) {
+    // Dyskryminator (8 bajtów) – musi być zgodny z tym, co ustawiasz w on-chain
+    const discriminator = new Uint8Array([228, 37, 235, 14, 223, 66, 40, 21]);
+    
+    const eventIdBytes = serializeString(event_id); // np. "nGhs9IxZfx5q"
+    const sectionBytes = serializeString(section);    // np. "SekcjaA"
+    const rowByte = serializeU8(row);                   // 1 bajt
+    const seatByte = serializeU8(seat);                 // 1 bajt
+    const eventBytes = eventPubkey.toBytes();           // 32 bajty
 
-      const totalLength = discriminator.length + eventIdBytes.length + sectionBytes.length + rowByte.length + seatByte.length;
-      const buffer = new Uint8Array(totalLength);
-      let offset = 0;
-      
-      buffer.set(discriminator, offset);
-      offset += discriminator.length;
-      
-      buffer.set(eventIdBytes, offset);
-      offset += eventIdBytes.length;
-      
-      buffer.set(sectionBytes, offset);
-      offset += sectionBytes.length;
-      
-      buffer.set(rowByte, offset);
-      offset += rowByte.length;
-      
-      buffer.set(seatByte, offset);
-      
-      return buffer;
-    }
+    // Całkowita długość = 8 + (4 + event_id.length) + (4 + section.length) + 1 + 1 + 32
+    const totalLength = discriminator.length + eventIdBytes.length + sectionBytes.length + rowByte.length + seatByte.length + eventBytes.length;
+    const buffer = new Uint8Array(totalLength);
+    let offset = 0;
+    
+    buffer.set(discriminator, offset);
+    offset += discriminator.length;
+    
+    buffer.set(eventIdBytes, offset);
+    offset += eventIdBytes.length;
+    
+    buffer.set(sectionBytes, offset);
+    offset += sectionBytes.length;
+    
+    buffer.set(rowByte, offset);
+    offset += rowByte.length;
+    
+    buffer.set(seatByte, offset);
+    offset += seatByte.length;
+    
+    buffer.set(eventBytes, offset);
+    
+    return buffer;
+  }
+
 
 
 
@@ -546,22 +553,23 @@
     // Budujemy dane instrukcji dla mint NFT
     const ixDataMint = buildInstructionData(event_id, event_name, sectionName, row, seat, metadataURI);
 
-    // Wyliczamy PDA dla TicketStatus używając seedów
-    const ticketStatusPDA = await getTicketStatusPDA(event_id, sectionName, row, seat);
+// Obliczamy PDA dla TicketStatus (jak już masz zaimplementowane)
+const ticketStatusPDA = await getTicketStatusPDA(event_id, sectionName, row, seat);
 
-    // Budujemy dane instrukcji dla initialize_ticket_status:
-    const ixDataInit = buildInitTicketStatusData(event_id, sectionName, row, seat);
+// Budujemy dane instrukcji – przekazujemy event_id, sectionName, row, seat oraz eventPDA (jako Pubkey eventu)
+const ixDataInit = buildInitTicketStatusData(event_id, sectionName, row, seat, eventPDA);
 
-    // Tworzymy instrukcję dla initialize_ticket_status
-    const initTicketStatusIx = new solanaWeb3.TransactionInstruction({
-      keys: [
-        { pubkey: ticketStatusPDA, isSigner: false, isWritable: true },
-        { pubkey: walletPublicKey, isSigner: true, isWritable: true },
-        { pubkey: solanaWeb3.SystemProgram.programId, isSigner: false, isWritable: false }
-      ],
-      programId: PROGRAM_ID,
-      data: ixDataInit,
-    });
+// Tworzymy instrukcję dla initialize_ticket_status
+const initTicketStatusIx = new solanaWeb3.TransactionInstruction({
+  keys: [
+    { pubkey: ticketStatusPDA, isSigner: false, isWritable: true },
+    { pubkey: walletPublicKey, isSigner: true, isWritable: true },
+    { pubkey: solanaWeb3.SystemProgram.programId, isSigner: false, isWritable: false }
+  ],
+  programId: PROGRAM_ID,
+  data: ixDataInit,
+});
+
 
 
     // Budujemy instrukcję dla mint NFT
