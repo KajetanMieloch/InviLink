@@ -5,10 +5,8 @@
   <title>Moje NFT</title>
   <!-- Solana Web3 -->
   <script src="https://cdn.jsdelivr.net/npm/@solana/web3.js@latest/lib/index.iife.min.js"></script>
-  <!-- BN.js -->
+  <!-- BN.js (opcjonalnie, jeśli potrzebujesz) -->
   <script src="https://cdn.jsdelivr.net/npm/bn.js@5.2.0/lib/bn.min.js"></script>
-  <!-- Borsh UMD – ładowanie biblioteki borsh -->
-  <script src="https://unpkg.com/borsh@0.7.0/lib/index.umd.min.js"></script>
   <style>
     body { font-family: Arial, sans-serif; margin: 20px; }
     .nft-container { display: flex; flex-wrap: wrap; gap: 20px; }
@@ -24,56 +22,69 @@
   <pre id="log"></pre>
 
   <script>
-    // Upewnij się, że borsh jest ustawiony (niektóre wersje mogą być pod nazwą "Borsh")
-    const borsh = window.borsh || window.Borsh;
-    if (!borsh) {
-      console.error("Biblioteka borsh nie została załadowana!");
-    }
-    
     const connection = new solanaWeb3.Connection("https://api.devnet.solana.com", "confirmed");
     let walletPublicKey = null;
     const TOKEN_PROGRAM_ID = new solanaWeb3.PublicKey("TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA");
     const METADATA_PROGRAM_ID = new solanaWeb3.PublicKey("metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s");
-    
+
     const logEl = document.getElementById("log");
     function log(message) {
       logEl.innerText += message + "\n";
       console.log(message);
     }
-    
-    // Struktury do dekodowania metadanych NFT
-    class Creator {
-      constructor(args) {
-        this.address = args.address;
-        this.verified = args.verified;
-        this.share = args.share;
-      }
+
+    // Własna funkcja deserializująca metadane NFT.
+    // Zakładamy, że struktura (po pominięciu 8 bajtów Anchor discriminator)
+    // jest następująca:
+    //   - 1 bajt: key
+    //   - 32 bajty: updateAuthority
+    //   - 32 bajty: mint
+    //   - 4 bajty: długość stringa "name", potem UTF-8 (maksymalnie 32 bajty, wypełnione zerami)
+    //   - 4 bajty: długość stringa "symbol", potem UTF-8
+    //   - 4 bajty: długość stringa "uri", potem UTF-8
+    // (Dalsze pola pomijamy dla uproszczenia)
+    function customDeserializeMetadata(buffer) {
+      let offset = 8; // pomijamy 8 bajtów dyskryminatora
+      const dv = new DataView(buffer.buffer, buffer.byteOffset, buffer.byteLength);
+
+      // Odczytujemy 1 bajt: key (możesz to pominąć, ale zapisujemy)
+      const key = dv.getUint8(offset);
+      offset += 1;
+
+      // Odczytujemy updateAuthority (32 bajty)
+      const updateAuthorityBytes = buffer.slice(offset, offset + 32);
+      const updateAuthority = new solanaWeb3.PublicKey(updateAuthorityBytes).toBase58();
+      offset += 32;
+
+      // Odczytujemy mint (32 bajty)
+      const mintBytes = buffer.slice(offset, offset + 32);
+      const mint = new solanaWeb3.PublicKey(mintBytes).toBase58();
+      offset += 32;
+
+      // Odczytujemy nazwę: 4 bajty długości + dane
+      const nameLen = dv.getUint32(offset, true);
+      offset += 4;
+      const nameBytes = buffer.slice(offset, offset + nameLen);
+      const name = new TextDecoder().decode(nameBytes).replace(/\0/g, "");
+      offset += nameLen;
+
+      // Odczytujemy symbol
+      const symbolLen = dv.getUint32(offset, true);
+      offset += 4;
+      const symbolBytes = buffer.slice(offset, offset + symbolLen);
+      const symbol = new TextDecoder().decode(symbolBytes).replace(/\0/g, "");
+      offset += symbolLen;
+
+      // Odczytujemy URI
+      const uriLen = dv.getUint32(offset, true);
+      offset += 4;
+      const uriBytes = buffer.slice(offset, offset + uriLen);
+      const uri = new TextDecoder().decode(uriBytes).replace(/\0/g, "");
+      offset += uriLen;
+
+      return { key, updateAuthority, mint, name, symbol, uri };
     }
-    class Data {
-      constructor(args) {
-        this.name = args.name;
-        this.symbol = args.symbol;
-        this.uri = args.uri;
-        this.sellerFeeBasisPoints = args.sellerFeeBasisPoints;
-        this.creators = args.creators;
-      }
-    }
-    class Metadata {
-      constructor(args) {
-        this.key = args.key;
-        this.updateAuthority = args.updateAuthority;
-        this.mint = args.mint;
-        this.data = args.data;
-        this.primarySaleHappened = args.primarySaleHappened;
-        this.isMutable = args.isMutable;
-      }
-    }
-    const METADATA_SCHEMA = new Map([
-      [Creator, { kind: 'struct', fields: [['address', [32]], ['verified', 'u8'], ['share', 'u8']] }],
-      [Data, { kind: 'struct', fields: [['name', 'string'], ['symbol', 'string'], ['uri', 'string'], ['sellerFeeBasisPoints', 'u16'], ['creators', { kind: 'option', type: [Creator] }]] }],
-      [Metadata, { kind: 'struct', fields: [['key', 'u8'], ['updateAuthority', [32]], ['mint', [32]], ['data', Data], ['primarySaleHappened', 'u8'], ['isMutable', 'u8']] }],
-    ]);
-    
+
     // Połączenie z Phantom Wallet
     document.getElementById("connectButton").addEventListener("click", async () => {
       if (!window.phantom || !window.phantom.solana) {
@@ -90,22 +101,26 @@
         log("Błąd łączenia: " + err);
       }
     });
-    
+
     async function loadNFTs() {
       try {
+        // Pobieramy wszystkie token accounts właściciela
         const tokenAccounts = await connection.getParsedTokenAccountsByOwner(walletPublicKey, { programId: TOKEN_PROGRAM_ID });
         log("Znaleziono " + tokenAccounts.value.length + " token accounts.");
-        const nftAccounts = tokenAccounts.value.filter(acc => {
-          const info = acc.account.data.parsed.info;
+        // Filtrujemy NFT: tokenAmount.decimals == 0 i tokenAmount.uiAmount == 1
+        const nftAccounts = tokenAccounts.value.filter(accountInfo => {
+          const info = accountInfo.account.data.parsed.info;
           return info.tokenAmount.decimals === 0 && info.tokenAmount.uiAmount === 1;
         });
         log("Znaleziono " + nftAccounts.length + " NFT.");
+        
         const nftContainer = document.getElementById("nftContainer");
         nftContainer.innerHTML = "";
-    
-        for (const acc of nftAccounts) {
-          const mintAddress = acc.account.data.parsed.info.mint;
-          // Oblicz PDA dla metadanych NFT
+        
+        // Dla każdego NFT pobieramy metadane
+        for (const nftAccount of nftAccounts) {
+          const mintAddress = nftAccount.account.data.parsed.info.mint;
+          // Obliczamy PDA konta metadanych wg standardu Metaplex:
           const seed1 = new TextEncoder().encode("metadata");
           const seed2 = METADATA_PROGRAM_ID.toBytes();
           const seed3 = new solanaWeb3.PublicKey(mintAddress).toBytes();
@@ -119,13 +134,12 @@
             log("Brak metadanych dla mint: " + mintAddress);
             continue;
           }
-          // Pomijamy 8 bajtów dyskryminatora Anchor
-          const metadataData = metadataAccount.data.slice(8);
-          const metadata = borsh.deserialize(METADATA_SCHEMA, Metadata, metadataData);
+          // Używamy własnej funkcji deserializującej
+          const metadata = customDeserializeMetadata(metadataAccount.data);
           
           let metadataJSON = {};
           try {
-            const response = await fetch(metadata.data.uri);
+            const response = await fetch(metadata.uri);
             metadataJSON = await response.json();
           } catch (err) {
             log("Błąd pobierania JSON dla mint: " + mintAddress);
@@ -133,8 +147,8 @@
           const nftDiv = document.createElement("div");
           nftDiv.className = "nft";
           nftDiv.innerHTML = `
-            <img src="${metadataJSON.image || ''}" alt="${metadata.data.name}">
-            <p><strong>${metadata.data.name}</strong></p>
+            <img src="${metadataJSON.image || ''}" alt="${metadata.name}">
+            <p><strong>${metadata.name}</strong></p>
             <p>Mint: ${mintAddress}</p>
           `;
           nftContainer.appendChild(nftDiv);
