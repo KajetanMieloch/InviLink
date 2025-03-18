@@ -10,7 +10,7 @@
     .nft-container { display: flex; flex-wrap: wrap; gap: 20px; }
     .nft { border: 1px solid #ccc; padding: 10px; width: 220px; }
     .nft img { width: 100%; height: auto; }
-    .metadata { font-size: 12px; word-wrap: break-word; }
+    .metadata { font-size: 12px; word-wrap: break-word; margin-top: 8px; }
     #log { margin-top: 20px; white-space: pre-wrap; }
   </style>
 </head>
@@ -32,39 +32,52 @@
       console.log(message);
     }
 
-    // Własna funkcja deserializująca metadane
-    // Założenie: struktura danych (po pominięciu 8 bajtów dyskryminatora Anchor) jest stała:
-    //   - 1 bajt: key
-    //   - 32 bajty: updateAuthority
-    //   - 32 bajty: mint
-    //   - 32 bajty: name
-    //   - 10 bajtów: symbol
-    //   - 200 bajtów: uri
+    // Funkcja, która poprawia URI z IPFS – usuwa ewentualny niechciany znak na początku oraz zamienia "ipfs://"
+    function fixIpfsUri(uri) {
+      if (!uri) return "";
+      uri = uri.trim();
+      // Usuń niechciany znak (np. "�") jeśli występuje na początku
+      if (uri.charAt(0) === "�") {
+        uri = uri.substring(1);
+      }
+      if (uri.startsWith("ipfs://")) {
+        return uri.replace("ipfs://", "https://ipfs.io/ipfs/");
+      }
+      return uri;
+    }
+
+    // Własna funkcja deserializująca metadane NFT (przyjmujemy stały format pól)
     function customDeserializeMetadata(buffer) {
-      let offset = 8; // pomijamy 8 bajtów dyskryminatora
+      let offset = 8; // pomijamy 8 bajtów dyskryminatora Anchor
       const dv = new DataView(buffer.buffer, buffer.byteOffset, buffer.byteLength);
       
+      // 1 bajt: key
       const key = dv.getUint8(offset);
       offset += 1;
       
+      // 32 bajty: updateAuthority
       const updateAuthorityBytes = buffer.slice(offset, offset + 32);
       const updateAuthority = new solanaWeb3.PublicKey(updateAuthorityBytes).toBase58();
       offset += 32;
       
+      // 32 bajty: mint
       const mintBytes = buffer.slice(offset, offset + 32);
       const mint = new solanaWeb3.PublicKey(mintBytes).toBase58();
       offset += 32;
       
+      // 32 bajty: name
       const nameBytes = buffer.slice(offset, offset + 32);
       let name = new TextDecoder().decode(nameBytes);
       name = name.replace(/\0/g, "").trim();
       offset += 32;
       
+      // 10 bajtów: symbol
       const symbolBytes = buffer.slice(offset, offset + 10);
       let symbol = new TextDecoder().decode(symbolBytes);
       symbol = symbol.replace(/\0/g, "").trim();
       offset += 10;
       
+      // 200 bajtów: uri
       const uriBytes = buffer.slice(offset, offset + 200);
       let uri = new TextDecoder().decode(uriBytes);
       uri = uri.replace(/\0/g, "").trim();
@@ -73,17 +86,7 @@
       return { key, updateAuthority, mint, name, symbol, uri };
     }
 
-    // Funkcja pomocnicza konwertująca ipfs:// do gateway
-    function fixIpfsUri(uri) {
-      if (!uri) return "";
-      // Jeśli URI zawiera "ipfs://", zamieniamy na publiczny gateway
-      if (uri.startsWith("ipfs://")) {
-        return uri.replace("ipfs://", "https://ipfs.io/ipfs/");
-      }
-      return uri;
-    }
-
-    // Połączenie z Phantom
+    // Połączenie z Phantom Wallet
     document.getElementById("connectButton").addEventListener("click", async () => {
       if (!window.phantom || !window.phantom.solana) {
         alert("Phantom Wallet is required!");
@@ -114,7 +117,7 @@
     
         for (const acc of nftAccounts) {
           const mintAddress = acc.account.data.parsed.info.mint;
-          // Obliczamy PDA dla metadanych
+          // Obliczamy PDA dla metadanych wg standardu Metaplex:
           const seed1 = new TextEncoder().encode("metadata");
           const seed2 = METADATA_PROGRAM_ID.toBytes();
           const seed3 = new solanaWeb3.PublicKey(mintAddress).toBytes();
@@ -128,7 +131,6 @@
             log("Brak metadanych dla mint: " + mintAddress);
             continue;
           }
-          // Sprawdzamy minimalną długość danych – oczekujemy co najmniej 8+1+32+32+32+10+200 = 315 bajtów
           if (metadataAccount.data.byteLength < 315) {
             log("Niewystarczająca długość danych dla mint: " + mintAddress);
             continue;
@@ -144,10 +146,9 @@
             log("Błąd pobierania JSON dla mint: " + mintAddress);
           }
     
-          // Jeśli obrazek nie jest widoczny, spróbuj przekonwertować URI
+          // Jeśli obrazek nie jest widoczny, naprawiamy URI
           const imageUrl = fixIpfsUri(metadataJSON.image || "");
     
-          // Tworzymy element NFT – obrazek oraz poniżej wypisujemy wszystkie metadane
           const nftDiv = document.createElement("div");
           nftDiv.className = "nft";
           nftDiv.innerHTML = `
