@@ -8,13 +8,14 @@
   <style>
     body { font-family: Arial, sans-serif; margin: 20px; }
     .nft-container { display: flex; flex-wrap: wrap; gap: 20px; }
-    .nft { border: 1px solid #ccc; padding: 10px; width: 220px; }
+    .nft { border: 1px solid #ccc; padding: 10px; width: 250px; }
     .nft img { width: 100%; height: auto; }
     .metadata { font-size: 12px; margin-top: 8px; }
     .metadata p { margin: 2px 0; }
     .attributes { margin-top: 4px; padding-left: 10px; }
     .attributes li { list-style: disc; }
     #log { margin-top: 20px; white-space: pre-wrap; }
+    button.activate { margin-top: 8px; padding: 6px 10px; font-size: 14px; }
   </style>
 </head>
 <body>
@@ -35,27 +36,25 @@
       console.log(message);
     }
 
-    // Funkcja poprawiająca URI – usuwa niechciany znak na początku oraz zamienia ipfs:// na https://ipfs.io/ipfs/
-    function fixIpfsUri(uri) {
-      if (!uri) return "";
-      uri = uri.trim();
-      if (uri.charAt(0) === "�") {
-        uri = uri.substring(1);
-      }
-      if (uri.startsWith("ipfs://")) {
-        return uri.replace("ipfs://", "https://ipfs.io/ipfs/");
-      }
-      return uri;
+    // Funkcje serializujące
+    function serializeString(str) {
+      const encoder = new TextEncoder();
+      const encoded = encoder.encode(str);
+      const lenBuffer = new Uint8Array(4);
+      new DataView(lenBuffer.buffer).setUint32(0, encoded.length, true);
+      const result = new Uint8Array(lenBuffer.length + encoded.length);
+      result.set(lenBuffer, 0);
+      result.set(encoded, lenBuffer.length);
+      return result;
+    }
+    function serializeU8(val) {
+      return new Uint8Array([val]);
     }
 
-    // Własna funkcja deserializująca metadane NFT (zakładamy stały format pól)
-    // Struktura (po 8 bajtach Anchor discriminator):
-    // 1 bajt: key
-    // 32 bajty: updateAuthority
-    // 32 bajty: mint
-    // 32 bajty: name
-    // 10 bajtów: symbol
-    // 200 bajtów: uri
+    // Dyskryminator funkcji activate_ticket: [110, 8, 92, 34, 61, 23, 0, 151]
+    const ACTIVATE_TICKET_DISCRIMINATOR = new Uint8Array([110, 8, 92, 34, 61, 23, 0, 151]);
+
+    // Własna funkcja deserializująca metadane NFT – zakładamy stały format pól
     function customDeserializeMetadata(buffer) {
       let offset = 8; // pomijamy 8 bajtów dyskryminatora
       const dv = new DataView(buffer.buffer, buffer.byteOffset, buffer.byteLength);
@@ -89,7 +88,20 @@
       return { key, updateAuthority, mint, name, symbol, uri };
     }
 
-    // Połączenie z Phantom Wallet
+    // Funkcja poprawiająca URI z IPFS
+    function fixIpfsUri(uri) {
+      if (!uri) return "";
+      uri = uri.trim();
+      if (uri.charAt(0) === "�") {
+        uri = uri.substring(1);
+      }
+      if (uri.startsWith("ipfs://")) {
+        return uri.replace("ipfs://", "https://ipfs.io/ipfs/");
+      }
+      return uri;
+    }
+
+    // Połączenie z Phantom
     document.getElementById("connectButton").addEventListener("click", async () => {
       if (!window.phantom || !window.phantom.solana) {
         alert("Phantom Wallet is required!");
@@ -148,8 +160,33 @@
           } catch (err) {
             log("Błąd pobierania JSON dla mint: " + mintAddress);
           }
-          
-          // Budujemy HTML z danymi z JSON
+    
+          // Wyciągamy dane z JSON
+          // Zakładamy, że name ma format "InviLink Ticket - <eventId>"
+          let eventIdFromName = "";
+          if (metadataJSON.name) {
+            const parts = metadataJSON.name.split(" - ");
+            if (parts.length >= 2) {
+              eventIdFromName = parts[1].trim();
+            }
+          }
+          // Wyciągamy section, row i seat z atrybutów
+          let sectionValue = "";
+          let rowValue = 0;
+          let seatValue = 0;
+          if (metadataJSON.attributes && Array.isArray(metadataJSON.attributes)) {
+            for (const attr of metadataJSON.attributes) {
+              if (attr.trait_type.toLowerCase() === "section") {
+                sectionValue = attr.value;
+              } else if (attr.trait_type.toLowerCase() === "row") {
+                rowValue = parseInt(attr.value);
+              } else if (attr.trait_type.toLowerCase() === "seat") {
+                seatValue = parseInt(attr.value);
+              }
+            }
+          }
+    
+          // Budujemy element NFT z obrazkiem i metadanymi
           const nftDiv = document.createElement("div");
           nftDiv.className = "nft";
           const imageUrl = fixIpfsUri(metadataJSON.image || "");
@@ -171,11 +208,81 @@
               <p><strong>URI:</strong> ${fixIpfsUri(metadata.uri)}</p>
               ${attributesHtml}
             </div>
+            <button class="activate" onclick='activateNFT("${eventIdFromName}", "${sectionValue}", ${rowValue}, ${seatValue})'>Aktywuj NFT</button>
           `;
           nftContainer.appendChild(nftDiv);
         }
       } catch (err) {
         log("Błąd ładowania NFT: " + err);
+      }
+    }
+
+    // Funkcja budująca dane dla instrukcji activate_ticket:
+    // Format: [discriminator (8 bajtów)] || [serializeString(event_id)] || [serializeString(section)] || [serializeU8(row)] || [serializeU8(seat)]
+    function buildActivateTicketData(eventId, section, row, seat) {
+      const eventIdBytes = serializeString(eventId);
+      const sectionBytes = serializeString(section);
+      const rowBytes = serializeU8(row);
+      const seatBytes = serializeU8(seat);
+      const totalLength = ACTIVATE_TICKET_DISCRIMINATOR.length + eventIdBytes.length + sectionBytes.length + rowBytes.length + seatBytes.length;
+      const data = new Uint8Array(totalLength);
+      let offset = 0;
+      data.set(ACTIVATE_TICKET_DISCRIMINATOR, offset);
+      offset += ACTIVATE_TICKET_DISCRIMINATOR.length;
+      data.set(eventIdBytes, offset); offset += eventIdBytes.length;
+      data.set(sectionBytes, offset); offset += sectionBytes.length;
+      data.set(rowBytes, offset); offset += rowBytes.length;
+      data.set(seatBytes, offset);
+      return data;
+    }
+
+    // Funkcja obliczająca PDA dla konta TicketStatus
+    async function getTicketStatusPDA(eventId, section, row, seat) {
+      const encoder = new TextEncoder();
+      const seed1 = encoder.encode("ticket_status");
+      const seed2 = encoder.encode(eventId);
+      const seed3 = encoder.encode(section);
+      const seed4 = new Uint8Array([row]);
+      const seed5 = new Uint8Array([seat]);
+      const [ticketStatusPDA] = await solanaWeb3.PublicKey.findProgramAddress(
+        [seed1, seed2, seed3, seed4, seed5],
+        PROGRAM_ID
+      );
+      return ticketStatusPDA;
+    }
+
+    // Funkcja aktywująca NFT poprzez wywołanie kontraktu activate_ticket
+    async function activateNFT(eventId, section, row, seat) {
+      try {
+        await window.phantom.solana.connect();
+        walletPublicKey = window.phantom.solana.publicKey;
+        const ticketStatusPDA = await getTicketStatusPDA(eventId, section, row, seat);
+        log("TicketStatus PDA do aktywacji: " + ticketStatusPDA.toBase58());
+    
+        const data = buildActivateTicketData(eventId, section, row, seat);
+    
+        const instruction = new solanaWeb3.TransactionInstruction({
+          keys: [
+            { pubkey: ticketStatusPDA, isWritable: true, isSigner: false },
+            { pubkey: walletPublicKey, isWritable: false, isSigner: true }
+          ],
+          programId: PROGRAM_ID,
+          data: data,
+        });
+    
+        const transaction = new solanaWeb3.Transaction().add(instruction);
+        transaction.feePayer = walletPublicKey;
+        const { blockhash } = await connection.getLatestBlockhash();
+        transaction.recentBlockhash = blockhash;
+    
+        const signedTx = await window.phantom.solana.signTransaction(transaction);
+        const txSignature = await connection.sendRawTransaction(signedTx.serialize());
+        await connection.confirmTransaction(txSignature, "confirmed");
+        log("NFT aktywowane! Tx Sig: " + txSignature);
+        alert("NFT aktywowane! Tx Sig: " + txSignature);
+      } catch (err) {
+        log("Błąd aktywacji NFT: " + err.message);
+        alert("Błąd aktywacji NFT: " + err.message);
       }
     }
   </script>
