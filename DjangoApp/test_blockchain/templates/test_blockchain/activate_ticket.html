@@ -5,7 +5,7 @@
   <title>Moje NFT</title>
   <!-- Solana Web3 -->
   <script src="https://cdn.jsdelivr.net/npm/@solana/web3.js@latest/lib/index.iife.min.js"></script>
-  <!-- Borsh UMD -->
+  <!-- Borsh UMD – ten skrypt ustawia globalną zmienną "borsh" -->
   <script src="https://unpkg.com/borsh@0.7.0/lib/index.umd.min.js"></script>
   <style>
     body { font-family: Arial, sans-serif; margin: 20px; }
@@ -22,7 +22,9 @@
   <pre id="log"></pre>
 
   <script>
-    // Ustawienia połączenia oraz programów
+    // Upewnij się, że globalna zmienna borsh jest dostępna
+    const borsh = window.borsh;
+    
     const connection = new solanaWeb3.Connection("https://api.devnet.solana.com", "confirmed");
     let walletPublicKey = null;
     const TOKEN_PROGRAM_ID = new solanaWeb3.PublicKey("TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA");
@@ -34,7 +36,7 @@
       console.log(message);
     }
 
-    // Definicje struktur do dekodowania metadanych NFT
+    // Struktury do dekodowania metadanych NFT
     class Creator {
       constructor(args) {
         this.address = args.address;
@@ -86,10 +88,8 @@
 
     async function loadNFTs() {
       try {
-        // Pobieramy token accounts użytkownika
         const tokenAccounts = await connection.getParsedTokenAccountsByOwner(walletPublicKey, { programId: TOKEN_PROGRAM_ID });
         log("Znaleziono " + tokenAccounts.value.length + " token accounts.");
-        // Filtrujemy NFT: decimals === 0 oraz uiAmount === 1
         const nftAccounts = tokenAccounts.value.filter(acc => {
           const info = acc.account.data.parsed.info;
           return info.tokenAmount.decimals === 0 && info.tokenAmount.uiAmount === 1;
@@ -98,11 +98,8 @@
         const nftContainer = document.getElementById("nftContainer");
         nftContainer.innerHTML = "";
 
-        // Dla każdego NFT pobieramy metadane
         for (const acc of nftAccounts) {
           const mintAddress = acc.account.data.parsed.info.mint;
-          // Obliczamy PDA konta metadanych:
-          // Używamy new TextEncoder().encode zamiast Buffer.from oraz .toBytes() zamiast toBuffer()
           const seed1 = new TextEncoder().encode("metadata");
           const seed2 = METADATA_PROGRAM_ID.toBytes();
           const seed3 = new solanaWeb3.PublicKey(mintAddress).toBytes();
@@ -116,7 +113,7 @@
             log("Brak metadanych dla mint: " + mintAddress);
             continue;
           }
-          // Usuń 8 bajtów dyskryminatora Anchor
+          // Pomijamy 8 bajtów dyskryminatora Anchor
           const metadataData = metadataAccount.data.slice(8);
           const metadata = borsh.deserialize(METADATA_SCHEMA, Metadata, metadataData);
           
