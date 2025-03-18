@@ -5,13 +5,14 @@
   <title>Moje NFT</title>
   <!-- Solana Web3 -->
   <script src="https://cdn.jsdelivr.net/npm/@solana/web3.js@latest/lib/index.iife.min.js"></script>
-  <!-- Borsh (wersja UMD) -->
+  <!-- Borsh UMD -->
   <script src="https://unpkg.com/borsh@0.7.0/lib/index.umd.min.js"></script>
   <style>
     body { font-family: Arial, sans-serif; margin: 20px; }
     .nft-container { display: flex; flex-wrap: wrap; gap: 20px; }
     .nft { border: 1px solid #ccc; padding: 10px; width: 200px; }
     .nft img { width: 100%; height: auto; }
+    #log { margin-top: 20px; white-space: pre-wrap; }
   </style>
 </head>
 <body>
@@ -21,95 +22,19 @@
   <pre id="log"></pre>
 
   <script>
-    // Ustawienia: endpoint, programy
+    // Ustawienia połączenia oraz programów
     const connection = new solanaWeb3.Connection("https://api.devnet.solana.com", "confirmed");
     let walletPublicKey = null;
-    // Klasyczny program tokenów
     const TOKEN_PROGRAM_ID = new solanaWeb3.PublicKey("TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA");
-    // Program metadanych Metaplex
     const METADATA_PROGRAM_ID = new solanaWeb3.PublicKey("metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s");
 
     const logEl = document.getElementById("log");
     function log(message) {
-      console.log(message);
       logEl.innerText += message + "\n";
+      console.log(message);
     }
 
-    // Połączenie z Phantom Wallet
-    document.getElementById("connectButton").addEventListener("click", async () => {
-      if (!window.phantom || !window.phantom.solana) {
-        alert("Phantom Wallet nie jest dostępny!");
-        return;
-      }
-      try {
-        const provider = window.phantom.solana;
-        await provider.connect();
-        walletPublicKey = provider.publicKey;
-        log("Wallet: " + walletPublicKey.toBase58());
-        loadNFTs();
-      } catch (err) {
-        log("Błąd łączenia: " + err);
-      }
-    });
-
-    async function loadNFTs() {
-      try {
-        // Pobieramy wszystkie token accounts właściciela
-        const tokenAccounts = await connection.getParsedTokenAccountsByOwner(walletPublicKey, { programId: TOKEN_PROGRAM_ID });
-        log(`Znaleziono ${tokenAccounts.value.length} token accounts.`);
-        // Filtrujemy NFT: tokenAmount.decimals == 0 i tokenAmount.uiAmount == 1
-        const nftAccounts = tokenAccounts.value.filter(accountInfo => {
-          const info = accountInfo.account.data.parsed.info;
-          return info.tokenAmount.decimals === 0 && info.tokenAmount.uiAmount === 1;
-        });
-        log(`Znaleziono ${nftAccounts.length} NFT.`);
-        
-        const nftContainer = document.getElementById("nftContainer");
-        nftContainer.innerHTML = "";
-        
-        // Dla każdego NFT pobieramy metadane
-        for (const nftAccount of nftAccounts) {
-          const mintAddress = nftAccount.account.data.parsed.info.mint;
-          // Obliczamy PDA konta metadanych: ["metadata", METADATA_PROGRAM_ID, mintAddress]
-          const [metadataPDA] = await solanaWeb3.PublicKey.findProgramAddress(
-            [
-              Buffer.from("metadata"),
-              METADATA_PROGRAM_ID.toBuffer(),
-              new solanaWeb3.PublicKey(mintAddress).toBuffer(),
-            ],
-            METADATA_PROGRAM_ID
-          );
-          log(`Mint: ${mintAddress} | Metadata PDA: ${metadataPDA.toBase58()}`);
-          const metadataAccountInfo = await connection.getAccountInfo(metadataPDA);
-          if (metadataAccountInfo) {
-            const metadata = decodeMetadata(metadataAccountInfo.data);
-            // Pobieramy JSON z URI
-            let metadataJSON = {};
-            try {
-              const response = await fetch(metadata.data.uri);
-              metadataJSON = await response.json();
-            } catch (err) {
-              log("Błąd pobierania JSON dla mint: " + mintAddress);
-            }
-            // Tworzymy element NFT
-            const nftDiv = document.createElement("div");
-            nftDiv.className = "nft";
-            nftDiv.innerHTML = `
-              <img src="${metadataJSON.image || ''}" alt="${metadata.data.name}" onerror="this.src='';">
-              <p><strong>${metadata.data.name}</strong></p>
-              <p>Mint: ${mintAddress}</p>
-            `;
-            nftContainer.appendChild(nftDiv);
-          } else {
-            log("Brak danych metadanych dla mint: " + mintAddress);
-          }
-        }
-      } catch (err) {
-        log("Błąd ładowania NFT: " + err);
-      }
-    }
-
-    // Schematy do dekodowania metadanych NFT przy użyciu borsh
+    // Definicje struktur do dekodowania metadanych NFT
     class Creator {
       constructor(args) {
         this.address = args.address;
@@ -142,10 +67,78 @@
       [Metadata, { kind: 'struct', fields: [['key', 'u8'], ['updateAuthority', [32]], ['mint', [32]], ['data', Data], ['primarySaleHappened', 'u8'], ['isMutable', 'u8']] }],
     ]);
 
-    function decodeMetadata(buffer) {
-      // Pomijamy 8 bajtów dyskryminatora Anchor
-      const metadataBuffer = buffer.slice(8);
-      return borsh.deserialize(METADATA_SCHEMA, Metadata, metadataBuffer);
+    // Połączenie z Phantom Wallet
+    document.getElementById("connectButton").addEventListener("click", async () => {
+      if (!window.phantom || !window.phantom.solana) {
+        alert("Phantom Wallet is required!");
+        return;
+      }
+      try {
+        const provider = window.phantom.solana;
+        await provider.connect();
+        walletPublicKey = provider.publicKey;
+        log("Wallet: " + walletPublicKey.toBase58());
+        loadNFTs();
+      } catch (err) {
+        log("Błąd łączenia: " + err);
+      }
+    });
+
+    async function loadNFTs() {
+      try {
+        // Pobieramy token accounts użytkownika
+        const tokenAccounts = await connection.getParsedTokenAccountsByOwner(walletPublicKey, { programId: TOKEN_PROGRAM_ID });
+        log("Znaleziono " + tokenAccounts.value.length + " token accounts.");
+        // Filtrujemy NFT: decimals === 0 oraz uiAmount === 1
+        const nftAccounts = tokenAccounts.value.filter(acc => {
+          const info = acc.account.data.parsed.info;
+          return info.tokenAmount.decimals === 0 && info.tokenAmount.uiAmount === 1;
+        });
+        log("Znaleziono " + nftAccounts.length + " NFT.");
+        const nftContainer = document.getElementById("nftContainer");
+        nftContainer.innerHTML = "";
+
+        // Dla każdego NFT pobieramy metadane
+        for (const acc of nftAccounts) {
+          const mintAddress = acc.account.data.parsed.info.mint;
+          // Obliczamy PDA konta metadanych:
+          // Używamy new TextEncoder().encode zamiast Buffer.from oraz .toBytes() zamiast toBuffer()
+          const seed1 = new TextEncoder().encode("metadata");
+          const seed2 = METADATA_PROGRAM_ID.toBytes();
+          const seed3 = new solanaWeb3.PublicKey(mintAddress).toBytes();
+          const [metadataPDA] = await solanaWeb3.PublicKey.findProgramAddress(
+            [seed1, seed2, seed3],
+            METADATA_PROGRAM_ID
+          );
+          log("Mint: " + mintAddress + " | Metadata PDA: " + metadataPDA.toBase58());
+          const metadataAccount = await connection.getAccountInfo(metadataPDA);
+          if (!metadataAccount) {
+            log("Brak metadanych dla mint: " + mintAddress);
+            continue;
+          }
+          // Usuń 8 bajtów dyskryminatora Anchor
+          const metadataData = metadataAccount.data.slice(8);
+          const metadata = borsh.deserialize(METADATA_SCHEMA, Metadata, metadataData);
+          
+          let metadataJSON = {};
+          try {
+            const response = await fetch(metadata.data.uri);
+            metadataJSON = await response.json();
+          } catch (err) {
+            log("Błąd pobierania JSON dla mint: " + mintAddress);
+          }
+          const nftDiv = document.createElement("div");
+          nftDiv.className = "nft";
+          nftDiv.innerHTML = `
+            <img src="${metadataJSON.image || ''}" alt="${metadata.data.name}">
+            <p><strong>${metadata.data.name}</strong></p>
+            <p>Mint: ${mintAddress}</p>
+          `;
+          nftContainer.appendChild(nftDiv);
+        }
+      } catch (err) {
+        log("Błąd ładowania NFT: " + err);
+      }
     }
   </script>
 </body>
