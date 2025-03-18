@@ -581,6 +581,7 @@ pub mod invilink {
     // ---------------- WALIDACJA BILETU BEZ ticket_mint ----------------
     // Walidacja oparta na: event_id, section, row, seat (np. przekazywane z URL)
 
+    /// Inicjalizacja konta TicketStatus – podczas tworzenia biletu ustawiamy used = false, activated = false
     #[derive(Accounts)]
     #[instruction(event_id: String, section: String, row: u8, seat: u8, event: Pubkey)]
     pub struct InitializeTicketStatus<'info> {
@@ -589,7 +590,7 @@ pub mod invilink {
             payer = payer,
             seeds = [b"ticket_status", event_id.as_bytes(), section.as_bytes(), &[row], &[seat]],
             bump,
-            space = 41 // tylko discriminator, brak danych
+            space = 50 // 8 (discriminator) + 32 (event) + 1 (used) + 1 (activated) + 8 (timestamp)
         )]
         pub ticket_status: Account<'info, TicketStatus>,
         #[account(mut)]
@@ -608,15 +609,15 @@ pub mod invilink {
         let ticket_status = &mut ctx.accounts.ticket_status;
         ticket_status.event = event;
         ticket_status.used = false;
+        ticket_status.activated = false;
+        ticket_status.activation_timestamp = 0;
         Ok(())
     }
-    
 
+        /// Kontekst dla aktywacji biletu – może być wywoływany np. przez właściciela biletu
     #[derive(Accounts)]
     #[instruction(event_id: String, section: String, row: u8, seat: u8)]
-    pub struct ValidateTicket<'info> {
-        #[account(mut)]
-        pub event: Account<'info, EventNFT>,
+    pub struct ActivateTicket<'info> {
         #[account(
             mut,
             seeds = [b"ticket_status", event_id.as_bytes(), section.as_bytes(), &[row], &[seat]],
@@ -624,32 +625,78 @@ pub mod invilink {
         )]
         pub ticket_status: Account<'info, TicketStatus>,
         #[account(signer)]
-        /// CHECK: Konto walidatora; walidujemy je w programie, porównując klucz.
-        pub validator: AccountInfo<'info>,
+        /// CHECK: Konto użytkownika – weryfikacja może być dokonana na podstawie logiki aplikacji
+        pub user: AccountInfo<'info>,
     }
 
-    pub fn validate_ticket(ctx: Context<ValidateTicket>, event_id: String, section: String, row: u8, seat: u8) -> Result<()> {
-        let event = &ctx.accounts.event;
-        let validator = ctx.accounts.validator.key();
-        // Sprawdzamy, czy walidator jest na liście walidatorów eventu.
-        require!(event.validators.contains(&validator), ErrorCode::NotValidator);
-        
-        // Pobieramy konto biletu (TicketStatus) i sprawdzamy, czy bilet nie był wcześniej użyty.
+    /// Funkcja aktywująca bilet – ustawia flagę activated na true i zapisuje aktualny czas
+    pub fn activate_ticket(
+        ctx: Context<ActivateTicket>,
+        event_id: String,
+        section: String,
+        row: u8,
+        seat: u8,
+    ) -> Result<()> {
         let ticket_status = &mut ctx.accounts.ticket_status;
+        // Jeśli bilet był już użyty, nie można go aktywować
         require!(!ticket_status.used, ErrorCode::TicketAlreadyUsed);
-        
-        // Oznaczamy bilet jako użyty, aby nie można było go wykorzystać ponownie.
-        ticket_status.used = true;
-        
-        // Emitujemy event, aby poinformować o walidacji biletu.
-        emit!(TicketValidated {
-            event: event.key(),
-            validator,
-            timestamp: Clock::get()?.unix_timestamp,
-        });
-        
+        let current_ts = Clock::get()?.unix_timestamp;
+        ticket_status.activated = true;
+        ticket_status.activation_timestamp = current_ts;
         Ok(())
     }
+    
+
+ /// Kontekst walidacji biletu – wywoływany przez walidatora
+#[derive(Accounts)]
+#[instruction(event_id: String, section: String, row: u8, seat: u8)]
+pub struct ValidateTicket<'info> {
+    #[account(mut)]
+    pub event: Account<'info, EventNFT>,
+    #[account(
+        mut,
+        seeds = [b"ticket_status", event_id.as_bytes(), section.as_bytes(), &[row], &[seat]],
+        bump,
+    )]
+    pub ticket_status: Account<'info, TicketStatus>,
+    #[account(signer)]
+    /// CHECK: Konto walidatora – weryfikujemy je w programie, porównując z listą
+    pub validator: AccountInfo<'info>,
+}
+
+/// Walidacja biletu – sprawdzamy, czy bilet został aktywowany i czy okres aktywacji (5 min) nie wygasł.
+pub fn validate_ticket(ctx: Context<ValidateTicket>, event_id: String, section: String, row: u8, seat: u8) -> Result<()> {
+    let event = &ctx.accounts.event;
+    let validator = ctx.accounts.validator.key();
+    // Weryfikujemy, czy walidator znajduje się na liście zatwierdzonych
+    require!(event.validators.contains(&validator), ErrorCode::NotValidator);
+    
+    let ticket_status = &mut ctx.accounts.ticket_status;
+    // Sprawdzamy, czy bilet został aktywowany
+    if !ticket_status.activated {
+        return Err(ErrorCode::TicketNotActivated.into());
+    }
+    let current_ts = Clock::get()?.unix_timestamp;
+    // Jeśli od momentu aktywacji minęło więcej niż 5 minut (300 sekund), to traktujemy aktywację jako wygasłą
+    if current_ts - ticket_status.activation_timestamp > 300 {
+        ticket_status.activated = false; // automatycznie deaktywujemy
+        return Err(ErrorCode::TicketActivationExpired.into());
+    }
+    // Sprawdzamy, czy bilet nie był już wcześniej użyty
+    require!(!ticket_status.used, ErrorCode::TicketAlreadyUsed);
+    
+    // Oznaczamy bilet jako użyty
+    ticket_status.used = true;
+    
+    // Emitujemy event walidacji (opcjonalnie)
+    emit!(TicketValidated {
+        event: event.key(),
+        validator,
+        timestamp: current_ts,
+    });
+    
+    Ok(())
+}
 }
 
 // ---------------- KONTEKSTY (ACCOUNTS) ----------------
@@ -947,8 +994,10 @@ pub struct SeatingSectionInput {
 
 #[account]
 pub struct TicketStatus {
-    pub event: Pubkey,
-    pub used: bool,
+    pub event: Pubkey,            // event, do którego bilet się odnosi
+    pub used: bool,               // czy bilet został wykorzystany
+    pub activated: bool,          // czy bilet został aktywowany
+    pub activation_timestamp: i64 // moment aktywacji (unix timestamp)
 }
 
 #[event]
@@ -1008,4 +1057,8 @@ pub enum ErrorCode {
     ValidatorAlreadyAdded,
     #[msg("Caller is not a validator for this event.")]
     NotValidator,
+    #[msg("Bilet nie został aktywowany. Aktywuj bilet przed skanowaniem.")]
+    TicketNotActivated,
+    #[msg("Okres aktywacji biletu wygasł. Aktywuj ponownie.")]
+    TicketActivationExpired,
 }
