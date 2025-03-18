@@ -5,6 +5,8 @@
   <title>Moje NFT</title>
   <!-- Solana Web3 -->
   <script src="https://cdn.jsdelivr.net/npm/@solana/web3.js@latest/lib/index.iife.min.js"></script>
+  <!-- BN.js -->
+  <script src="https://cdn.jsdelivr.net/npm/bn.js@5.2.0/lib/bn.min.js"></script>
   <!-- Borsh UMD – ładowanie biblioteki borsh -->
   <script src="https://unpkg.com/borsh@0.7.0/lib/index.umd.min.js"></script>
   <style>
@@ -22,7 +24,7 @@
   <pre id="log"></pre>
 
   <script>
-    // Upewnij się, że globalna zmienna borsh jest dostępna
+    // Upewnij się, że borsh jest ustawiony (niektóre wersje mogą być pod nazwą "Borsh")
     const borsh = window.borsh || window.Borsh;
     if (!borsh) {
       console.error("Biblioteka borsh nie została załadowana!");
@@ -32,13 +34,13 @@
     let walletPublicKey = null;
     const TOKEN_PROGRAM_ID = new solanaWeb3.PublicKey("TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA");
     const METADATA_PROGRAM_ID = new solanaWeb3.PublicKey("metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s");
-
+    
     const logEl = document.getElementById("log");
     function log(message) {
       logEl.innerText += message + "\n";
       console.log(message);
     }
-
+    
     // Struktury do dekodowania metadanych NFT
     class Creator {
       constructor(args) {
@@ -71,7 +73,7 @@
       [Data, { kind: 'struct', fields: [['name', 'string'], ['symbol', 'string'], ['uri', 'string'], ['sellerFeeBasisPoints', 'u16'], ['creators', { kind: 'option', type: [Creator] }]] }],
       [Metadata, { kind: 'struct', fields: [['key', 'u8'], ['updateAuthority', [32]], ['mint', [32]], ['data', Data], ['primarySaleHappened', 'u8'], ['isMutable', 'u8']] }],
     ]);
-
+    
     // Połączenie z Phantom Wallet
     document.getElementById("connectButton").addEventListener("click", async () => {
       if (!window.phantom || !window.phantom.solana) {
@@ -88,7 +90,7 @@
         log("Błąd łączenia: " + err);
       }
     });
-
+    
     async function loadNFTs() {
       try {
         const tokenAccounts = await connection.getParsedTokenAccountsByOwner(walletPublicKey, { programId: TOKEN_PROGRAM_ID });
@@ -100,9 +102,10 @@
         log("Znaleziono " + nftAccounts.length + " NFT.");
         const nftContainer = document.getElementById("nftContainer");
         nftContainer.innerHTML = "";
-
+    
         for (const acc of nftAccounts) {
           const mintAddress = acc.account.data.parsed.info.mint;
+          // Oblicz PDA dla metadanych NFT
           const seed1 = new TextEncoder().encode("metadata");
           const seed2 = METADATA_PROGRAM_ID.toBytes();
           const seed3 = new solanaWeb3.PublicKey(mintAddress).toBytes();
