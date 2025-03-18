@@ -5,7 +5,7 @@
   <title>Moje NFT</title>
   <!-- Solana Web3 -->
   <script src="https://cdn.jsdelivr.net/npm/@solana/web3.js@latest/lib/index.iife.min.js"></script>
-  <!-- Borsh UMD – ten skrypt ustawia globalną zmienną "borsh" -->
+  <!-- Borsh UMD – ładowanie biblioteki borsh -->
   <script src="https://unpkg.com/borsh@0.7.0/lib/index.umd.min.js"></script>
   <style>
     body { font-family: Arial, sans-serif; margin: 20px; }
@@ -23,7 +23,10 @@
 
   <script>
     // Upewnij się, że globalna zmienna borsh jest dostępna
-    const borsh = window.borsh;
+    const borsh = window.borsh || window.Borsh;
+    if (!borsh) {
+      console.error("Biblioteka borsh nie została załadowana!");
+    }
     
     const connection = new solanaWeb3.Connection("https://api.devnet.solana.com", "confirmed");
     let walletPublicKey = null;
