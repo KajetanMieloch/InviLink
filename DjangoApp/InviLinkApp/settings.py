@@ -29,7 +29,7 @@ DEBUG = True
 ALLOWED_HOSTS = ["*"]
 
 CSRF_TRUSTED_ORIGINS = [
-    "https://invilink.toadres.pl"
+    "https://invilink.bieda.it"
 ]
 
 LOGOUT_REDIRECT_URL = '/events/'
@@ -44,9 +44,6 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     # my apps
-    'events',
-    'tickets',
-    'userProfile',
     'test_blockchain',
 ]
 

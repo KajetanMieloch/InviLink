@@ -9,6 +9,10 @@
     <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
     <link rel="stylesheet" href="{% static 'css/styles.css' %}">
 </head>
+      <!-- Solana Web3 -->
+      <script src="https://cdn.jsdelivr.net/npm/@solana/web3.js@latest/lib/index.iife.min.js"></script>
+      <!-- BN.js -->
+      <script src="https://cdn.jsdelivr.net/npm/bn.js@5.2.0/lib/bn.min.js"></script>  
 <body>
     <!-- Navbar -->
     <nav class="navbar navbar-expand-lg navbar-light bg-light">
@@ -21,26 +25,6 @@
                 <li class="nav-item">
                     <a class="nav-link" href="{% url 'event_list' %}">Wydarzenia</a>
                 </li>
-                {% if user.is_authenticated %}
-                    <li class="nav-item">
-                        <a class="nav-link" href="{% url 'edit_profile' %}">Profil</a>
-                    </li>
-                    <li class="nav-item">
-                        <span class="navbar-text mr-3">
-                            Witaj, {% if user.userprofile.nickname %}{{ user.userprofile.nickname }}{% else %}{{ user.username }}{% endif %}!
-                        </span>
-                    </li>
-                    <li class="nav-item">
-                        <form method="post" action="{% url 'logout' %}" style="display:inline;">
-                            {% csrf_token %}
-                            <button type="submit" class="btn btn-link nav-link">Wyloguj</button>
-                        </form>
-                    </li>
-                {% else %}
-                    <li class="nav-item">
-                        <button class="btn btn-primary nav-link" onclick="connectPhantom()">Zaloguj z Phantom</button>
-                    </li>
-                {% endif %}
             </ul>
         </div>
     </nav>
@@ -48,69 +32,5 @@
     <div class="container mt-4">
         {% block content %}{% endblock %}
     </div>
-
-    <!-- Scripts -->
-    <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@4.5.2/dist/js/bootstrap.bundle.min.js"></script>
-    <script>
-    // Funkcja do logowania przez Phantom Wallet
-    function connectPhantom() {
-        if (window.solana && window.solana.isPhantom) {
-            // Desktop Phantom Wallet (API)
-            window.solana.connect()
-                .then((resp) => {
-                    const publicKey = resp.publicKey.toString();
-                    console.log("Connected with public key:", publicKey);
-
-                    fetch("{% url 'phantom_login' %}", {
-                        method: "POST",
-                        headers: {
-                            "Content-Type": "application/json",
-                            "X-CSRFToken": "{{ csrf_token }}"
-                        },
-                        body: JSON.stringify({ publicKey: publicKey })
-                    }).then(response => {
-                        if (response.ok) {
-                            location.reload();
-                        }
-                    });
-                })
-                .catch((err) => console.error("Phantom connection failed:", err));
-        } else if (/Mobi|Android/i.test(navigator.userAgent)) {
-            // Mobile device logic
-            if (window.solana) {
-                window.solana.connect()
-                    .then((resp) => {
-                        const publicKey = resp.publicKey.toString();
-                        console.log("Connected with public key:", publicKey);
-
-                        fetch("{% url 'phantom_login' %}", {
-                            method: "POST",
-                            headers: {
-                                "Content-Type": "application/json",
-                                "X-CSRFToken": "{{ csrf_token }}"
-                            },
-                            body: JSON.stringify({ publicKey: publicKey })
-                        }).then(response => {
-                            if (response.ok) {
-                                location.reload();
-                            }
-                        });
-                    })
-                    .catch((err) => console.error("Phantom connection failed:", err));
-            } else {
-                // Przekierowanie do aplikacji Phantom na urządzeniu mobilnym
-                const currentUrl = encodeURIComponent(window.location.href);
-                const phantomDeeplink = `phantom://browser?url=${currentUrl}`;
-                alert("Phantom Wallet is not installed. Redirecting to Phantom Browser...");
-                window.location.href = phantomDeeplink;
-            }
-        } else {
-            // Desktop bez Phantom Wallet
-            alert("Phantom Wallet is required. Please install it.");
-            window.location.href = "https://phantom.app/"; // Przekierowanie do strony instalacyjnej
-        }
-    }
-</script>
 </body>
 </html>
