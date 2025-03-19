@@ -9,17 +9,17 @@ use solana_program::hash::hash;
 use solana_program::pubkey;
 use anchor_spl::metadata::Metadata;
 use base64::{engine::general_purpose, Engine as _};
-// Importy do transferu lamportów
+// Dodajemy importy niezbędne do transferu lamportów
 use solana_program::program::invoke;
 use solana_program::system_instruction;
 
-declare_id!("4bCuALcJwCqw3rAGTEAUgHU3izf6JikLsomSQzLxj5aX");
+declare_id!("2Yh2Jud5p81cVVM5Si2S53YcmtgErkuCTsX8RBhZ91ab");
 
 // Stałe globalne
 const MASTER_ACCOUNT: Pubkey = pubkey!("4Wg5ZqjS3AktHzq34hK1T55aFNKSjBpmJ3PyRChpPNDh");
 const FEE_PERCENTAGE: u64 = 5; // 5%
 
-// ---------------- FUNKCJE POMOCNICZE ----------------
+// ---------------- FUNKCJE POMOCNICZE POZA CHAINEM ----------------
 
 fn generate_event_id(name: &str, event_date: i64, organizer: &Pubkey) -> String {
     let seed = b"339562";
@@ -27,20 +27,21 @@ fn generate_event_id(name: &str, event_date: i64, organizer: &Pubkey) -> String 
     let mut pos = 0;
     buffer[pos..pos + seed.len()].copy_from_slice(seed);
     pos += seed.len();
-
+    
     let name_bytes = name.as_bytes();
     let name_len = name_bytes.len();
     buffer[pos..pos + name_len].copy_from_slice(name_bytes);
     pos += name_len;
-
+    
+    // Dodajemy datę – 8 bajtów, little-endian
     let date_bytes = event_date.to_le_bytes();
     buffer[pos..pos + date_bytes.len()].copy_from_slice(&date_bytes);
     pos += date_bytes.len();
-
+    
     let pubkey_bytes = organizer.to_bytes();
     buffer[pos..pos + pubkey_bytes.len()].copy_from_slice(&pubkey_bytes);
     pos += pubkey_bytes.len();
-
+    
     let hash_result = hash(&buffer[..pos]);
     let encoded = general_purpose::URL_SAFE_NO_PAD.encode(hash_result.as_ref());
     encoded.chars().take(12).collect()
@@ -77,7 +78,7 @@ fn generate_ticket_id(
     encoded.chars().take(12).collect()
 }
 
-// ---------------- PROGRAM ----------------
+// ---------------- PROGRAM NA CHAINIE ----------------
 
 #[program]
 pub mod invilink {
@@ -90,14 +91,15 @@ pub mod invilink {
         Ok(())
     }
 
-    // Inicjalizacja rejestru eventów – maksymalnie 10 eventów
+    // Inicjalizacja rejestru eventów
     pub fn initialize_event_registry(ctx: Context<InitializeEventRegistry>) -> Result<()> {
         let registry = &mut ctx.accounts.registry;
         registry.event_count = 0;
-        registry.events = [Pubkey::default(); 10];
+        registry.events = Vec::new();
         Ok(())
     }
 
+    // Dodanie nowego organizatora
     pub fn add_organizer(ctx: Context<AddOrganizer>, new_organizer: Pubkey) -> Result<()> {
         let organizers = &mut ctx.accounts.organizers_pool;
         require!(ctx.accounts.signer.key() == MASTER_ACCOUNT, ErrorCode::Unauthorized);
@@ -105,7 +107,18 @@ pub mod invilink {
         organizers.organizers.push(new_organizer);
         Ok(())
     }
-
+    // Dodanie nowego walidatora
+    pub fn add_validator(ctx: Context<AddValidator>, validator: Pubkey) -> Result<()> {
+        let event = &mut ctx.accounts.event;
+        require!(event.organizer == *ctx.accounts.organizer.key, ErrorCode::Unauthorized);
+        if event.validators.contains(&validator) {
+            return Err(ErrorCode::ValidatorAlreadyAdded.into());
+        }
+        event.validators.push(validator);
+        Ok(())
+    }
+    
+    // Usunięcie organizatora
     pub fn remove_organizer(ctx: Context<RemoveOrganizer>, organizer_to_remove: Pubkey) -> Result<()> {
         let organizers = &mut ctx.accounts.organizers_pool;
         require!(ctx.accounts.signer.key() == MASTER_ACCOUNT, ErrorCode::Unauthorized);
@@ -115,8 +128,7 @@ pub mod invilink {
         Ok(())
     }
 
-    
-    // Tworzenie eventu – funkcja create_event_seating
+    // Zarządzanie eventami – wyłącznie przez create_event_seating
     #[derive(Accounts)]
     #[instruction(
         event_id: String,
@@ -154,7 +166,7 @@ pub mod invilink {
         ctx: Context<CreateEventSeating>,
         event_id: String,
         name: String,
-        event_date: i64,
+        event_date: i64,        // NOWY parametr
         ticket_price: u64,
         available_tickets: u64,
     ) -> Result<()> {
@@ -170,10 +182,11 @@ pub mod invilink {
         let expected_event_id = generate_event_id(&name, event_date, ctx.accounts.organizer.key);
         require!(event_id == expected_event_id, ErrorCode::InvalidEventId);
     
+        // Inicjalizacja eventu – przypisujemy również datę eventu
         event.event_id = event_id.clone();
         event.organizer = *ctx.accounts.organizer.key;
         event.name = name.clone();
-        event.event_date = event_date;
+        event.event_date = event_date; // NOWE: ustawiamy datę eventu
         event.ticket_price = ticket_price;
         event.available_tickets = available_tickets;
         event.sold_tickets = 0;
@@ -181,25 +194,23 @@ pub mod invilink {
         event.active = false;
         event.validators = Vec::new();
     
+        // Inicjalizacja mapy miejsc
         seating_map.event_id = event.event_id.clone();
         seating_map.organizer = event.organizer;
         seating_map.sections = Vec::new();
         seating_map.total_seats = 0;
     
-        let count = registry.event_count as usize;
-        require!(count < 10, ErrorCode::RegistryFull);
-        registry.events[count] = event.key();
-        registry.event_count += 1;
-    
+        registry.events.push(event.key());
+        registry.event_count = registry.events.len() as u32;    
         Ok(())
     }
     
+    // Aktualizacja eventu
     pub fn update_event(
         ctx: Context<UpdateEvent>,
         new_name: Option<String>,
         new_ticket_price: Option<u64>,
         new_available_tickets: Option<u64>,
-        new_event_date: Option<i64>, // nowy parametr
     ) -> Result<()> {
         let event = &mut ctx.accounts.event;
         require!(event.organizer == *ctx.accounts.organizer.key, ErrorCode::Unauthorized);
@@ -215,12 +226,8 @@ pub mod invilink {
             require!(available >= event.sold_tickets, ErrorCode::InvalidTicketQuantity);
             event.available_tickets = available;
         }
-        if let Some(date) = new_event_date {
-            event.event_date = date;
-        }
         Ok(())
     }
-    
     
     #[derive(Accounts)]
     pub struct UpdateEventSeatingType<'info> {
@@ -238,7 +245,7 @@ pub mod invilink {
         pub organizer: Signer<'info>,
         pub system_program: Program<'info, System>,
     }
-    
+
     pub fn update_event_seating_type(
         ctx: Context<UpdateEventSeatingType>,
         new_seating_type: u8,
@@ -254,7 +261,7 @@ pub mod invilink {
         event.seating_type = 1;
         Ok(())
     }
-    
+
     pub fn activate_event(ctx: Context<ActivateEvent>) -> Result<()> {
         let event = &mut ctx.accounts.event;
         require!(event.organizer == *ctx.accounts.organizer.key, ErrorCode::Unauthorized);
@@ -262,16 +269,17 @@ pub mod invilink {
         event.active = true;
         Ok(())
     }
-    
+
     pub fn deactivate_event(ctx: Context<DeactivateEvent>) -> Result<()> {
         let event = &mut ctx.accounts.event;
         require!(event.organizer == *ctx.accounts.organizer.key, ErrorCode::Unauthorized);
         require!(event.active, ErrorCode::EventNotActive);
+        // Dodany warunek: nie da się deaktywować eventu, jeśli sprzedano jakiekolwiek bilety
         require!(event.sold_tickets == 0, ErrorCode::EventCannotDeactivate);
         event.active = false;
         Ok(())
     }    
-    
+
     pub fn delete_event(ctx: Context<DeleteEvent>) -> Result<()> {
         let event = &mut ctx.accounts.event;
         let registry = &mut ctx.accounts.registry;
@@ -285,21 +293,23 @@ pub mod invilink {
         registry.event_count -= 1;
         Ok(())
     }
-    
+
+    // Inicjalizacja mapy miejsc
     pub fn initialize_seating(ctx: Context<InitializeSeating>, event_id: String) -> Result<()> {
         let seating_map = &mut ctx.accounts.seating_map;
         seating_map.event_id = event_id;
         seating_map.sections = Vec::new();
         Ok(())
     }
-    
+
+    // Inicjalizacja sekcji miejsc
     pub fn initialize_seating_section(
         ctx: Context<InitializeSeatingSection>,
         section_name: String,
         section_type: u8,
         rows: u8,
         seats_per_row: u8,
-        ticket_price: u64,
+        ticket_price: u64, // NOWY parametr - cena w danej sekcji niezależna od ceny eventu
     ) -> Result<()> {
         let seating_map = &mut ctx.accounts.seating_map;
         let section_account = &mut ctx.accounts.seating_section;
@@ -321,7 +331,7 @@ pub mod invilink {
         section_account.section_type = section_type;
         section_account.rows = rows;
         section_account.seats_per_row = seats_per_row;
-        section_account.ticket_price = ticket_price;
+        section_account.ticket_price = ticket_price; // Ustawiamy cenę sekcji
         section_account.seat_status = vec![0; (rows as usize) * (seats_per_row as usize)];
     
         seating_map.sections.push(section_account.key());
@@ -329,12 +339,13 @@ pub mod invilink {
         Ok(())
     }
     
+    // Aktualizacja konfiguracji sekcji miejsc
     pub fn update_seating_section(
         ctx: Context<UpdateSeatingSection>,
         new_rows: Option<u8>,
         new_seats_per_row: Option<u8>,
         new_section_type: Option<u8>,
-        new_ticket_price: Option<u64>,
+        new_ticket_price: Option<u64>, // NOWY parametr
     ) -> Result<()> {
         let seating_map = &mut ctx.accounts.seating_map;
         let section = &mut ctx.accounts.seating_section;
@@ -368,6 +379,7 @@ pub mod invilink {
         if let Some(t) = new_section_type {
             section.section_type = t;
         }
+        // Aktualizacja ceny – jeśli podano nową cenę, zmieniamy
         if let Some(new_price) = new_ticket_price {
             section.ticket_price = new_price;
         }
@@ -380,6 +392,7 @@ pub mod invilink {
         Ok(())
     }
     
+    // Usunięcie sekcji miejsc
     pub fn remove_seating_section(ctx: Context<RemoveSeatingSection>) -> Result<()> {
         let seating_map = &mut ctx.accounts.seating_map;
         let seating_section = &ctx.accounts.seating_section;
@@ -408,6 +421,7 @@ pub mod invilink {
         Ok(())
     }
     
+    // Emitowanie szczegółów mapy miejsc jako event
     pub fn emit_seating_map_details(ctx: Context<EmitSeatingMapDetails>) -> Result<()> {
         let seating_map = &ctx.accounts.seating_map;
         emit!(SeatingMapDetails {
@@ -425,21 +439,27 @@ pub mod invilink {
         section_name: String,
         row: u8,
         seat: u8,
-        ipfs_uri: String,
+        ipfs_uri: String, // nowy parametr – dynamiczne URI z IPFS
     ) -> Result<()> {
+        // 1. Sprawdzenie, czy konto SeatingMap zawiera właściwy event_id
         require!(
             ctx.accounts.seating_map.event_id == event_id,
             ErrorCode::InvalidEventId
         );
+        // 2. Sprawdzenie, czy event jest aktywny
         require!(
             ctx.accounts.event.active,
             ErrorCode::EventNotActive
         );
+        // 2a. Sprawdzenie, czy wydarzenie nie minęło (zakaz zakupu biletu po dacie wydarzenia)
         let clock = Clock::get()?;
+        let adjusted_timestamp = clock.unix_timestamp - 86400; // odejmujemy 1 dzień (86400 sekund)
         require!(
-            clock.unix_timestamp < ctx.accounts.event.event_date,
+            adjusted_timestamp < ctx.accounts.event.event_date,
             ErrorCode::EventAlreadyOccurred
         );
+        
+        // 3. Sprawdzenie, czy miejsce w danej sekcji istnieje
         let seating_section = &mut ctx.accounts.seating_section;
         require!(
             (row as usize) < (seating_section.rows as usize),
@@ -458,11 +478,13 @@ pub mod invilink {
             seating_section.seat_status[seat_index] == 0,
             ErrorCode::SeatAlreadyTaken
         );
-    
+
+        // Pobieramy cenę biletu z konta sekcji
         let price = seating_section.ticket_price;
         if ctx.accounts.buyer.lamports() < price {
             return Err(ErrorCode::InsufficientFunds.into());
         }
+        // Obliczamy opłatę (5%) i kwotę dla organizatora (95%)
         let fee = price.checked_mul(FEE_PERCENTAGE).unwrap().checked_div(100).unwrap();
         let organizer_amount = price.checked_sub(fee).unwrap();
     
@@ -472,6 +494,7 @@ pub mod invilink {
             let master_info = ctx.accounts.master_account.to_account_info();
             let system_program_info = ctx.accounts.system_program.to_account_info();
     
+            // Transfer 95% ceny do organizatora
             let ix_to_organizer = system_instruction::transfer(
                 buyer_info.key,
                 organizer_info.key,
@@ -482,6 +505,7 @@ pub mod invilink {
                 &[buyer_info.clone(), organizer_info.clone(), system_program_info.clone()],
             )?;
     
+            // Transfer 5% ceny do MASTER_ACCOUNT
             let ix_to_master = system_instruction::transfer(
                 buyer_info.key,
                 master_info.key,
@@ -493,6 +517,7 @@ pub mod invilink {
             )?;
         }
     
+        // Mintujemy NFT – mintujemy 1 jednostkę tokena
         let cpi_accounts = MintTo {
             mint: ctx.accounts.mint.to_account_info(),
             to: ctx.accounts.token_account.to_account_info(),
@@ -501,12 +526,7 @@ pub mod invilink {
         let cpi_ctx = CpiContext::new(ctx.accounts.token_program.to_account_info(), cpi_accounts);
         token::mint_to(cpi_ctx, 1)?;
     
-        // Inicjalizujemy stan biletu: tworzymy TicketStatus z used = false
-        let ticket_status = &mut ctx.accounts.ticket_status;
-        ticket_status.event = ctx.accounts.event.key();
-        ticket_status.ticket_mint = ctx.accounts.mint.key();
-        ticket_status.used = false;
-    
+        // Generacja ticket_id przy użyciu funkcji pomocniczej (niezmieniona)
         let ticket_id = generate_ticket_id(
             ctx.accounts.buyer.key,
             &event_id,
@@ -516,9 +536,10 @@ pub mod invilink {
             seat,
         );
     
+        // Ustalamy metadane – dynamicznie pobieramy URI przekazane przez parametr ipfs_uri
         let title = format!("Invilink Ticket");
         let symbol = "INVI".to_string();
-        let uri = ipfs_uri;
+        let uri = ipfs_uri; // TU używamy przekazanego dynamicznego URI
     
         let creators = vec![mpl_token_metadata::types::Creator {
             address: ctx.accounts.buyer.key(),
@@ -549,40 +570,136 @@ pub mod invilink {
         let cpi_ctx_meta = CpiContext::new(ctx.accounts.token_metadata_program.to_account_info(), cpi_accounts_meta);
         create_metadata_accounts_v3(cpi_ctx_meta, data_v2, true, true, None)?;
     
+        // Aktualizacja stanu miejsca – oznaczamy miejsce jako zajęte
         seating_section.seat_status[seat_index] = 1;
+        // Aktualizacja liczby sprzedanych biletów
         ctx.accounts.event.sold_tickets = ctx.accounts.event.sold_tickets.checked_add(1)
             .ok_or(ErrorCode::InvalidTicket)?;
         Ok(())
     }
+    
+    // ---------------- WALIDACJA BILETU BEZ ticket_mint ----------------
+    // Walidacja oparta na: event_id, section, row, seat (np. przekazywane z URL)
 
-    // Funkcja dodająca walidatora – tylko organizator eventu może dodać walidatora
-    pub fn add_validator(ctx: Context<AddValidator>, validator: Pubkey) -> Result<()> {
-        let event = &mut ctx.accounts.event;
-        require!(event.organizer == *ctx.accounts.organizer.key, ErrorCode::Unauthorized);
-        require!(!event.validators.contains(&validator), ErrorCode::ValidatorAlreadyAdded);
-        event.validators.push(validator);
-        Ok(())
+    /// Inicjalizacja konta TicketStatus – podczas tworzenia biletu ustawiamy used = false, activated = false
+    #[derive(Accounts)]
+    #[instruction(event_id: String, section: String, row: u8, seat: u8, event: Pubkey)]
+    pub struct InitializeTicketStatus<'info> {
+        #[account(
+            init_if_needed,
+            payer = payer,
+            seeds = [b"ticket_status", event_id.as_bytes(), section.as_bytes(), &[row], &[seat]],
+            bump,
+            space = 50 // 8 (discriminator) + 32 (event) + 1 (used) + 1 (activated) + 8 (timestamp)
+        )]
+        pub ticket_status: Account<'info, TicketStatus>,
+        #[account(mut)]
+        pub payer: Signer<'info>,
+        pub system_program: Program<'info, System>,
     }
-
-    // Funkcja walidująca bilet – może być wywołana tylko przez uprawnionego walidatora
-    pub fn validate_ticket(ctx: Context<ValidateTicket>) -> Result<()> {
-        let event = &ctx.accounts.event;
-        let validator = ctx.accounts.validator.key();
-        require!(event.validators.contains(&validator), ErrorCode::NotValidator);
+    
+    pub fn initialize_ticket_status(
+        ctx: Context<InitializeTicketStatus>,
+        event_id: String,
+        section: String,
+        row: u8,
+        seat: u8,
+        event: Pubkey,
+    ) -> Result<()> {
         let ticket_status = &mut ctx.accounts.ticket_status;
-        require!(!ticket_status.used, ErrorCode::TicketAlreadyUsed);
-        ticket_status.used = true;
-        emit!(TicketValidated {
-            event: event.key(),
-            ticket_mint: ctx.accounts.ticket_status.ticket_mint,
-            validator,
-            timestamp: Clock::get()?.unix_timestamp,
-        });
+        ticket_status.event = event;
+        ticket_status.used = false;
+        ticket_status.activated = false;
+        ticket_status.activation_timestamp = 0;
         Ok(())
     }
+
+        /// Kontekst dla aktywacji biletu – może być wywoływany np. przez właściciela biletu
+    #[derive(Accounts)]
+    #[instruction(event_id: String, section: String, row: u8, seat: u8)]
+    pub struct ActivateTicket<'info> {
+        #[account(
+            mut,
+            seeds = [b"ticket_status", event_id.as_bytes(), section.as_bytes(), &[row], &[seat]],
+            bump,
+        )]
+        pub ticket_status: Account<'info, TicketStatus>,
+        #[account(signer)]
+        /// CHECK: Konto użytkownika – weryfikacja może być dokonana na podstawie logiki aplikacji
+        pub user: AccountInfo<'info>,
+    }
+
+    /// Funkcja aktywująca bilet – ustawia flagę activated na true i zapisuje aktualny czas
+    pub fn activate_ticket(
+        ctx: Context<ActivateTicket>,
+        event_id: String,
+        section: String,
+        row: u8,
+        seat: u8,
+    ) -> Result<()> {
+        let ticket_status = &mut ctx.accounts.ticket_status;
+        // Jeśli bilet był już użyty, nie można go aktywować
+        require!(!ticket_status.used, ErrorCode::TicketAlreadyUsed);
+        let current_ts = Clock::get()?.unix_timestamp;
+        ticket_status.activated = true;
+        ticket_status.activation_timestamp = current_ts;
+        Ok(())
+    }
+    
+
+ /// Kontekst walidacji biletu – wywoływany przez walidatora
+#[derive(Accounts)]
+#[instruction(event_id: String, section: String, row: u8, seat: u8)]
+pub struct ValidateTicket<'info> {
+    #[account(mut)]
+    pub event: Account<'info, EventNFT>,
+    #[account(
+        mut,
+        seeds = [b"ticket_status", event_id.as_bytes(), section.as_bytes(), &[row], &[seat]],
+        bump,
+    )]
+    pub ticket_status: Account<'info, TicketStatus>,
+    #[account(signer)]
+    /// CHECK: Konto walidatora – weryfikujemy je w programie, porównując z listą
+    pub validator: AccountInfo<'info>,
 }
 
-// ---------------- DEFINICJE KONTEKSTÓW ----------------
+/// Walidacja biletu – sprawdzamy, czy bilet został aktywowany i czy okres aktywacji (5 min) nie wygasł.
+pub fn validate_ticket(ctx: Context<ValidateTicket>, event_id: String, section: String, row: u8, seat: u8) -> Result<()> {
+    let event = &ctx.accounts.event;
+    let validator = ctx.accounts.validator.key();
+    // Weryfikujemy, czy walidator znajduje się na liście zatwierdzonych
+    require!(event.validators.contains(&validator), ErrorCode::NotValidator);
+    
+    let ticket_status = &mut ctx.accounts.ticket_status;
+    // Sprawdzamy, czy bilet został aktywowany
+    if !ticket_status.activated {
+        return Err(ErrorCode::TicketNotActivated.into());
+    }
+    let current_ts = Clock::get()?.unix_timestamp;
+    // Jeśli od momentu aktywacji minęło więcej niż 5 minut (300 sekund), to traktujemy aktywację jako wygasłą
+    if current_ts - ticket_status.activation_timestamp > 300 {
+        ticket_status.activated = false; // automatycznie deaktywujemy
+        return Err(ErrorCode::TicketActivationExpired.into());
+    }
+    // Sprawdzamy, czy bilet nie był już wcześniej użyty
+    require!(!ticket_status.used, ErrorCode::TicketAlreadyUsed);
+    
+    // Oznaczamy bilet jako użyty
+    ticket_status.used = true;
+    
+    // Emitujemy event walidacji (opcjonalnie)
+    emit!(TicketValidated {
+        event: event.key(),
+        validator,
+        timestamp: current_ts,
+    });
+    
+    Ok(())
+}
+}
+
+// ---------------- KONTEKSTY (ACCOUNTS) ----------------
 
 #[derive(Accounts)]
 pub struct InitializeOrganizersPool<'info> {
@@ -595,7 +712,7 @@ pub struct InitializeOrganizersPool<'info> {
 
 #[derive(Accounts)]
 pub struct InitializeEventRegistry<'info> {
-    #[account(init, payer = payer, space = 3216, seeds = [b"event_registry"], bump)]
+    #[account(init, payer = payer, space = 10240, seeds = [b"event_registry"], bump)]
     pub registry: Account<'info, EventRegistry>,
     #[account(mut)]
     pub payer: Signer<'info>,
@@ -631,7 +748,7 @@ pub struct ActivateEvent<'info> {
     #[account(mut)]
     pub event: Account<'info, EventNFT>,
     #[account(signer)]
-    /// CHECK: This account is the event organizer; its key is verified against event.organizer.
+    /// CHECK: Konto organizatora jest walidowane poprzez porównanie klucza z polem event.organizer.
     pub organizer: AccountInfo<'info>,
 }
 
@@ -640,8 +757,17 @@ pub struct DeactivateEvent<'info> {
     #[account(mut)]
     pub event: Account<'info, EventNFT>,
     #[account(signer)]
-    /// CHECK: This account is the event organizer; its key is verified against event.organizer.
+    /// CHECK: Konto organizatora jest walidowane poprzez porównanie klucza z polem event.organizer.
     pub organizer: AccountInfo<'info>,
+}
+
+#[derive(Accounts)]
+pub struct AddValidator<'info> {
+    #[account(mut)]
+    pub event: Account<'info, EventNFT>,
+    #[account(signer)]
+    /// CHECK: Konto organizatora – jego klucz jest porównywany z event.organizer.
+    pub organizer: Signer<'info>,
 }
 
 #[derive(Accounts)]
@@ -651,7 +777,7 @@ pub struct DeleteEvent<'info> {
     #[account(mut)]
     pub registry: Account<'info, EventRegistry>,
     #[account(signer)]
-    /// CHECK: This account is the event organizer; its key is verified against event.organizer.
+    /// CHECK: Konto organizatora jest walidowane poprzez porównanie klucza z polem event.organizer.
     pub organizer: AccountInfo<'info>,
 }
 
@@ -711,6 +837,8 @@ pub struct UpdateSeatingSection<'info> {
 pub struct RemoveSeatingSection<'info> {
     #[account(mut)]
     pub seating_map: Account<'info, SeatingMap>,
+    /// Konto sekcji, która ma zostać usunięta.
+    /// Atrybut `close = organizer` spowoduje, że środki z tego konta zostaną przekazane organizatorowi przy zamykaniu.
     #[account(mut, close = organizer)]
     pub seating_section: Account<'info, SeatingSectionAccount>,
     #[account(
@@ -729,10 +857,12 @@ pub struct EmitSeatingMapDetails<'info> {
 
 #[derive(Accounts)]
 pub struct CloseTargetAccount<'info> {
+    /// CHECK: To konto musi być MASTER_ACCOUNT. Sprawdzamy to ręcznie w kodzie.
     #[account(signer)]
     pub authority: Signer<'info>,
+    /// CHECK: To konto jest zamykane, a jego bezpieczeństwo wynika z faktu, że cały proces zamykania
+    /// jest kontrolowany przez MASTER_ACCOUNT, więc nie ma potrzeby dodatkowej walidacji.
     #[account(mut)]
-    /// CHECK: This account is safe to close because its lifecycle is fully controlled by the program.
     pub closable_account: AccountInfo<'info>,
 }
 
@@ -771,22 +901,14 @@ pub struct MintTicketNft<'info> {
         associated_token::authority = buyer,
     )]
     pub token_account: Account<'info, TokenAccount>,
-    #[account(
-        init,
-        payer = buyer,
-        seeds = [b"ticket_status", mint.key().as_ref()],
-        bump,
-        space = 73 // 8 + 32 + 32 + 1
-    )]
-    pub ticket_status: Account<'info, TicketStatus>,
     #[account(mut)]
-    /// CHECK: The metadata account is unchecked because its validity is ensured by the CPI call to create_metadata_accounts_v3.
+    /// CHECK: Metadane są walidowane przez CPI.
     pub metadata: AccountInfo<'info>,
     #[account(mut, address = MASTER_ACCOUNT)]
-    /// CHECK: This is a constant master account. Its address is hardcoded and trusted; no further validation is required.
+    /// CHECK: Konto MASTER_ACCOUNT (stałe) – przekazywane będą opłaty.
     pub master_account: AccountInfo<'info>,
     #[account(mut, address = event.organizer)]
-    /// CHECK: This account is the organizer's wallet. Its address is verified by the constraint on the event account (event.organizer), so no further checks are necessary.
+    /// CHECK: Konto organizatora, do którego trafi 95% ceny.
     pub organizer_wallet: AccountInfo<'info>,
     pub token_program: Program<'info, Token>,
     pub associated_token_program: Program<'info, AssociatedToken>,
@@ -795,28 +917,7 @@ pub struct MintTicketNft<'info> {
     pub rent: Sysvar<'info, Rent>,
 }
 
-#[derive(Accounts)]
-pub struct AddValidator<'info> {
-    #[account(mut)]
-    pub event: Account<'info, EventNFT>,
-    #[account(signer)]
-    /// CHECK: This account is the event organizer; its key is compared to event.organizer.
-    pub organizer: Signer<'info>,
-}
-
-#[derive(Accounts)]
-pub struct ValidateTicket<'info> {
-    #[account(mut)]
-    pub event: Account<'info, EventNFT>,
-    #[account(mut, seeds = [b"ticket_status", ticket_mint.key().as_ref()], bump)]
-    pub ticket_status: Account<'info, TicketStatus>,
-    #[account(signer)]
-    /// CHECK: Validator account is unchecked; its key is later verified in the program.
-    pub validator: AccountInfo<'info>,
-    pub ticket_mint: Account<'info, Mint>,
-}
-
-// ---------------- STRUKTURY ----------------
+// ---------------- STRUKTURY KONTA ----------------
 
 #[account]
 pub struct FeePool {
@@ -832,7 +933,7 @@ pub struct OrganizersPool {
 #[account]
 pub struct EventRegistry {
     pub event_count: u32,
-    pub events: [Pubkey; 10],
+    pub events: Vec<Pubkey>,
 }
 
 #[account]
@@ -840,21 +941,13 @@ pub struct EventNFT {
     pub event_id: String,
     pub organizer: Pubkey,
     pub name: String,
-    pub event_date: i64,
+    pub event_date: i64, // np. UNIX timestamp
     pub ticket_price: u64,
     pub available_tickets: u64,
     pub sold_tickets: u64,
     pub seating_type: u8,
     pub active: bool,
-    // Lista walidatorów dla eventu
     pub validators: Vec<Pubkey>,
-}
-
-#[account]
-pub struct TicketStatus {
-    pub event: Pubkey,
-    pub ticket_mint: Pubkey,
-    pub used: bool,
 }
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone)]
@@ -868,8 +961,8 @@ pub struct SeatingSection {
 #[account]
 pub struct SeatingMap {
     pub event_id: String,
-    pub organizer: Pubkey,
-    pub active: bool,
+    pub organizer: Pubkey, // adres organizatora, pobieramy go przy tworzeniu eventu
+    pub active: bool,      // stan eventu – true, gdy event jest aktywny
     pub sections: Vec<Pubkey>,
     pub total_seats: u64,
 }
@@ -881,14 +974,6 @@ pub struct SeatingMapDetails {
     pub sections: Vec<Pubkey>,
 }
 
-#[event]
-pub struct TicketValidated {
-    pub event: Pubkey,
-    pub ticket_mint: Pubkey,
-    pub validator: Pubkey,
-    pub timestamp: i64,
-}
-
 #[account]
 pub struct SeatingSectionAccount {
     pub event_id: String,
@@ -896,7 +981,7 @@ pub struct SeatingSectionAccount {
     pub section_type: u8,
     pub rows: u8,
     pub seats_per_row: u8,
-    pub ticket_price: u64,
+    pub ticket_price: u64, // NOWE – cena biletu dla tej sekcji
     pub seat_status: Vec<u8>,
 }
 
@@ -906,6 +991,23 @@ pub struct SeatingSectionInput {
     pub rows: u8,
     pub seats_per_row: u8,
 }
+
+#[account]
+pub struct TicketStatus {
+    pub event: Pubkey,            // event, do którego bilet się odnosi
+    pub used: bool,               // czy bilet został wykorzystany
+    pub activated: bool,          // czy bilet został aktywowany
+    pub activation_timestamp: i64 // moment aktywacji (unix timestamp)
+}
+
+#[event]
+pub struct TicketValidated {
+    pub event: Pubkey,
+    pub validator: Pubkey,
+    pub timestamp: i64,
+}
+
+// ---------------- ERROR CODE ----------------
 
 #[error_code]
 pub enum ErrorCode {
@@ -955,4 +1057,8 @@ pub enum ErrorCode {
     ValidatorAlreadyAdded,
     #[msg("Caller is not a validator for this event.")]
     NotValidator,
+    #[msg("Bilet nie został aktywowany. Aktywuj bilet przed skanowaniem.")]
+    TicketNotActivated,
+    #[msg("Okres aktywacji biletu wygasł. Aktywuj ponownie.")]
+    TicketActivationExpired,
 }

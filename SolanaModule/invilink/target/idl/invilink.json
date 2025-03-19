@@ -1,5 +1,5 @@
 {
-  "address": "2XgNYDqbBZGiNHEk4PW3FCyPKHBaijnbQTR2bKFd2fxj",
+  "address": "2Yh2Jud5p81cVVM5Si2S53YcmtgErkuCTsX8RBhZ91ab",
   "metadata": {
     "name": "invilink",
     "version": "0.1.0",
@@ -30,6 +30,50 @@
         }
       ],
       "args": []
+    },
+    {
+      "name": "activate_ticket",
+      "docs": [
+        "Funkcja aktywująca bilet – ustawia flagę activated na true i zapisuje aktualny czas"
+      ],
+      "discriminator": [
+        110,
+        8,
+        92,
+        34,
+        61,
+        23,
+        0,
+        151
+      ],
+      "accounts": [
+        {
+          "name": "ticket_status",
+          "writable": true
+        },
+        {
+          "name": "user",
+          "signer": true
+        }
+      ],
+      "args": [
+        {
+          "name": "event_id",
+          "type": "string"
+        },
+        {
+          "name": "section",
+          "type": "string"
+        },
+        {
+          "name": "row",
+          "type": "u8"
+        },
+        {
+          "name": "seat",
+          "type": "u8"
+        }
+      ]
     },
     {
       "name": "add_organizer",
@@ -517,6 +561,56 @@
       ]
     },
     {
+      "name": "initialize_ticket_status",
+      "discriminator": [
+        228,
+        37,
+        235,
+        14,
+        223,
+        66,
+        40,
+        21
+      ],
+      "accounts": [
+        {
+          "name": "ticket_status",
+          "writable": true
+        },
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "event_id",
+          "type": "string"
+        },
+        {
+          "name": "section",
+          "type": "string"
+        },
+        {
+          "name": "row",
+          "type": "u8"
+        },
+        {
+          "name": "seat",
+          "type": "u8"
+        },
+        {
+          "name": "event",
+          "type": "pubkey"
+        }
+      ]
+    },
+    {
       "name": "mint_ticket_nft",
       "discriminator": [
         212,
@@ -683,36 +777,6 @@
           }
         },
         {
-          "name": "ticket_status",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  116,
-                  105,
-                  99,
-                  107,
-                  101,
-                  116,
-                  95,
-                  115,
-                  116,
-                  97,
-                  116,
-                  117,
-                  115
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "mint"
-              }
-            ]
-          }
-        },
-        {
           "name": "metadata",
           "writable": true
         },
@@ -821,6 +885,10 @@
         },
         {
           "name": "seating_section",
+          "docs": [
+            "Konto sekcji, która ma zostać usunięta.",
+            "Atrybut `close = organizer` spowoduje, że środki z tego konta zostaną przekazane organizatorowi przy zamykaniu."
+          ],
           "writable": true
         },
         {
@@ -877,12 +945,6 @@
           "name": "new_available_tickets",
           "type": {
             "option": "u64"
-          }
-        },
-        {
-          "name": "new_event_date",
-          "type": {
-            "option": "i64"
           }
         }
       ]
@@ -1009,6 +1071,9 @@
     },
     {
       "name": "validate_ticket",
+      "docs": [
+        "Walidacja biletu – sprawdzamy, czy bilet został aktywowany i czy okres aktywacji (5 min) nie wygasł."
+      ],
       "discriminator": [
         222,
         125,
@@ -1026,43 +1091,31 @@
         },
         {
           "name": "ticket_status",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  116,
-                  105,
-                  99,
-                  107,
-                  101,
-                  116,
-                  95,
-                  115,
-                  116,
-                  97,
-                  116,
-                  117,
-                  115
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "ticket_mint"
-              }
-            ]
-          }
+          "writable": true
         },
         {
           "name": "validator",
           "signer": true
-        },
-        {
-          "name": "ticket_mint"
         }
       ],
-      "args": []
+      "args": [
+        {
+          "name": "event_id",
+          "type": "string"
+        },
+        {
+          "name": "section",
+          "type": "string"
+        },
+        {
+          "name": "row",
+          "type": "u8"
+        },
+        {
+          "name": "seat",
+          "type": "u8"
+        }
+      ]
     }
   ],
   "accounts": [
@@ -1288,6 +1341,16 @@
       "code": 6022,
       "name": "NotValidator",
       "msg": "Caller is not a validator for this event."
+    },
+    {
+      "code": 6023,
+      "name": "TicketNotActivated",
+      "msg": "Bilet nie został aktywowany. Aktywuj bilet przed skanowaniem."
+    },
+    {
+      "code": 6024,
+      "name": "TicketActivationExpired",
+      "msg": "Okres aktywacji biletu wygasł. Aktywuj ponownie."
     }
   ],
   "types": [
@@ -1353,10 +1416,7 @@
           {
             "name": "events",
             "type": {
-              "array": [
-                "pubkey",
-                10
-              ]
+              "vec": "pubkey"
             }
           }
         ]
@@ -1474,12 +1534,16 @@
             "type": "pubkey"
           },
           {
-            "name": "ticket_mint",
-            "type": "pubkey"
-          },
-          {
             "name": "used",
             "type": "bool"
+          },
+          {
+            "name": "activated",
+            "type": "bool"
+          },
+          {
+            "name": "activation_timestamp",
+            "type": "i64"
           }
         ]
       }
@@ -1491,10 +1555,6 @@
         "fields": [
           {
             "name": "event",
-            "type": "pubkey"
-          },
-          {
-            "name": "ticket_mint",
             "type": "pubkey"
           },
           {
