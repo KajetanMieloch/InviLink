@@ -1,0 +1,174 @@
+{% extends "base.html" %}
+{% block content %}
+  <style>
+    :root {
+      --primary-color: #00d1ff;
+      --secondary-color: #1a1a1a;
+      --accent-color: #ff4081;
+      --background-color: #0d0d0d;
+      --text-color: #ffffff;
+      --font-family: 'Inter', sans-serif;
+    }
+
+    /* Globalne style */
+    body {
+      margin: 0;
+      font-family: var(--font-family);
+      background-color: var(--background-color);
+      color: var(--text-color);
+    }
+
+    /* Pełnoekranowy hero */
+    .hero {
+      position: relative;
+      height: 100vh;
+      width: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      overflow: hidden;
+    }
+
+    .hero-bg {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: url('https://www.securities.io/wp-content/uploads/2022/08/Solana-Featured-Aug-2.jpg') no-repeat center center/cover;
+      filter: brightness(0.6);
+      transform: scale(1.1);
+      z-index: -2;
+      transition: transform 0.3s ease;
+    }
+
+    .hero-overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: linear-gradient(135deg, rgba(0,209,255,0.7), rgba(255,64,129,0.7));
+      mix-blend-mode: screen;
+      z-index: -1;
+    }
+
+    .hero-content {
+      position: relative;
+      max-width: 800px;
+      padding: 20px;
+    }
+
+    .hero-content h1 {
+      font-size: 3rem;
+      margin-bottom: 20px;
+      line-height: 1.2;
+    }
+
+    .hero-content p {
+      font-size: 1.25rem;
+      margin-bottom: 40px;
+    }
+
+    /* Pełnoekranowe sekcje – bez ograniczającego kontenera */
+    section {
+      padding: 80px 20px;
+      width: 100%;
+    }
+
+    .card {
+      background: var(--secondary-color);
+      border-radius: 10px;
+      padding: 40px;
+      margin-bottom: 40px;
+      box-shadow: 0 8px 20px rgba(0, 0, 0, 0.5);
+      transition: transform 0.3s ease;
+      width: 100%;
+      max-width: 1200px;
+      margin-left: auto;
+      margin-right: auto;
+    }
+
+    .card:hover {
+      transform: translateY(-10px);
+    }
+
+    .card h2 {
+      margin-top: 0;
+      color: var(--primary-color);
+    }
+
+    footer {
+      text-align: center;
+      padding: 40px 20px;
+      font-size: 0.9em;
+      color: #aaa;
+      border-top: 1px solid #333;
+      width: 100%;
+    }
+
+    /* Wersja mobilna */
+    @media (max-width: 768px) {
+      .hero-content h1 {
+        font-size: 2.5rem;
+      }
+      .hero-content p {
+        font-size: 1rem;
+      }
+      .card {
+        padding: 20px;
+      }
+    }
+  </style>
+
+  <!-- Sekcja Hero -->
+  <div class="hero">
+    <div class="hero-bg"></div>
+    <div class="hero-overlay"></div>
+    <div class="hero-content">
+      <h1>Witamy w InviLink</h1>
+      <p>Nowoczesna platforma biletowa na Solanie – rewolucja w świecie Web3.0</p>
+    </div>
+  </div>
+
+  <!-- Sekcja "O nas" -->
+  <section id="about">
+    <div class="card">
+      <h2>Czym jest InviLink?</h2>
+      <p>
+        InviLink to innowacyjna platforma biletowa, która wykorzystuje technologię blockchain opartą na Solanie.
+        Dzięki rozwiązaniom Web3.0 zapewniamy bezpieczne, przejrzyste i szybkie transakcje przy zakupie biletów na wydarzenia.
+      </p>
+    </div>
+  </section>
+
+  <!-- Sekcja "Technologie" -->
+  <section id="tools">
+    <div class="card">
+      <h2>Narzędzia i Technologie</h2>
+      <ul>
+        <li>Django</li>
+        <li>Solana</li>
+        <li>Rust</li>
+        <li>Blockchain</li>
+        <li>HTML5 &amp; CSS3</li>
+        <li>JavaScript</li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- Stopka -->
+  <footer id="contact">
+    <p>© Kajetan Mieloch</p>
+  </footer>
+
+  <script>
+    // Prosta animacja skalowania tła przy przewijaniu
+    window.addEventListener('scroll', function() {
+      const heroBg = document.querySelector('.hero-bg');
+      const scrollY = window.scrollY;
+      heroBg.style.transform = `scale(${1.1 + scrollY / 1000})`;
+    });
+  </script>
+{% endblock %}
