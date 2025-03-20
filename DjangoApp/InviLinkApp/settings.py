@@ -46,6 +46,7 @@ INSTALLED_APPS = [
     # my apps
     'test_blockchain',
     'admin_panel',
+    'event_zone'
 ]
 
 
