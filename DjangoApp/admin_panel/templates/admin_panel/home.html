@@ -1,0 +1,192 @@
+{% extends "base.html" %}
+{% block content %}
+<style>
+  :root {
+    --transition-speed: 0.5s;
+    --primary-color: #000000; /* czarny */
+    --secondary-color: #f1c40f; /* żółty */
+    --accent-color: #8e44ad; /* fioletowy */
+    /* Gradient colors for Solana-like effect */
+    --gradient-start: #1e90ff; /* niebieski */
+    --gradient-end: #8e44ad;   /* fioletowy */
+  }
+
+  html, body {
+    margin: 0;
+    padding: 0;
+    overflow-x: hidden;
+    background: #111;
+    font-family: sans-serif;
+  }
+
+  /* Modal overlay covers entire screen */
+  .modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.8);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+  }
+
+  /* Modal card styling */
+  .modal {
+    background: #000;
+    border: 2px solid var(--accent-color);
+    border-radius: 8px;
+    width: 95%;
+    height: 95%;
+    margin-top: 1.25%;
+    margin-left: 2.5%;
+    padding: 30px;
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    text-align: center;
+    color: white;
+  }
+
+  .modal-content {
+    overflow-y: auto;
+    background-color: #000;
+  }
+
+  .modal h1 {
+    font-size: 2rem;
+    margin-bottom: 20px;
+  }
+
+  .modal p {
+    font-size: 1rem;
+    line-height: 1.5;
+    margin-bottom: 20px;
+  }
+
+  /* Footer container for modal actions */
+  .modal-footer {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  /* Container for the buttons at the bottom */
+  .button-row {
+    display: flex;
+    justify-content: center;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+
+  .btn {
+    padding: 10px 20px;
+    font-size: 1rem;
+    border-radius: 4px;
+    cursor: pointer;
+    border: none;
+    transition: background 0.3s, color 0.3s;
+    text-decoration: none;
+  }
+
+  /* Filled gradient button: "Take me to event zone" */
+  .btn-filled {
+    background: linear-gradient(45deg, var(--gradient-start), var(--gradient-end));
+    color: white;
+  }
+
+  /* Outline button with gradient border and gradient text: "Take me to organiser site" */
+  .btn-outline {
+    background: transparent;
+    border: 2px solid transparent;
+    border-image: linear-gradient(45deg, var(--gradient-start), var(--gradient-end)) 1;
+    border-radius: 4px;
+    padding: 10px 20px;
+    font-size: 1rem;
+    background: linear-gradient(45deg, var(--gradient-start), var(--gradient-end));
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+
+  /* Yellow button with black text: "im an admin" */
+  .btn-yellow {
+    background: var(--secondary-color);
+    color: var(--primary-color);
+    border: none;
+    border-radius: 4px;
+    padding: 10px 20px;
+    font-size: 1rem;
+    cursor: pointer;
+  }
+
+  /* Checkbox container styling */
+  .checkbox-container {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-top: 10px;
+  }
+
+  .checkbox-container input {
+    margin-right: 10px;
+    transform: scale(1.2);
+  }
+</style>
+
+<div class="modal-overlay" id="adminModal">
+  <div class="modal">
+    <div class="modal-content">
+      <h1>Administrative Access Only</h1>
+      <p>
+        This page is strictly for the contract manager. If you are a participant, you are most likely looking for the
+        Event Zone, and if you are an organizer, please visit the Organiser Site.
+      </p>
+    </div>
+    <div class="modal-footer">
+      <div class="button-row">
+        <a class="btn btn-filled" href="https://invilink.bieda.it/explore" target="_blank" rel="noopener noreferrer">
+          Take me to event zone
+        </a>
+        <a class="btn btn-outline" href="https://invilink.bieda.it/org" target="_blank" rel="noopener noreferrer">
+          Take me to organiser site
+        </a>
+        <button class="btn btn-yellow" id="adminBtn" disabled>
+          im an admin
+        </button>
+      </div>
+      <div class="checkbox-container">
+        <input type="checkbox" id="ackCheckbox">
+        <label for="ackCheckbox">I understand</label>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Placeholder for Admin Interface (a blank white page for now) -->
+<div id="adminContent" style="display: none; background: #000000; min-height: 100vh; padding: 40px; text-align: center;">
+  <h2>Admin Dashboard</h2>
+  <p>This area will contain administrative tools and controls.</p>
+</div>
+
+<script>
+  const ackCheckbox = document.getElementById('ackCheckbox');
+  const adminBtn = document.getElementById('adminBtn');
+  const adminModal = document.getElementById('adminModal');
+  const adminContent = document.getElementById('adminContent');
+
+  // Enable "im an admin" button when the checkbox is checked
+  ackCheckbox.addEventListener('change', function() {
+    adminBtn.disabled = !this.checked;
+  });
+
+  // When "im an admin" is clicked, hide the modal and show the admin content
+  adminBtn.addEventListener('click', function() {
+    adminModal.style.display = 'none';
+    adminContent.style.display = 'block';
+  });
+</script>
+{% endblock %}
