@@ -45,6 +45,7 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     # my apps
     'test_blockchain',
+    'admin_panel',
 ]
 
 

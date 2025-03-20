@@ -8,42 +8,44 @@
   <title>{% block title %}InviLink{% endblock %}</title>
   <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
   <link rel="stylesheet" href="{% static 'css/styles.css' %}">
+  <link rel="icon" href="{% static 'images/favicon.ico' %}">
   <style>
     body {
+      background-color: #000000; /* główny kolor: czarny */
+      color: #ffffff;
       margin: 0;
       padding: 0;
       font-family: 'Arial', sans-serif;
     }
-    /* Pasek nawigacyjny: przezroczysty i przyklejony */
+    /* Pasek nawigacyjny */
     .navbar {
       transition: background-color 0.3s ease, box-shadow 0.3s ease;
       position: fixed;
       top: 0;
       width: 100%;
       z-index: 999;
+      background-color: #000000 !important; /* czarny */
     }
-    /* Domyślny stan – przezroczysty */
-    .navbar.bg-transparent {
-      background-color: rgba(86, 9, 185, 0.8) !important;
+    .navbar-brand {
+      color: #f1c40f !important; /* secondary: żółty */
+      font-weight: bold;
     }
-    /* Po przewinięciu – lekko zmienione tło i cień */
-    .navbar.scrolled {
-      background-color: rgba(255, 255, 255, 0.8) !important;
-      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+    .navbar-brand:hover {
+      color: #8e44ad !important; /* secondary: fioletowy */
     }
-
     .nav-link {
-      color: #00d1ff !important;
+      color: #f1c40f !important; /* secondary: żółty */
       font-weight: 800;
       font-size: large;
     }
-
-
+    .nav-link:hover {
+      color: #8e44ad !important; /* secondary: fioletowy */
+    }
   </style>
 </head>
 <body>
   <!-- Navbar -->
-  <nav class="navbar navbar-expand-lg bg-transparent">
+  <nav class="navbar navbar-expand-lg">
     <a class="navbar-brand" href="{% url 'home' %}">InviLink</a>
     <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarNav" 
       aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
@@ -65,16 +67,5 @@
   <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/popper.js@1.16.1/dist/umd/popper.min.js"></script>
   <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
-  <script>
-    // Dodanie klasy 'scrolled' do navbaru przy przewijaniu strony
-    window.addEventListener('scroll', function() {
-      const navbar = document.querySelector('.navbar');
-      if (window.scrollY > 50) {
-        navbar.classList.add('scrolled');
-      } else {
-        navbar.classList.remove('scrolled');
-      }
-    });
-  </script>
 </body>
 </html>
