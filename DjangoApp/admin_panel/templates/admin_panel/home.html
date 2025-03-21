@@ -232,30 +232,50 @@
       const connection = new solanaWeb3.Connection(NETWORK, "confirmed");
       //ID of the Anchor program
       //Calculate PDA (Program Derived Address) for `event_registry`
-      const [organizersPoolPDA] = await solanaWeb3.PublicKey.findProgramAddress(
+      const [eventRegistry] = await solanaWeb3.PublicKey.findProgramAddress(
           [new TextEncoder().encode("event_registry")],  // Seed compatible with Anchor.toml
           PROGRAM_ID
       );
 
-      logMessage("Organizers Pool PDA: " + organizersPoolPDA.toBase58());
+        //Calculate PDA (Program Derived Address) for `organizers_pool`
+      const [organizersPool] = await solanaWeb3.PublicKey.findProgramAddress(
+          [new TextEncoder().encode("organizers_pool")],  // Seed compatible with Anchor.toml
+          PROGRAM_ID
+      );
 
-      //Discriminator for the `initialize_event_registry` function
-      const discriminator = new Uint8Array([222, 221, 108, 11, 214, 161, 6, 121]);
+      logMessage("Organizers Pool PDA: " + eventRegistry.toBase58());
+
+      //eventRegistryDiscriminator for the `initialize_event_registry` function
+      const eventRegistryDiscriminator = new Uint8Array([222, 221, 108, 11, 214, 161, 6, 121]);
+      const organizersPoolDiscriminator = new Uint8Array([213, 153, 51, 23, 150, 192, 71, 166]);
 
       //Create transaction instruction
-      const transactionInstruction = new solanaWeb3.TransactionInstruction({
+      const eventRegistryInstruction = new solanaWeb3.eventRegistryInstruction({
           keys: [
-              { pubkey: organizersPoolPDA, isSigner: false, isWritable: true },  // Konto PDA
+              { pubkey: eventRegistry, isSigner: false, isWritable: true },  // Konto PDA
               { pubkey: walletPublicKey, isSigner: true, isWritable: true },     // Payer
               { pubkey: solanaWeb3.SystemProgram.programId, isSigner: false, isWritable: false }  // System Program
           ],
           programId: PROGRAM_ID,
-          data: discriminator // We send only 8 bytes from the function discriminator
+          data: eventRegistryDiscriminator // We send only 8 bytes from the function eventRegistryDiscriminator
+      });
+
+      const organizersPoolInstruction = new solanaWeb3.organizersPoolInstruction({
+          keys: [
+              { pubkey: organizersPool, isSigner: false, isWritable: true },  // Konto PDA
+              { pubkey: walletPublicKey, isSigner: true, isWritable: true },     // Payer
+              { pubkey: solanaWeb3.SystemProgram.programId, isSigner: false, isWritable: false }  // System Program
+          ],
+          programId: PROGRAM_ID,
+          data: organizersPoolDiscriminator // We send only 8 bytes from the function eventRegistryDiscriminator
       });
 
       try {
           //Create transaction
-          let transaction = new solanaWeb3.Transaction().add(transactionInstruction);
+          let transaction = new solanaWeb3.Transaction();
+          transaction.add(eventRegistryInstruction);
+          transaction.add(organizersPoolInstruction);
+
           transaction.feePayer = walletPublicKey;
           const { blockhash } = await connection.getLatestBlockhash();
           transaction.recentBlockhash = blockhash;
