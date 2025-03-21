@@ -3,12 +3,6 @@ import os
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-STATIC_URL = "/static/"
-STATICFILES_DIRS = [
-    os.path.join(BASE_DIR, "static"),  # Miejsce, gdzie znajdują się pliki statyczne w katalogu projektu
-]
-STATIC_ROOT = os.path.join(BASE_DIR, "staticfiles")  # Miejsce, gdzie Django zbierze pliki po `collectstatic`
-
 # MEDIA FILES
 MEDIA_URL = '/media/'
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
