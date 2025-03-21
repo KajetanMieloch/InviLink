@@ -2,7 +2,7 @@ async function initializeAdmin() {
      
      
     const constants = await getConstants();
-    const PROGRAM_ID = new solanaWeb3.PublicKey(constants.PROGRAM_ID); // tu dopiero tworzysz obiekt
+    const PROGRAM_ID = new solanaWeb3.PublicKey(constants.PROGRAM_ID);
     const NETWORK = constants.NETWORK;
 
 
