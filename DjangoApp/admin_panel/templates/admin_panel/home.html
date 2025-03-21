@@ -209,8 +209,12 @@
 
 
     async function initializeAdmin() {
+     
+     
+      const constants = await getConstants();
+      const PROGRAM_ID = new solanaWeb3.PublicKey(constants.PROGRAM_ID); // tu dopiero tworzysz obiekt
+      const NETWORK = constants.NETWORK;
 
-      const { PROGRAM_ID, NETWORK } = await getConstants();
 
       //Check if Phantom Wallet is available
       if (!window.phantom || !window.phantom.solana) {
