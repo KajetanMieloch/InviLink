@@ -124,17 +124,61 @@
     cursor: pointer;
   }
 
-  /* Checkbox container styling */
-  .checkbox-container {
+  /* Dodatkowe style dla przycisku "Initialise" */
+  #adminContent button.btn {
+    margin-top: 20px;
+  }
+
+  /* Styles for expandable log section */
+  .log-container {
+    margin-top: 30px;
+    width: 90%;
+    max-width: 800px;
+    margin-left: auto;
+    margin-right: auto;
+  }
+
+  .log-header {
+    cursor: pointer;
+    border: 2px solid transparent;
+    border-image: linear-gradient(45deg, var(--gradient-start), var(--gradient-end)) 1;
+    border-radius: 4px;
+    padding: 10px 15px;
     display: flex;
     align-items: center;
     justify-content: center;
-    margin-top: 10px;
+    gap: 10px;
+    transition: background var(--transition-speed);
   }
 
-  .checkbox-container input {
-    margin-right: 10px;
-    transform: scale(1.2);
+  .log-header:hover {
+    background: rgba(255, 255, 255, 0.05);
+  }
+
+  .log-header span {
+    font-size: 1.1rem;
+  }
+
+  .log-arrow {
+    font-size: 1.2rem;
+    /* Gradient text effect for the arrow */
+    background: linear-gradient(45deg, var(--gradient-start), var(--gradient-end));
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+
+  .log-content {
+    display: none;
+    margin-top: 5px;
+    background: #2c2c2c;
+    border-radius: 4px;
+    padding: 15px;
+    font-family: Consolas, "Courier New", monospace;
+    color: #fff;
+    text-align: left;
+    max-height: 300px;
+    overflow-y: auto;
   }
 </style>
 
@@ -146,7 +190,7 @@
         This page is strictly for the contract manager. If you are a participant, you are most likely looking for the
         Event Zone, and if you are an organizer, please visit the Organiser Site.
         </br>
-        If you need anny help, please contact us at <a href="mailto: 339562@uwr.edu.pl"> 339562@uwr.edu.pl </a> <strong> I will be happy to help you! </strong>
+        If you need any help, please contact us at <a href="mailto:339562@uwr.edu.pl">339562@uwr.edu.pl</a> <strong>I will be happy to help you!</strong>
       </p>
     </div>
     <div class="modal-footer">
@@ -169,39 +213,60 @@
   </div>
 </div>
 
-<!-- Placeholder for Admin Interface (a blank white page for now) -->
+<!-- Placeholder for Admin Interface (initialnie ukryty) -->
 <div id="adminContent" style="display: none; min-height: 100vh; padding: 40px; text-align: center;">
   <h1>Admin Dashboard</h1>
   <h2>Initialise Event Registry and Organizer Pool</h2>
-  <button onclick="initializeAdmin()">Initialise</button>
+  <!-- Stylizowany przycisk "Initialise" -->
+  <button class="btn btn-filled" onclick="initializeAdmin()">Initialise</button>
 
-  <div id="log"></div>
-  
+  <!-- Rozwijalna sekcja logów -->
+  <div id="logContainer" class="log-container">
+    <div id="logHeader" class="log-header">
+      <span>Logs of TX:</span>
+      <span id="logArrow" class="log-arrow">&#9654;</span>
+    </div>
+    <div id="logContent" class="log-content">
+      <!-- Logi będą dodawane dynamicznie, każda linia oddzielnie -->
+    </div>
+  </div>
 </div>
 
-
-<!-- Javascript to handle the modal and admin content -->
+<!-- Javascript obsługujący modal i zawartość admina -->
 <script>
   const ackCheckbox = document.getElementById('ackCheckbox');
   const adminBtn = document.getElementById('adminBtn');
   const adminModal = document.getElementById('adminModal');
   const adminContent = document.getElementById('adminContent');
 
-  // Enable "im an admin" button when the checkbox is checked
+  // Włącz przycisk "im an admin" po zaznaczeniu checkboxa
   ackCheckbox.addEventListener('change', function() {
     adminBtn.disabled = !this.checked;
   });
 
-  // When "im an admin" is clicked, hide the modal and show the admin content
+  // Po kliknięciu "im an admin", ukryj modal i pokaż panel admina
   adminBtn.addEventListener('click', function() {
     adminModal.style.display = 'none';
     adminContent.style.display = 'block';
   });
+
+  // Rozwijana sekcja logów
+  const logHeader = document.getElementById('logHeader');
+  const logContent = document.getElementById('logContent');
+  const logArrow = document.getElementById('logArrow');
+
+  logHeader.addEventListener('click', function() {
+    if (logContent.style.display === 'none' || logContent.style.display === '') {
+      logContent.style.display = 'block';
+      logArrow.innerHTML = '&#9660;'; // strzałka w dół
+    } else {
+      logContent.style.display = 'none';
+      logArrow.innerHTML = '&#9654;'; // strzałka w prawo
+    }
+  });
 </script>
 
-
-
-<!-- Javascript to handle initialisation of the Event Registry, Organizer Pool -->
+<!-- Skrypty do obsługi interakcji z blockchainem -->
 <script src="https://cdn.jsdelivr.net/npm/@solana/web3.js@latest/lib/index.iife.min.js"></script>
 <script src="{% static 'js/logmsg.js' %}"></script>
 <script src="{% static 'js/getConstants.js' %}"></script>
