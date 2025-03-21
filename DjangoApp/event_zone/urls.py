@@ -8,4 +8,4 @@ app_name = 'event_zone'
 
 urlpatterns = [
     path('', views.home, name='home'),
-] + static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)
+]

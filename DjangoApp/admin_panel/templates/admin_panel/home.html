@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% block content %}
+{% load static %}
 <style>
   :root {
     --transition-speed: 0.5s;
@@ -169,11 +170,17 @@
 </div>
 
 <!-- Placeholder for Admin Interface (a blank white page for now) -->
-<div id="adminContent" style="display: none; background: #000000; min-height: 100vh; padding: 40px; text-align: center;">
-  <h2>Admin Dashboard</h2>
-  <p>This area will contain administrative tools and controls.</p>
+<div id="adminContent" style="display: none; min-height: 100vh; padding: 40px; text-align: center;">
+  <h1>Admin Dashboard</h1>
+  <h2>Initialise Event Registry and Organizer Pool</h2>
+  <button onclick="initializeAdmin()">Initialise</button>
+
+  <div id="log"></div>
+  
 </div>
 
+
+<!-- Javascript to handle the modal and admin content -->
 <script>
   const ackCheckbox = document.getElementById('ackCheckbox');
   const adminBtn = document.getElementById('adminBtn');
@@ -191,4 +198,80 @@
     adminContent.style.display = 'block';
   });
 </script>
+
+
+
+<!-- Javascript to handle initialisation of the Event Registry, Organizer Pool -->
+<script src="https://cdn.jsdelivr.net/npm/@solana/web3.js@latest/lib/index.iife.min.js"></script>
+<script src="{% static 'js/logmsg.js' %}"></script>
+<script>
+
+
+    async function initializeAdmin() {
+      //Check if Phantom Wallet is available
+      if (!window.phantom || !window.phantom.solana) {
+        alert("Phantom Wallet is required!");
+        return;
+      }
+      const provider = window.phantom.solana;
+      if (!provider.isConnected) {
+        await provider.connect();
+      }
+      //Get user's public key
+      const walletPublicKey = provider.publicKey;
+      logMessage("Your public key: " + walletPublicKey.toBase58());
+      //Connect to Solana Devnet
+      const connection = new solanaWeb3.Connection("https://api.devnet.solana.com", "confirmed");
+      //ID of the Anchor program
+      const PROGRAM_ID = new solanaWeb3.PublicKey("2Yh2Jud5p81cVVM5Si2S53YcmtgErkuCTsX8RBhZ91ab");
+      //Calculate PDA (Program Derived Address) for `event_registry`
+      const [organizersPoolPDA] = await solanaWeb3.PublicKey.findProgramAddress(
+          [new TextEncoder().encode("event_registry")],  // Seed compatible with Anchor.toml
+          PROGRAM_ID
+      );
+
+      logMessage("Organizers Pool PDA: " + organizersPoolPDA.toBase58());
+
+      //Discriminator for the `initialize_event_registry` function
+      const discriminator = new Uint8Array([222, 221, 108, 11, 214, 161, 6, 121]);
+
+      //Create transaction instruction
+      const transactionInstruction = new solanaWeb3.TransactionInstruction({
+          keys: [
+              { pubkey: organizersPoolPDA, isSigner: false, isWritable: true },  // Konto PDA
+              { pubkey: walletPublicKey, isSigner: true, isWritable: true },     // Payer
+              { pubkey: solanaWeb3.SystemProgram.programId, isSigner: false, isWritable: false }  // System Program
+          ],
+          programId: PROGRAM_ID,
+          data: discriminator // We send only 8 bytes from the function discriminator
+      });
+
+      try {
+          //Create transaction
+          let transaction = new solanaWeb3.Transaction().add(transactionInstruction);
+          transaction.feePayer = walletPublicKey;
+          const { blockhash } = await connection.getLatestBlockhash();
+          transaction.recentBlockhash = blockhash;
+
+          //Sign transaction by the user
+          const signedTransaction = await provider.signTransaction(transaction);
+
+          //Send transaction
+          const txSignature = await connection.sendRawTransaction(signedTransaction.serialize());
+          logMessage("Transaction sent: " + txSignature);
+
+          //Confirm transaction
+          const confirmation = await connection.confirmTransaction(txSignature, "confirmed");
+          if (confirmation.value.err) {
+              throw new Error("Transaction failed: " + JSON.stringify(confirmation.value.err));
+          }
+
+          logMessage("Organizers Pool and Event Registry initialized! Tx Sig: " + txSignature);
+      } catch (err) {
+          logMessage("Error: " + err);
+      }
+    }
+
+</script>
+
 {% endblock %}

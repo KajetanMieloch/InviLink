@@ -14,4 +14,4 @@ urlpatterns = [
     path('admin_panel/', include('admin_panel.urls')),
     path('explore/', include('event_zone.urls')),
     path('organizer/', include('organizer.urls')),
-] + static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)
+]
