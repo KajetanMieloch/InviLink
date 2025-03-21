@@ -12,5 +12,6 @@ urlpatterns = [
     path('test_blockchain/', include('test_blockchain.urls')),
     path('', views.home, name='home'),
     path('admin_panel/', include('admin_panel.urls')),
-    path('explore/', include('event_zone.urls'))
+    path('explore/', include('event_zone.urls')),
+    path('organizer/', include('organizer.urls')),
 ] + static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)

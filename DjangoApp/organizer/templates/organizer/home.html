@@ -137,15 +137,13 @@
   }
 </style>
 
-<div class="modal-overlay" id="adminModal">
+<div class="modal-overlay" id="orgModal">
   <div class="modal">
     <div class="modal-content">
-      <h1>Administrative Access Only</h1>
+      <h1>Organiser Access Only</h1>
       <p>
-        This page is strictly for the contract manager. If you are a participant, you are most likely looking for the
-        Event Zone, and if you are an organizer, please visit the Organiser Site.
-        </br>
-        If you need anny help, please contact us at <a href="mailto: 339562@uwr.edu.pl"> 339562@uwr.edu.pl </a> <strong> I will be happy to help you! </strong>
+        This page is strictly for the organisers. If you are a participant, you are most likely looking for the
+        Event Zone.
       </p>
     </div>
     <div class="modal-footer">
@@ -153,11 +151,8 @@
         <a class="btn btn-filled" href="https://invilink.bieda.it/explore" target="_blank" rel="noopener noreferrer">
           Take me to event zone
         </a>
-        <a class="btn btn-outline" href="https://invilink.bieda.it/organizer" target="_blank" rel="noopener noreferrer">
-          Take me to organiser site
-        </a>
-        <button class="btn btn-yellow" id="adminBtn" disabled>
-          im an admin
+        <button class="btn btn-yellow" id="orgBtn" disabled>
+          Im an organizer
         </button>
       </div>
       <div class="checkbox-container">
@@ -169,26 +164,26 @@
 </div>
 
 <!-- Placeholder for Admin Interface (a blank white page for now) -->
-<div id="adminContent" style="display: none; background: #000000; min-height: 100vh; padding: 40px; text-align: center;">
+<div id="orgContent" style="display: none; background: #000000; min-height: 100vh; padding: 40px; text-align: center;">
   <h2>Admin Dashboard</h2>
   <p>This area will contain administrative tools and controls.</p>
 </div>
 
 <script>
   const ackCheckbox = document.getElementById('ackCheckbox');
-  const adminBtn = document.getElementById('adminBtn');
-  const adminModal = document.getElementById('adminModal');
-  const adminContent = document.getElementById('adminContent');
+  const orgBtn = document.getElementById('orgBtn');
+  const orgModal = document.getElementById('orgModal');
+  const orgContent = document.getElementById('orgContent');
 
-  // Enable "im an admin" button when the checkbox is checked
+  // Enable "Im organizer" button when the checkbox is checked
   ackCheckbox.addEventListener('change', function() {
-    adminBtn.disabled = !this.checked;
+    orgBtn.disabled = !this.checked;
   });
 
   // When "im an admin" is clicked, hide the modal and show the admin content
-  adminBtn.addEventListener('click', function() {
-    adminModal.style.display = 'none';
-    adminContent.style.display = 'block';
+  orgBtn.addEventListener('click', function() {
+    orgModal.style.display = 'none';
+    orgContent.style.display = 'block';
   });
 </script>
 {% endblock %}
