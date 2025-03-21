@@ -204,14 +204,12 @@
 <!-- Javascript to handle initialisation of the Event Registry, Organizer Pool -->
 <script src="https://cdn.jsdelivr.net/npm/@solana/web3.js@latest/lib/index.iife.min.js"></script>
 <script src="{% static 'js/logmsg.js' %}"></script>
-<script src="{% static 'js/getConstants.js' %}"></script>
 <script>
 
 
     async function initializeAdmin() {
 
-      const { PROGRAM_ID, NETWORK } = await getConstants();
-
+      
       //Check if Phantom Wallet is available
       if (!window.phantom || !window.phantom.solana) {
         alert("Phantom Wallet is required!");
@@ -225,8 +223,9 @@
       const walletPublicKey = provider.publicKey;
       logMessage("Your public key: " + walletPublicKey.toBase58());
       //Connect to Solana Devnet
-      const connection = new solanaWeb3.Connection(NETWORK, "confirmed");
+      const connection = new solanaWeb3.Connection("https://api.devnet.solana.com", "confirmed");
       //ID of the Anchor program
+      const PROGRAM_ID = new solanaWeb3.PublicKey("2Yh2Jud5p81cVVM5Si2S53YcmtgErkuCTsX8RBhZ91ab");
       //Calculate PDA (Program Derived Address) for `event_registry`
       const [organizersPoolPDA] = await solanaWeb3.PublicKey.findProgramAddress(
           [new TextEncoder().encode("event_registry")],  // Seed compatible with Anchor.toml
