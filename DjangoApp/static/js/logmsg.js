@@ -1,9 +1,5 @@
 function logMessage(message) {
-  const logEl = document.getElementById("logContent");
-  if (!logEl) {
-    console.warn("Element o id 'logContent' nie został znaleziony.");
-    return;
+    const logEl = document.getElementById("logContent");
+    logEl.textContent += message + "\n";
+    console.log(message);
   }
-  logEl.textContent += message + "\n";
-  console.log(message);
-}
