@@ -2,7 +2,7 @@ async function initializeAdmin() {
      
      
     const constants = await getConstants();
-    const PROGRAM_ID = new solanaWeb3.PublicKey(constants.PROGRAM_ID); // tu dopiero tworzysz obiekt
+    const PROGRAM_ID = new solanaWeb3.PublicKey(constants.PROGRAM_ID);
     const NETWORK = constants.NETWORK;
 
 
@@ -42,7 +42,7 @@ async function initializeAdmin() {
     //Create transaction instruction
     const eventRegistryInstruction = new solanaWeb3.TransactionInstruction({
         keys: [
-            { pubkey: eventRegistry, isSigner: false, isWritable: true },  // Konto PDA
+            { pubkey: eventRegistry, isSigner: false, isWritable: true },  // PDA acc
             { pubkey: walletPublicKey, isSigner: true, isWritable: true },     // Payer
             { pubkey: solanaWeb3.SystemProgram.programId, isSigner: false, isWritable: false }  // System Program
         ],
@@ -52,7 +52,7 @@ async function initializeAdmin() {
 
     const organizersPoolInstruction = new solanaWeb3.TransactionInstruction({
         keys: [
-            { pubkey: organizersPool, isSigner: false, isWritable: true },  // Konto PDA
+            { pubkey: organizersPool, isSigner: false, isWritable: true },  // PDA acc
             { pubkey: walletPublicKey, isSigner: true, isWritable: true },     // Payer
             { pubkey: solanaWeb3.SystemProgram.programId, isSigner: false, isWritable: false }  // System Program
         ],
