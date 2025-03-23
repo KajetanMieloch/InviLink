@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+
+{% block content %}
+<style>
+  .not-found-container {
+    position: relative;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    color: white;
+    text-align: center;
+    padding: 20px;
+    overflow: hidden;
+    z-index: 1;
+  }
+
+  .not-found-container::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: url("https://img.huffingtonpost.com/asset/55dde0c81400002e002e40df.jpeg?cache=o95ml0usvc&ops=1910_1000") center/cover no-repeat;
+    filter: blur(8px) brightness(0.3);
+    z-index: -1;
+  }
+
+  .not-found-container h1 {
+    font-size: 4.5rem;
+    margin-bottom: 20px;
+    background: linear-gradient(45deg, #ff6b6b, #c0392b);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+
+  .not-found-container p {
+    font-size: 1.3rem;
+    margin-bottom: 30px;
+    color: #eee;
+    max-width: 600px;
+  }
+
+  .btn-filled {
+    background: linear-gradient(45deg, #1e90ff, #8e44ad);
+    color: white;
+    border: none;
+    padding: 12px 24px;
+    font-size: 1rem;
+    border-radius: 4px;
+    cursor: pointer;
+    text-decoration: none;
+    transition: background 0.3s ease;
+    z-index: 1;
+  }
+
+  .btn-filled:hover {
+    background: linear-gradient(45deg, #3aa0ff, #a262d4);
+    text-decoration: none;
+  }
+</style>
+
+<div class="not-found-container">
+  <h1>500</h1>
+  <p>Nasze serwery chyba wybuchły 💥 Spróbuj ponownie później.</p>
+  <a href="/" class="btn-filled">Wróć na stronę główną</a>
+</div>
+{% endblock %}
