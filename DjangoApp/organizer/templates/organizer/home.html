@@ -112,7 +112,7 @@
     color: transparent;
   }
 
-  /* Yellow button with black text: "im an admin" */
+  /* Yellow button with black text: "im an org" */
   .btn-yellow {
     background: var(--secondary-color);
     color: var(--primary-color);
@@ -135,6 +135,76 @@
     margin-right: 10px;
     transform: scale(1.2);
   }
+
+
+  .org-sections {
+    display: flex;
+    flex-direction: row;
+    height: 100vh;
+    box-sizing: border-box;
+    width: 100%;
+  }
+
+  .section {
+    position: relative;
+    overflow: hidden;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.5);
+    border-radius: 8px;
+    width: 50%;
+    height: 100%;
+  }
+
+
+  /* Background for section using pseudoelement */
+  .section::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-image: var(--bg-url);
+    background-size: cover;
+    background-position: center;
+    filter: blur(8px) brightness(0.4);
+    transition: all 0.5s ease;
+  }
+
+  /* Hover effect on background */
+  .section:hover::before {
+    filter: blur(4px) brightness(0.6);
+    transform: scale(1.05);
+  }
+
+  /* Section content styling – centered both vertically and horizontally */
+  .section-content {
+    position: relative;
+    z-index: 1;
+    padding: 20px;
+    color: white;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    text-align: center;
+    overflow-y: auto;
+  }
+
+  a.section {
+  text-decoration: none;
+  color: inherit;
+}
+
+a.section:hover {
+  text-decoration: none;
+}
+
+a.section h2 {
+  text-decoration: none;
+}
+
+
 </style>
 
 <div class="modal-overlay" id="orgModal">
@@ -148,7 +218,7 @@
     </div>
     <div class="modal-footer">
       <div class="button-row">
-        <a class="btn btn-filled" href="https://invilink.bieda.it/explore" target="_blank" rel="noopener noreferrer">
+        <a class="btn btn-filled" href="/explore">
           Take me to event zone
         </a>
         <button class="btn btn-yellow" id="orgBtn" disabled>
@@ -163,11 +233,24 @@
   </div>
 </div>
 
-<!-- Placeholder for Admin Interface (a blank white page for now) -->
-<div id="orgContent" style="display: none; background: #000000; min-height: 100vh; padding: 40px; text-align: center;">
-  <h2>Admin Dashboard</h2>
-  <p>This area will contain administrative tools and controls.</p>
+<!-- org Interface with 3 Sections -->
+<div class="org-sections" id="orgContent" style="display: none;">
+  <!-- Section 1: Initialization -->
+  <a class="section" style="--bg-url: url('https://www.healthleadersmedia.com/sites/hlmp/files/files/shutterstock_2124967913.jpg');" href="/organizer/events">
+    <div class="section-content">
+      <h2>Events Mangment</h2>
+    </div>
+  </a>
+
+  <!-- Section 2: Add new organizer -->
+  <a class="section" style="--bg-url: url('https://www.montreuxjazzfestival.com/wp-content/uploads/2022/04/staff-hommes-dos.jpg');" href="/organizer/validation">
+    <div class="section-content">
+      <h2>Ticet Validation</h2>
+    </div>
+  </a>
+
 </div>
+
 
 <!-- JavaScript to handle the modal and checkbox -->
 
@@ -182,10 +265,10 @@
     orgBtn.disabled = !this.checked;
   });
 
-  // When "im an admin" is clicked, hide the modal and show the admin content
+  // When "im an org" is clicked, hide the modal and show the org content
   orgBtn.addEventListener('click', function() {
     orgModal.style.display = 'none';
-    orgContent.style.display = 'block';
+    orgContent.style.display = 'flex';
   });
 </script>
 

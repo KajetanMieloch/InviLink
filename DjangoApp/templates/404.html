@@ -1,0 +1,69 @@
+{% extends "base.html" %}
+
+{% block content %}
+<style>
+  .not-found-container {
+    position: relative;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    color: white;
+    text-align: center;
+    padding: 20px;
+    overflow: hidden;
+    z-index: 1;
+  }
+
+  .not-found-container::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: url(https://dailycoin.com/wp-content/uploads/2022/12/Solana-_-History_web.jpg) center/cover no-repeat;
+    filter: blur(4px) brightness(0.3);
+    z-index: -1;
+  }
+
+  .not-found-container h1 {
+    font-size: 5rem;
+    margin-bottom: 20px;
+    background: linear-gradient(45deg, #1e90ff, #8e44ad);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+
+  .not-found-container p {
+    font-size: 1.2rem;
+    margin-bottom: 30px;
+    color: #ccc;
+  }
+
+  .btn-filled {
+    background: linear-gradient(45deg, #1e90ff, #8e44ad);
+    color: white;
+    border: none;
+    padding: 12px 24px;
+    font-size: 1rem;
+    border-radius: 4px;
+    cursor: pointer;
+    text-decoration: none;
+    transition: background 0.3s ease;
+    z-index: 1;
+  }
+
+  .btn-filled:hover {
+    background: linear-gradient(45deg, #3aa0ff, #a262d4);
+    text-decoration: none;
+  }
+</style>
+
+<div class="not-found-container">
+  <h1>404</h1>
+  <p>Sorry, the page you’re looking for doesn’t exist.</p>
+  <a href="/" class="btn-filled">Take me home</a>
+</div>
+{% endblock %}

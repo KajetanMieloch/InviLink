@@ -8,5 +8,6 @@ from . import views
 app_name = 'organizer'
 
 urlpatterns = [
-    path('', views.home, name='home')
+    path('', views.home, name='home'),
+    path('events/', views.events, name='events'),
 ]
