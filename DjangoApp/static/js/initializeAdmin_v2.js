@@ -1,9 +1,10 @@
-const constants = await getConstants();
-const PROGRAM_ID = new solanaWeb3.PublicKey(constants.PROGRAM_ID);
-const NETWORK = constants.NETWORK;
-
 async function initializeAdmin() {
-     
+
+    
+    const constants = await getConstants();
+    const PROGRAM_ID = new solanaWeb3.PublicKey(constants.PROGRAM_ID);
+    const NETWORK = constants.NETWORK;
+
    //Check if Phantom Wallet is available
     if (!window.phantom || !window.phantom.solana) {
       alert("Phantom Wallet is required!");

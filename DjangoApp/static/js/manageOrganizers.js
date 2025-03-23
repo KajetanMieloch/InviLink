@@ -1,9 +1,11 @@
-const constants = await getConstants();
-const PROGRAM_ID = new solanaWeb3.PublicKey(constants.PROGRAM_ID);
-const NETWORK = constants.NETWORK;
-
 async function fetchOrganizers() {
-  if (!window.phantom || !window.phantom.solana) {
+
+    const constants = await getConstants();
+    const PROGRAM_ID = new solanaWeb3.PublicKey(constants.PROGRAM_ID);
+    const NETWORK = constants.NETWORK;
+
+
+    if (!window.phantom || !window.phantom.solana) {
     alert("Phantom Wallet is required!");
     return;
   }
@@ -86,6 +88,13 @@ function renderOrganizersList(organizers) {
 }
 
 async function removeOrganizer(organizerAddress) {
+
+    
+const constants = await getConstants();
+const PROGRAM_ID = new solanaWeb3.PublicKey(constants.PROGRAM_ID);
+const NETWORK = constants.NETWORK;
+
+
   logMessage("Removing organizer: " + organizerAddress + "...");
 
   if (!window.phantom || !window.phantom.solana) {
@@ -101,7 +110,7 @@ async function removeOrganizer(organizerAddress) {
   const walletPublicKey = provider.publicKey;
   logMessage("Your public key: " + walletPublicKey.toBase58());
 
-  const connection = new solanaWeb3.Connection("https://api.devnet.solana.com", "confirmed");
+  const connection = new solanaWeb3.Connection(NETWORK, "confirmed");
 
   // Calculating PDA for organizers_pool
   const [organizersPoolPDA] = await solanaWeb3.PublicKey.findProgramAddress(

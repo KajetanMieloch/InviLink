@@ -1,8 +1,8 @@
-const constants = await getConstants();
-const PROGRAM_ID = new solanaWeb3.PublicKey(constants.PROGRAM_ID);
-const NETWORK = constants.NETWORK;
-
 async function addOrganizer() {
+
+  const constants = await getConstants();
+  const PROGRAM_ID = new solanaWeb3.PublicKey(constants.PROGRAM_ID);
+  const NETWORK = constants.NETWORK;
 
     if (!window.phantom || !window.phantom.solana) {
       alert("Phantom Wallet is required!");
