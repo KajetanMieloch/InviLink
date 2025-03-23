@@ -15,7 +15,7 @@ async function addOrganizer() {
     }
 
     const walletPublicKey = provider.publicKey;
-    logMessage("Your public key: " + walletPublicKey.toBase58());
+    console.log("Your public key: " + walletPublicKey.toBase58());
 
     const connection = new solanaWeb3.Connection(NETWORK, "confirmed");
 
@@ -39,7 +39,7 @@ async function addOrganizer() {
       PROGRAM_ID
     );
 
-    logMessage("Organizers Pool PDA: " + organizersPoolPDA.toBase58());
+    console.log("Organizers Pool PDA: " + organizersPoolPDA.toBase58());
 
     // Discriminator for the `add_organizer` function
     const discriminator = new Uint8Array([142, 52, 252, 155, 155, 95, 29, 215]);
@@ -71,15 +71,15 @@ async function addOrganizer() {
 
       const signedTransaction = await provider.signTransaction(transaction);
       const txSignature = await connection.sendRawTransaction(signedTransaction.serialize());
-      logMessage("Transaction sent, signature: " + txSignature);
+      console.log("Transaction sent, signature: " + txSignature);
 
       const confirmation = await connection.confirmTransaction(txSignature, "confirmed");
       if (confirmation.value.err) {
         throw new Error("Transaction failed: " + JSON.stringify(confirmation.value.err));
       }
 
-      logMessage("Organizer added! Tx Sig: " + txSignature);
+      console.log("Organizer added! Tx Sig: " + txSignature);
     } catch (err) {
-      logMessage("Error: " + err.message);
+      console.log("Error: " + err.message);
     }
 }
