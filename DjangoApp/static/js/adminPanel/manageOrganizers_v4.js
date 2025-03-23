@@ -61,7 +61,6 @@ async function fetchOrganizers() {
     renderOrganizersList(organizersList);
   } catch (err) {
     console.log("Error: " + err.message);
-    alert("Error: " + err.message);
   }
 }
 
