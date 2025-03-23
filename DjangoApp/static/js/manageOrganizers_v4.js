@@ -16,7 +16,7 @@ async function fetchOrganizers() {
   }
 
   const walletPublicKey = provider.publicKey;
-  logMessage("Your public key: " + walletPublicKey.toBase58());
+  console.log("Your public key: " + walletPublicKey.toBase58());
 
   const connection = new solanaWeb3.Connection(NETWORK, "confirmed");
 
@@ -26,7 +26,7 @@ async function fetchOrganizers() {
     PROGRAM_ID
   );
 
-  logMessage("Organizers Pool PDA: " + organizersPoolPDA.toBase58());
+  console.log("Organizers Pool PDA: " + organizersPoolPDA.toBase58());
 
   try {
     const accountInfo = await connection.getAccountInfo(organizersPoolPDA);
@@ -39,7 +39,7 @@ async function fetchOrganizers() {
 
     // Reading the number of organizers (offset by 8 bytes due to discriminator)
     const organizersCount = new DataView(accountInfo.data.buffer).getUint32(8, true);
-    logMessage("Number of organizers: " + organizersCount);
+    console.log("Number of organizers: " + organizersCount);
 
     // Organizers list
     const organizersList = [];
@@ -56,11 +56,11 @@ async function fetchOrganizers() {
       }
     }
 
-    logMessage("Organizers retrieved: " + JSON.stringify(organizersList));
+    console.log("Organizers retrieved: " + JSON.stringify(organizersList));
 
     renderOrganizersList(organizersList);
   } catch (err) {
-    logMessage("Error: " + err.message);
+    console.log("Error: " + err.message);
     alert("Error: " + err.message);
   }
 }
@@ -95,7 +95,7 @@ const PROGRAM_ID = new solanaWeb3.PublicKey(constants.PROGRAM_ID);
 const NETWORK = constants.NETWORK;
 
 
-  logMessage("Removing organizer: " + organizerAddress + "...");
+  console.log("Removing organizer: " + organizerAddress + "...");
 
   if (!window.phantom || !window.phantom.solana) {
     alert("Phantom Wallet is required!");
@@ -108,7 +108,7 @@ const NETWORK = constants.NETWORK;
   }
 
   const walletPublicKey = provider.publicKey;
-  logMessage("Your public key: " + walletPublicKey.toBase58());
+  console.log("Your public key: " + walletPublicKey.toBase58());
 
   const connection = new solanaWeb3.Connection(NETWORK, "confirmed");
 
@@ -118,7 +118,7 @@ const NETWORK = constants.NETWORK;
     PROGRAM_ID
   );
 
-  logMessage("Organizers Pool PDA: " + organizersPoolPDA.toBase58());
+  console.log("Organizers Pool PDA: " + organizersPoolPDA.toBase58());
 
   // Discriminator for the `remove_organizer` function
   const discriminator = new Uint8Array([64, 187, 72, 87, 252, 241, 195, 60]); // Discriminator from IDL
@@ -148,19 +148,19 @@ const NETWORK = constants.NETWORK;
 
     const signedTransaction = await provider.signTransaction(transaction);
     const txSignature = await connection.sendRawTransaction(signedTransaction.serialize());
-    logMessage("Transaction sent, signature: " + txSignature);
+    console.log("Transaction sent, signature: " + txSignature);
 
     const confirmation = await connection.confirmTransaction(txSignature, "confirmed");
     if (confirmation.value.err) {
       throw new Error("Transaction failed: " + JSON.stringify(confirmation.value.err));
     }
 
-    logMessage("Organizer removed! Tx Sig: " + txSignature);
+    console.log("Organizer removed! Tx Sig: " + txSignature);
     alert("Organizer removed! Tx Sig: " + txSignature);
 
     fetchOrganizers(); // Refresh the list
   } catch (err) {
-    logMessage("Error: " + err.message);
+    console.log("Error: " + err.message);
     alert("Error: " + err.message);
   }
 }

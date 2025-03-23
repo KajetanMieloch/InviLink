@@ -16,7 +16,7 @@ async function initializeAdmin() {
     }
     //Get user's public key
     const walletPublicKey = provider.publicKey;
-    logMessage("Your public key: " + walletPublicKey.toBase58());
+    console.log("Your public key: " + walletPublicKey.toBase58());
     //Connect to Solana Devnet
     const connection = new solanaWeb3.Connection(NETWORK, "confirmed");
     //ID of the Anchor program
@@ -32,7 +32,7 @@ async function initializeAdmin() {
         PROGRAM_ID
     );
 
-    logMessage("Organizers Pool PDA: " + eventRegistry.toBase58());
+    console.log("Organizers Pool PDA: " + eventRegistry.toBase58());
 
     //eventRegistryDiscriminator for the `initialize_event_registry` function
     const eventRegistryDiscriminator = new Uint8Array([222, 221, 108, 11, 214, 161, 6, 121]);
@@ -74,7 +74,7 @@ async function initializeAdmin() {
 
         //Send transaction
         const txSignature = await connection.sendRawTransaction(signedTransaction.serialize());
-        logMessage("Transaction sent: " + txSignature);
+        console.log("Transaction sent: " + txSignature);
 
         //Confirm transaction
         const confirmation = await connection.confirmTransaction(txSignature, "confirmed");
@@ -82,8 +82,8 @@ async function initializeAdmin() {
             throw new Error("Transaction failed: " + JSON.stringify(confirmation.value.err));
         }
 
-        logMessage("Organizers Pool and Event Registry initialized! Tx Sig: " + txSignature);
+        console.log("Organizers Pool and Event Registry initialized! Tx Sig: " + txSignature);
     } catch (err) {
-        logMessage("Error: " + err);
+        console.log("Error: " + err);
     }
 }
