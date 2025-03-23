@@ -10,4 +10,6 @@ app_name = 'organizer'
 urlpatterns = [
     path('', views.home, name='home'),
     path('events/', views.events, name='events'),
+    path('create_event/', views.create_event, name='create_event'),
+    path('manage_events/', views.manage_events, name='manage_events'),
 ]
