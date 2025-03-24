@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+{% block content %}
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+  <meta charset="UTF-8">
+  <title>Menadżer Seating - InviLink</title>
+  <!-- Solana Web3 -->
+  <script src="https://cdn.jsdelivr.net/npm/@solana/web3.js@latest/lib/index.iife.min.js"></script>
+  <!-- bn.js – globalna zmienna BN -->
+  <script src="https://cdn.jsdelivr.net/npm/bn.js@5.2.0/lib/bn.min.js"></script>
+  <style>
+    body { font-family: Arial, sans-serif; padding: 20px; }
+    label { display: block; margin: 10px 0; }
+    input, select { width: 300px; padding: 8px; font-size: 16px; }
+    button { margin: 10px 0; padding: 10px 15px; font-size: 16px; }
+    #log { margin: 20px 0; padding: 10px; border: 1px solid #ccc; width: 90%; white-space: pre-wrap; }
+    #eventDetails, #seatingCounter { margin-top: 20px; }
+    table { border-collapse: collapse; width: 90%; margin-top: 20px; }
+    th, td { border: 1px solid #ddd; padding: 8px; text-align: center; }
+    .seat-preview { display: grid; gap: 2px; }
+    .seat-preview div { width: 10px; height: 10px; }
+    #addSectionForm { margin-top: 20px; padding: 10px; border: 1px solid #aaa; width: 90%; display: none; }
+  </style>
+</head>
+<body>
+  <h1>Menadżer Seating - Szczegóły Eventu</h1>
+  
+  <label>Podaj Event ID:
+    <input id="eventIdInput" type="text" placeholder="Wprowadź Event ID">
+  </label>
+  <button onclick="loadEvent()">Wczytaj Event</button>
+  <div id="eventDetails"></div>
+  <div id="seatingCounter"></div>
+  <div id="sectionsTable"></div>
+  
+  <!-- Formularz dodania sekcji siedzeniowej (widoczny tylko, gdy event.seating_type jest 1 lub 2) -->
+  <div id="addSectionForm">
+    <h3>Dodaj Sekcję Siedzeniową</h3>
+    <label>Nazwa sekcji:
+      <input id="sectionNameInput" type="text" placeholder="np. Front Stage" required>
+    </label>
+    <label>Typ sekcji:
+      <select id="sectionTypeInput" required>
+        <option value="1">Numerowane</option>
+        <option value="0">Stojące</option>
+      </select>
+    </label>
+    <label>Cena biletu:
+      <input id="ticketPriceInput" type="number" placeholder="np. 100" min="0" required>
+    </label>
+    <label>Liczba wierszy:
+      <input id="rowsInput" type="number" placeholder="np. 5" min="1" required>
+    </label>
+    <label>Liczba miejsc w wierszu:
+      <input id="seatsPerRowInput" type="number" placeholder="np. 10" min="1" required>
+    </label>
+    <button onclick="addSeatingSection()">Dodaj Sekcję</button>
+  </div>
+{% endblock %}

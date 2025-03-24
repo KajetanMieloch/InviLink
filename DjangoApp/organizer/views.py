@@ -14,4 +14,4 @@ def explore(request):
     return render(request, 'organizer/explore_events.html')
 
 def manage(request, event_id):
-    return render(request, 'organizer/manage_event.html')
+    return render(request, 'organizer/manage_event.html', {'event_id': event_id})

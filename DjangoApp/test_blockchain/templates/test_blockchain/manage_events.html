@@ -119,70 +119,6 @@
       return buffer;
     }
 
-    // Dekodowanie EventNFT – rozszerzone o event_date (UNIX timestamp)
-    function decodeEventNFT(data) {
-      let offset = 8; // pomijamy 8 bajtowy discriminator
-      const dv = new DataView(data.buffer, data.byteOffset, data.byteLength);
-
-      function readString() {
-        if (offset + 4 > data.byteLength) return "";
-        const len = dv.getUint32(offset, true);
-        offset += 4;
-        if (offset + len > data.byteLength) return "";
-        const strBytes = data.slice(offset, offset + len);
-        offset += len;
-        return new TextDecoder().decode(strBytes);
-      }
-
-      const event_id = readString();
-      const organizerBytes = data.slice(offset, offset + 32); offset += 32;
-      const organizer = new solanaWeb3.PublicKey(organizerBytes).toBase58();
-      const name = readString();
-      
-      // Odczytujemy event_date (8 bajtów, i64)
-      let event_date = 0;
-      if (offset + 8 <= data.byteLength) {
-        event_date = Number(dv.getBigUint64(offset, true));
-        offset += 8;
-      }
-      
-      let ticket_price = "0";
-      if (offset + 8 <= data.byteLength) {
-        ticket_price = dv.getBigUint64(offset, true).toString();
-        offset += 8;
-      }
-      let available_tickets = "0";
-      if (offset + 8 <= data.byteLength) {
-        available_tickets = dv.getBigUint64(offset, true).toString();
-        offset += 8;
-      }
-      let sold_tickets = "0";
-      if (offset + 8 <= data.byteLength) {
-        sold_tickets = dv.getBigUint64(offset, true).toString();
-        offset += 8;
-      }
-      let seating_type = 0;
-      if (offset + 1 <= data.byteLength) {
-        seating_type = dv.getUint8(offset);
-        offset += 1;
-      }
-      let active = false;
-      if (offset + 1 <= data.byteLength) {
-        active = dv.getUint8(offset) !== 0;
-        offset += 1;
-      }
-      return {
-        event_id,
-        organizer,
-        name,
-        event_date,
-        ticket_price,
-        available_tickets,
-        sold_tickets,
-        seating_type,
-        active,
-      };
-    }
 
     // Dekodowanie SeatingMap – zakładamy: event_id, vec<Pubkey>, total_seats
     function decodeSeatingMap(data) {
@@ -234,52 +170,6 @@
       return { event_id, section_name, section_type, rows, seats_per_row, ticket_price: ticket_price.toString(), seat_status };
     }
 
-    async function loadEvent() {
-      try {
-        const eventId = document.getElementById("eventIdInput").value.trim();
-        if (!eventId) {
-          alert("Podaj Event ID!");
-          return;
-        }
-        logMessage("Wczytano Event ID: " + eventId);
-      
-        // Obliczamy PDA dla eventu: seeds = [ "event", eventId ]
-        const seed1 = new TextEncoder().encode("event");
-        const seed2 = new TextEncoder().encode(eventId);
-        const [eventPDA] = await solanaWeb3.PublicKey.findProgramAddress(
-          [seed1, seed2],
-          PROGRAM_ID
-        );
-        logMessage("Obliczone Event PDA: " + eventPDA.toBase58());
-      
-        const eventAcc = await connection.getAccountInfo(eventPDA);
-        if (!eventAcc) {
-          logMessage("Nie znaleziono konta eventu przy PDA: " + eventPDA.toBase58());
-          document.getElementById("eventDetails").textContent = "Nie znaleziono eventu o podanym Event ID.";
-          document.getElementById("seatingCounter").innerHTML = "";
-          document.getElementById("sectionsTable").innerHTML = "";
-          document.getElementById("addSectionForm").style.display = "none";
-          return;
-        }
-        logMessage("Znaleziono konto eventu.");
-        const eventData = decodeEventNFT(eventAcc.data);
-        logMessage("Zdekodowane dane eventu: " + JSON.stringify(eventData, null, 2));
-        showEventInfo(eventData);
-        window.currentEvent = eventData;
-      
-        if (eventData.seating_type === 1 || eventData.seating_type === 2) {
-          document.getElementById("addSectionForm").style.display = "block";
-          await loadSeatingSections(eventId);
-        } else {
-          document.getElementById("seatingCounter").innerHTML = "";
-          document.getElementById("sectionsTable").innerHTML = "<p>Event jest typu open-space (brak seating mapy).</p>";
-          document.getElementById("addSectionForm").style.display = "none";
-        }
-      } catch (err) {
-        logMessage("Błąd: " + err.message);
-        alert("Błąd podczas wczytywania eventu: " + err.message);
-      }
-    }
 
     function showEventInfo(eventData) {
       // Konwersja daty z UNIX timestamp na czytelny format (np. dd.mm.yyyy)

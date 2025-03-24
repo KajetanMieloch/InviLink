@@ -38,7 +38,7 @@ async function loadEvents() {
         <td>${eventData.organizer}</td>
         <td id="action-${pubkeyStr}"></td>
         `;
-        if (eventData.organizer === walletPublicKey.toBase58()) {
+                if (eventData.organizer === walletPublicKey.toBase58()) {
         tbody.appendChild(tr);
         const actionTd = document.getElementById("action-" + pubkeyStr);
             const btnManage = document.createElement("button");
