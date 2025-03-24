@@ -32,7 +32,6 @@ async function loadEvents() {
         <td>${eventData.event_id}</td>
         <td>${eventData.name}</td>
         <td>${eventDateStr}</td>
-        <td>${eventData.ticket_price}</td>
         <td>${eventData.available_tickets}</td>
         <td>${eventData.sold_tickets}</td>
         <td>${eventData.active}</td>
