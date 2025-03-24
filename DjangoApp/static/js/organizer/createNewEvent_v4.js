@@ -4,10 +4,10 @@ async function createNewEvent() {
     const PROGRAM_ID = new solanaWeb3.PublicKey(constants.PROGRAM_ID);
     const NETWORK = constants.NETWORK;
     const CREATE_EVENT_SEATING_DISCRIMINATOR = new Uint8Array([235, 92, 108, 158, 159, 112, 128, 66]);
+    const connection = new solanaWeb3.Connection(NETWORK, "confirmed");
 
     try {
       await initConnection();
-      const connection = new solanaWeb3.Connection(NETWORK, "confirmed");
       const eventName = document.getElementById("eventName").value.trim();
       const eventDateInput = document.getElementById("eventDate").value;
       const ticketPriceSol = parseFloat(document.getElementById("ticketPrice").value);
