@@ -12,9 +12,11 @@ urlpatterns = [
     path('events', views.events, name='events'),
     path('create', views.create, name='create'),
     path('explore', views.explore, name='explore'),
+    path('manage/<str:event_id>', views.manage, name='manage'),
     
     path('events/', views.events, name='events'),
     path('create/', views.create, name='create'),
     path('explore/', views.explore, name='explore'),
+    path('manage/<str:event_id>/', views.manage, name='manage'),
 
 ]

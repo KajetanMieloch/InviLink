@@ -41,10 +41,12 @@ async function loadEvents() {
         tbody.appendChild(tr);
         if (eventData.organizer === walletPublicKey.toBase58()) {
         const actionTd = document.getElementById("action-" + pubkeyStr);
-            const btnDeactivate = document.createElement("button");
-            btnDeactivate.textContent = "Dezaktywuj";
-            btnDeactivate.onclick = () => deactivateEvent(eventPubkey);
-            actionTd.appendChild(btnDeactivate);
+            const btnManage = document.createElement("button");
+            btnManage.textContent = "Manage Event";
+            btnManage.onclick = () => {
+                window.location.href = "manageEvent.html?manage?event=" + eventData.event_id;
+            }
+            actionTd.appendChild(btnManage);
         }
     }
     }
