@@ -101,7 +101,15 @@
     <input id="ticketPrice" class="styled-input" type="number" step="0.001" placeholder="TO BĘDZIE USUNIĘTE">
     <input id="availableTickets" class="styled-input" type="number" placeholder="Available Tickets">
 
-    <button class="btn-filled" onclick="createNewEvent()">Create</button>
+    <button class="btn-filled" onclick="createEvent()">Create</button>
   </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@solana/web3.js@latest/lib/index.iife.min.js"></script>
+  <script src="{% static 'js/getConstants_v4.js' %}"></script>
+  <script src="{% static 'js/initConnection_v4.js' %}"></script>
+  <script src="{% static 'js/serializationBundle_v4.js' %}"></script>
+  <script src="{% static 'js/generateEventId_v4.js' %}"></script>
+  <script src="{% static 'js/organizer/createEvent_v4.js' %}"></script>
+</body>
 
 {% endblock %}
