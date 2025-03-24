@@ -942,7 +942,6 @@ pub struct EventNFT {
     pub organizer: Pubkey,
     pub name: String,
     pub event_date: i64, // np. UNIX timestamp
-    pub ticket_price: u64,
     pub available_tickets: u64,
     pub sold_tickets: u64,
     pub seating_type: u8,

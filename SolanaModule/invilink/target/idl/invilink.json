@@ -1377,10 +1377,6 @@
             "type": "i64"
           },
           {
-            "name": "ticket_price",
-            "type": "u64"
-          },
-          {
             "name": "available_tickets",
             "type": "u64"
           },
