@@ -38,7 +38,7 @@
 
   <script>
     // Ustawienia
-    const PROGRAM_ID = new solanaWeb3.PublicKey("2XgNYDqbBZGiNHEk4PW3FCyPKHBaijnbQTR2bKFd2fxj");
+    const PROGRAM_ID = new solanaWeb3.PublicKey("2Yh2Jud5p81cVVM5Si2S53YcmtgErkuCTsX8RBhZ91ab");
     const REGISTRY_SEED = "event_registry";
     const DEFAULT_PUBKEY = "11111111111111111111111111111111";
 
@@ -47,31 +47,27 @@
     const DEACTIVATE_EVENT_DISCRIMINATOR = new Uint8Array([222, 84, 182, 86, 46, 110, 215, 19]);
     const DELETE_EVENT_DISCRIMINATOR    = new Uint8Array([103, 111, 95, 106, 232, 24, 190, 84]);
     const UPDATE_EVENT_DISCRIMINATOR    = new Uint8Array([70, 108, 211, 125, 171, 176, 25, 217]);
-    // Zmieniono: usunięto UPDATE_EVENT_SEATING_TYPE_DISCRIMINATOR
 
     let connection, provider, walletPublicKey;
 
-    // Dekodowanie konta rejestru eventów
+    // Funkcja dekodująca rejestr eventów – teraz czyta dynamiczny wektor:
     function decodeRegistry(data) {
       let offset = 8; // pomijamy 8-bajtowy discriminator
       const dv = new DataView(data.buffer, data.byteOffset, data.byteLength);
       const eventCount = dv.getUint32(offset, true);
       offset += 4;
+      // Odczytujemy długość wektora (u32)
+      const vecLen = dv.getUint32(offset, true);
+      offset += 4;
       const events = [];
-      // Przebiegamy przez 10 pozycji (bo rejestr ma stałą tablicę 10 elementów)
-      for (let i = 0; i < 10; i++) {
+      for (let i = 0; i < vecLen; i++) {
         const pubkeyBytes = data.slice(offset, offset + 32);
         const pubkey = new solanaWeb3.PublicKey(pubkeyBytes).toBase58();
         offset += 32;
-        // Dodajemy tylko jeśli nie jest domyślnym pubkey
-        if (pubkey !== "11111111111111111111111111111111") {
-          events.push(pubkey);
-        }
+        events.push(pubkey);
       }
       return { eventCount, events };
     }
-
-
 
     // Dekodowanie konta eventu zgodnie z formatem Anchor, uwzględniające nowe pole event_date
     function decodeEvent(data) {
@@ -88,62 +84,44 @@
         return new TextDecoder().decode(strBytes);
       }
 
-      // Odczyt event_id
       const event_id = readString();
-
-      // Odczyt organizatora (32 bajty)
       let organizer = "";
       if (offset + 32 <= data.byteLength) {
         const orgBytes = data.slice(offset, offset + 32);
         organizer = new solanaWeb3.PublicKey(orgBytes).toBase58();
         offset += 32;
       }
-
-      // Odczyt nazwy eventu
       const name = readString();
-
-      // Odczyt daty eventu (i64, UNIX timestamp)
       let event_date = 0;
       if (offset + 8 <= data.byteLength) {
         event_date = Number(dv.getBigUint64(offset, true));
         offset += 8;
       }
-
-      // Odczyt ticket_price
       let ticket_price = "0";
       if (offset + 8 <= data.byteLength) {
         ticket_price = dv.getBigUint64(offset, true).toString();
         offset += 8;
       }
-
-      // Odczyt available_tickets
       let available_tickets = "0";
       if (offset + 8 <= data.byteLength) {
         available_tickets = dv.getBigUint64(offset, true).toString();
         offset += 8;
       }
-
-      // Odczyt sold_tickets
       let sold_tickets = "0";
       if (offset + 8 <= data.byteLength) {
         sold_tickets = dv.getBigUint64(offset, true).toString();
         offset += 8;
       }
-
-      // Odczyt seating_type – może nie być zapisany w starszej wersji
       let seating_type = 0;
       if (offset + 1 <= data.byteLength) {
         seating_type = dv.getUint8(offset);
         offset += 1;
       }
-
-      // Odczyt pola active – ustalamy domyślnie false, jeśli nie ma
       let active = false;
       if (offset + 1 <= data.byteLength) {
         active = dv.getUint8(offset) !== 0;
         offset += 1;
       }
-
       return {
         event_id,
         organizer,
@@ -161,30 +139,6 @@
       const logEl = document.getElementById("log");
       logEl.textContent += msg + "\n";
       console.log(msg);
-    }
-
-    // Pomocnicze funkcje do serializacji opcji (dla update_event)
-    function encodeOptionString(str) {
-      if (!str) return new Uint8Array([0]);
-      const encoder = new TextEncoder();
-      const strBytes = encoder.encode(str);
-      const lengthBytes = new Uint8Array(4);
-      new DataView(lengthBytes.buffer).setUint32(0, strBytes.length, true);
-      const result = new Uint8Array(1 + 4 + strBytes.length);
-      result[0] = 1;
-      result.set(lengthBytes, 1);
-      result.set(strBytes, 5);
-      return result;
-    }
-
-    function encodeOptionU64(val) {
-      if (val === null || val === undefined || val === "") return new Uint8Array([0]);
-      let bnVal = new BN(val.toString());
-      const buf = bnVal.toArrayLike(Uint8Array, 'le', 8);
-      const result = new Uint8Array(1 + 8);
-      result[0] = 1;
-      result.set(buf, 1);
-      return result;
     }
 
     async function loadEvents() {
@@ -217,7 +171,6 @@
           const eventAcc = await connection.getAccountInfo(eventPubkey);
           if (eventAcc) {
             const eventData = decodeEvent(eventAcc.data);
-            // Konwersja daty na czytelny format
             const eventDateStr = new Date(eventData.event_date * 1000).toLocaleDateString();
 
             const tr = document.createElement("tr");
@@ -240,8 +193,6 @@
                 btnUpdate.textContent = "Aktualizuj";
                 btnUpdate.onclick = () => updateEvent(eventPubkey);
                 actionTd.appendChild(btnUpdate);
-
-                // Usunięto przycisk "Zmień typ miejsc"
 
                 const btnActivate = document.createElement("button");
                 btnActivate.textContent = "Aktywuj";
@@ -268,64 +219,56 @@
     }
 
     async function updateEvent(eventPubkey) {
-    try {
-      logMessage("Aktualizacja eventu: " + eventPubkey.toBase58());
-      const newName = prompt("Podaj nową nazwę eventu (lub pozostaw puste, aby nie zmieniać):");
-      const newTicketPrice = prompt("Podaj nową cenę biletu (lamporty) (pozostaw puste, aby zachować dotychczasową):");
-      const newAvailableTickets = prompt("Podaj nową liczbę dostępnych biletów (lub pozostaw puste):");
-      const newEventDate = prompt("Podaj nową datę eventu (UNIX timestamp) (lub pozostaw puste):");
-
-      const encodedName = encodeOptionString(newName);
-      const encodedTicketPrice = encodeOptionU64(newTicketPrice);
-      const encodedAvailable = encodeOptionU64(newAvailableTickets);
-      const encodedEventDate = encodeOptionU64(newEventDate); // zakodowanie daty jako 8 bajtów
-
-      const totalLength = UPDATE_EVENT_DISCRIMINATOR.length +
-                          encodedName.length +
-                          encodedTicketPrice.length +
-                          encodedAvailable.length +
-                          encodedEventDate.length;
-      const updateData = new Uint8Array(totalLength);
-      let offset = 0;
-      updateData.set(UPDATE_EVENT_DISCRIMINATOR, offset);
-      offset += UPDATE_EVENT_DISCRIMINATOR.length;
-      updateData.set(encodedName, offset);
-      offset += encodedName.length;
-      updateData.set(encodedTicketPrice, offset);
-      offset += encodedTicketPrice.length;
-      updateData.set(encodedAvailable, offset);
-      offset += encodedAvailable.length;
-      updateData.set(encodedEventDate, offset);
-
-      const instruction = new solanaWeb3.TransactionInstruction({
-        keys: [
-          { pubkey: eventPubkey, isWritable: true, isSigner: false },
-          { pubkey: walletPublicKey, isWritable: true, isSigner: true }
-        ],
-        programId: PROGRAM_ID,
-        data: updateData
-      });
-      logMessage("Instrukcja update_event utworzona.");
-      const transaction = new solanaWeb3.Transaction().add(instruction);
-      transaction.feePayer = walletPublicKey;
-      const { blockhash } = await connection.getLatestBlockhash();
-      transaction.recentBlockhash = blockhash;
-      logMessage("Transakcja przygotowana, podpisuję...");
-      const signedTx = await provider.signTransaction(transaction);
-      logMessage("Transakcja podpisana.");
-      const txSig = await connection.sendRawTransaction(signedTx.serialize());
-      logMessage("Transakcja wysłana. Signature: " + txSig);
-      logMessage("Czekam na potwierdzenie transakcji...");
-      await connection.confirmTransaction(txSig, "confirmed");
-      logMessage("Transakcja potwierdzona.");
-      alert("Event zaktualizowany! Tx Sig: " + txSig);
-      loadEvents();
-    } catch (err) {
-      console.error(err);
-      logMessage("Błąd podczas aktualizacji eventu: " + err.message);
-      alert("Błąd podczas aktualizacji eventu: " + err.message);
+      try {
+        logMessage("Aktualizacja eventu: " + eventPubkey.toBase58());
+        const newName = prompt("Podaj nową nazwę eventu (lub pozostaw puste, aby nie zmieniać):");
+        const newTicketPrice = prompt("Podaj nową cenę biletu (lamporty) (pozostaw puste, aby zachować dotychczasową):");
+        const newAvailableTickets = prompt("Podaj nową liczbę dostępnych biletów (lub pozostaw puste):");
+        const encodedName = encodeOptionString(newName);
+        const encodedTicketPrice = encodeOptionU64(newTicketPrice);
+        const encodedAvailable = encodeOptionU64(newAvailableTickets);
+        const totalLength = UPDATE_EVENT_DISCRIMINATOR.length +
+                            encodedName.length +
+                            encodedTicketPrice.length +
+                            encodedAvailable.length;
+        const updateData = new Uint8Array(totalLength);
+        let offset = 0;
+        updateData.set(UPDATE_EVENT_DISCRIMINATOR, offset);
+        offset += UPDATE_EVENT_DISCRIMINATOR.length;
+        updateData.set(encodedName, offset);
+        offset += encodedName.length;
+        updateData.set(encodedTicketPrice, offset);
+        offset += encodedTicketPrice.length;
+        updateData.set(encodedAvailable, offset);
+        const instruction = new solanaWeb3.TransactionInstruction({
+          keys: [
+            { pubkey: eventPubkey, isWritable: true, isSigner: false },
+            { pubkey: walletPublicKey, isWritable: true, isSigner: true }
+          ],
+          programId: PROGRAM_ID,
+          data: updateData
+        });
+        logMessage("Instrukcja update_event utworzona.");
+        const transaction = new solanaWeb3.Transaction().add(instruction);
+        transaction.feePayer = walletPublicKey;
+        const { blockhash } = await connection.getLatestBlockhash();
+        transaction.recentBlockhash = blockhash;
+        logMessage("Transakcja przygotowana, podpisuję...");
+        const signedTx = await provider.signTransaction(transaction);
+        logMessage("Transakcja podpisana.");
+        const txSig = await connection.sendRawTransaction(signedTx.serialize());
+        logMessage("Transakcja wysłana. Signature: " + txSig);
+        logMessage("Czekam na potwierdzenie transakcji...");
+        await connection.confirmTransaction(txSig, "confirmed");
+        logMessage("Transakcja potwierdzona.");
+        alert("Event zaktualizowany! Tx Sig: " + txSig);
+        loadEvents();
+      } catch (err) {
+        console.error(err);
+        logMessage("Błąd podczas aktualizacji eventu: " + err.message);
+        alert("Błąd podczas aktualizacji eventu: " + err.message);
+      }
     }
-  }
 
     async function activateEvent(eventPubkey) {
       try {

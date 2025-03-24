@@ -33,14 +33,7 @@
   <div id="eventDetails"></div>
   <div id="seatingCounter"></div>
   <div id="sectionsTable"></div>
-
-    
-  <label>PublicKey Walidatora:
-    <input id="validatorInput" type="text" placeholder="Wprowadź PublicKey walidatora">
-  </label>
-  <button onclick="addValidator()">Dodaj Walidatora</button>
   
-
   <!-- Formularz dodania sekcji siedzeniowej (widoczny tylko, gdy event.seating_type jest 1 lub 2) -->
   <div id="addSectionForm">
     <h3>Dodaj Sekcję Siedzeniową</h3>
@@ -67,7 +60,7 @@
   
   <script>
     // Ustawienia – PROGRAM_ID musi odpowiadać Twojemu kontraktowi on‑chain
-    const PROGRAM_ID = new solanaWeb3.PublicKey("2XgNYDqbBZGiNHEk4PW3FCyPKHBaijnbQTR2bKFd2fxj");
+    const PROGRAM_ID = new solanaWeb3.PublicKey("2Yh2Jud5p81cVVM5Si2S53YcmtgErkuCTsX8RBhZ91ab");
     let connection, provider, walletPublicKey;
     window.currentEvent = null; // Globalne dane eventu
 
@@ -240,57 +233,6 @@
       }
       return { event_id, section_name, section_type, rows, seats_per_row, ticket_price: ticket_price.toString(), seat_status };
     }
-
-    async function addValidator() {
-      if (!window.currentEvent) {
-        alert("Najpierw wczytaj event!");
-        return;
-      }
-      const validatorInput = document.getElementById("validatorInput").value.trim();
-      if (!validatorInput) {
-        alert("Wprowadź PublicKey walidatora!");
-        return;
-      }
-      let validatorPubkey;
-      try {
-        validatorPubkey = new solanaWeb3.PublicKey(validatorInput);
-      } catch (err) {
-        alert("Niepoprawny format PublicKey!");
-        return;
-      }
-      
-      // Obliczamy PDA dla eventu – analogicznie jak przy wczytywaniu eventu
-      const eventId = window.currentEvent.event_id;
-      const [eventPDA] = await solanaWeb3.PublicKey.findProgramAddress(
-        [new TextEncoder().encode("event"), new TextEncoder().encode(eventId)],
-        PROGRAM_ID
-      );
-      
-
-      const ADD_VALIDATOR_DISCRIMINATOR = new Uint8Array([250, 113, 53, 54, 141, 117, 215, 185]);
-      const data = new Uint8Array(ADD_VALIDATOR_DISCRIMINATOR.length + 32);
-      data.set(ADD_VALIDATOR_DISCRIMINATOR, 0);
-      data.set(validatorPubkey.toBytes(), ADD_VALIDATOR_DISCRIMINATOR.length);
-      
-      const instruction = new solanaWeb3.TransactionInstruction({
-        keys: [
-          { pubkey: eventPDA, isWritable: true, isSigner: false },
-          { pubkey: walletPublicKey, isWritable: false, isSigner: true }
-        ],
-        programId: PROGRAM_ID,
-        data: data
-      });
-      
-      const transaction = new solanaWeb3.Transaction().add(instruction);
-      transaction.feePayer = walletPublicKey;
-      const { blockhash } = await connection.getLatestBlockhash();
-      transaction.recentBlockhash = blockhash;
-      const signedTx = await provider.signTransaction(transaction);
-      const txSig = await connection.sendRawTransaction(signedTx.serialize());
-      await connection.confirmTransaction(txSig, "confirmed");
-      alert("Walidator dodany! Tx Sig: " + txSig);
-    }
-
 
     async function loadEvent() {
       try {
@@ -687,8 +629,6 @@
         alert("Błąd usuwania sekcji: " + err.message);
       }
     }
-
-    window.addEventListener("load", loadEvents);
   </script>
 </body>
 </html>

@@ -1,0 +1,151 @@
+{% extends "base.html" %}
+{% block content %}
+<style>
+  :root {
+    --transition-speed: 0.5s;
+    --primary-color: #000000;
+    --secondary-color: #f1c40f;
+    --accent-color: #8e44ad;
+  }
+  html, body {
+    margin: 0;
+    padding: 0;
+    overflow-x: hidden;
+  }
+
+  .bg-container {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: -1;
+    pointer-events: none;
+  }
+
+  .bg-image {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-size: cover;
+    background-position: center;
+    opacity: 0;
+    transition: opacity var(--transition-speed) ease-in-out;
+    filter: blur(4px) brightness(0.5);
+  }
+  .bg-image.active {
+    opacity: 1;
+  }
+
+  .section {
+    height: 100vh;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    position: relative;
+    padding: 20px;
+    text-align: center;
+  }
+  .section h1 {
+    font-size: 3rem;
+    color: var(--secondary-color);
+    margin-bottom: 10px;
+  }
+  .section p {
+    font-size: 1.5rem;
+    color: #ffffff;
+    max-width: 600px;
+    margin: 0 auto 20px auto;
+    line-height: 1.6;
+  }
+
+  a {
+    color: var(--secondary-color);
+    text-decoration: none;
+  }
+  a:hover {
+    text-decoration: underline;
+  }
+
+  .text-box {
+    background: rgba(0, 0, 0, 0.3);
+    padding: 20px 40px;
+    border-radius: 8px;
+  }
+</style>
+
+
+<div class="bg-container">
+  <div class="bg-image" id="bg1" style="background-image: url('https://www.hollywoodreporter.com/wp-content/uploads/2021/04/GettyImages-1301916189-copy-1617396036.jpg');"></div>
+  <div class="bg-image" id="bg2" style="background-image: url('https://coincentral.com/wp-content/uploads/2022/09/Solana-logo.png');"></div>
+  <div class="bg-image" id="bg3" style="background-image: url('https://cdn.prod.website-files.com/67945105751938b26694a00e/67945629ee922ee7bf495bf7_Untitled-1.png');"></div>
+  <div class="bg-image" id="bg4" style="background-image: url('https://analyticsindiamag.com/wp-content/uploads/2021/07/Untitled-design-22-1.jpg');"></div>
+</div>
+
+<div class="section" data-bg="bg1">
+  <div class="text-box">
+    <h1>InviLink</h1>
+    <p>
+      InviLink is a web3 platform that allows event organizers to create and sell NFT-based tickets securely on the Solana blockchain. Attendees can purchase, trade, and verify their tickets seamlessly, ensuring authenticity and eliminating fraud. With full transparency, decentralized transactions, and a secondary marketplace, InviLink revolutionizes event access.
+    </p>
+  </div>
+</div>
+
+<div class="section" data-bg="bg2">
+  <div class="text-box">
+    <h1>Built on Solana for Speed and Security</h1>
+    <p>
+      InviLink leverages the Solana blockchain to provide fast, low-cost, and secure transactions for ticketing. Solana’s high throughput and scalability ensure seamless minting, purchasing, and transferring of NFT tickets without delays. Each ticket is recorded on-chain, guaranteeing authenticity and preventing fraud. With decentralized validation, event access is transparent, trustless, and efficient.
+    </p>
+  </div>
+</div>
+
+<div class="section" data-bg="bg3">
+  <div class="text-box">
+    <h1>Seamless Access with Phantom Wallet</h1>
+    <p>
+      InviLink is integrated with Phantom Wallet, a secure and user-friendly Solana wallet, ensuring effortless ticket management. Phantom allows users to store, purchase, and transfer NFT tickets with just a few clicks while maintaining full control over their assets. By leveraging Phantom, InviLink provides a decentralized, non-custodial experience with enhanced security. Get Phantom Wallet now and start your Web3 journey: <a href="https://phantom.app/" target="_blank" rel="noopener noreferrer">Download Phantom</a>.
+    </p>
+  </div>
+</div>
+
+<div class="section" data-bg="bg4">
+  <div class="text-box">
+    <h1>Build on InviLink – Open-Source & Ready to Use</h1>
+    <p>
+      InviLink is fully open-source and available on GitHub, allowing developers to integrate its smart contract into their own ticketing platforms. Whether you want to build a custom Web3 ticketing solution or simply use the existing smart contract for a JavaScript-based frontend, InviLink gives you the flexibility to create. Feel free to modify the contract to suit your needs, but if you find it useful, consider keeping the 5% fee structure as a way to support ongoing development. 🚀
+      <br><br>
+      🔗 Check out the project on GitHub: <a href="https://github.com/KajetanMieloch/InviLink" target="_blank" rel="noopener noreferrer">https://github.com/KajetanMieloch/InviLink</a>
+    </p>
+  </div>
+</div>
+
+<script>
+  const sections = document.querySelectorAll('.section');
+  const bgImages = document.querySelectorAll('.bg-image');
+
+  function changeBackground() {
+    const scrollY = window.scrollY;
+    const windowHeight = window.innerHeight;
+
+    sections.forEach((section) => {
+      const sectionTop = section.offsetTop;
+      if (scrollY + windowHeight / 2 >= sectionTop && scrollY + windowHeight / 2 < sectionTop + section.offsetHeight) {
+        const bgId = section.getAttribute('data-bg');
+        bgImages.forEach(bg => {
+          if(bg.id === bgId) {
+            bg.classList.add('active');
+          } else {
+            bg.classList.remove('active');
+          }
+        });
+      }
+    });
+  }
+
+  window.addEventListener('scroll', changeBackground);
+  window.addEventListener('load', changeBackground);
+</script>
+{% endblock %}

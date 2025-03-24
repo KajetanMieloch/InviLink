@@ -1,0 +1,357 @@
+{% extends "base.html" %}
+{% block content %}
+{% load static %}
+<style>
+  :root {
+    --transition-speed: 0.5s;
+    --primary-color: #000000;
+    --secondary-color: #f1c40f;
+    --accent-color: #8e44ad;
+    --gradient-start: #1e90ff;
+    --gradient-end: #8e44ad;
+  }
+
+  html, body {
+    margin: 0;
+    padding: 0;
+    overflow-x: hidden;
+    background: #111;
+    font-family: sans-serif;
+    width: 100vw;
+    height: 100vh;
+  }
+
+  h2 {
+    font-size: 1.5rem;
+    margin-bottom: 20px;
+  }
+
+  /* Modal overlay covers entire screen */
+  .modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.8);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+  }
+
+  /* Modal card styling */
+  .modal {
+    background: #000;
+    border: 2px solid var(--accent-color);
+    border-radius: 8px;
+    width: 95%;
+    height: 95%;
+    margin-top: 1.25%;
+    margin-left: 2.5%;
+    padding: 30px;
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    text-align: center;
+    color: white;
+  }
+
+  .modal-content {
+    overflow-y: auto;
+    background-color: #000;
+  }
+
+  .modal h1 {
+    font-size: 2rem;
+    margin-bottom: 20px;
+  }
+
+  .modal p {
+    font-size: 1rem;
+    line-height: 1.5;
+    margin-bottom: 20px;
+  }
+
+  /* Footer container for modal actions */
+  .modal-footer {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  /* Container for the buttons at the bottom */
+  .button-row {
+    display: flex;
+    justify-content: center;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+
+  .btn {
+    padding: 8px 16px;
+    font-size: 1rem;
+    border-radius: 4px;
+    cursor: pointer;
+    border: none;
+    transition: background 0.3s, color 0.3s;
+    text-decoration: none;
+  }
+
+  .btn.btn-filled {
+    background: linear-gradient(45deg, var(--gradient-start), var(--gradient-end));
+    color: white;
+  }
+
+  .btn.btn-outline {
+    background: transparent;
+    border: 2px solid transparent;
+    border-image: linear-gradient(45deg, var(--gradient-start), var(--gradient-end)) 1;
+    border-radius: 4px;
+    padding: 10px 20px;
+    font-size: 1rem;
+    background: linear-gradient(45deg, var(--gradient-start), var(--gradient-end));
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+
+  .btn.btn-yellow {
+    background: var(--secondary-color);
+    color: var(--primary-color);
+    border: none;
+    border-radius: 4px;
+    padding: 10px 20px;
+    font-size: 1rem;
+    cursor: pointer;
+  }
+
+  /* Styled input */
+  .styled-input {
+    width: 100%;
+    max-width: 400px;
+    padding: 10px 14px;
+    background: #000;
+    border: 2px solid transparent;
+    border-image: linear-gradient(45deg, var(--gradient-start), var(--gradient-end)) 1;
+    border-radius: 4px;
+    color: #fff;
+    font-size: 1rem;
+    outline: none;
+    transition: background 0.3s, border 0.3s;
+    margin-top: -14px;
+  }
+  .styled-input::placeholder {
+    color: #aaa;
+  }
+  .styled-input:focus {
+    background: #111;
+  }
+
+  /* Row for input and button */
+  .input-row {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-top: 15px;
+  }
+
+  .admin-sections {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    box-sizing: border-box;
+    width: 100%;
+  }
+
+  .section {
+    position: relative;
+    overflow: hidden;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.5);
+    border-radius: 8px;
+  }
+
+  .section.section-1 {
+    height: 26vh;
+  }
+  .section.section-2 {
+    height: 24vh;
+  }
+  .section.section-3 {
+    flex: 1;
+    height: 50vh;
+  }
+
+  /* Background for section using pseudoelement */
+  .section::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-image: var(--bg-url);
+    background-size: cover;
+    background-position: center;
+    filter: blur(8px) brightness(0.4);
+    transition: all 0.5s ease;
+  }
+
+  /* Hover effect on background */
+  .section:hover::before {
+    filter: blur(4px) brightness(0.6);
+    transform: scale(1.05);
+  }
+
+  /* Section content styling – centered both vertically and horizontally */
+  .section-content {
+    position: relative;
+    z-index: 1;
+    padding: 20px;
+    color: white;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    text-align: center;
+    overflow-y: auto;
+  }
+
+  .organizers-table {
+    width: 80%;
+    margin: 15px auto;
+    border-collapse: collapse;
+    background: #000;
+    color: #fff;
+    border: 2px solid var(--accent-color);
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.5);
+  }
+  .organizers-table thead {
+    background: linear-gradient(45deg, var(--gradient-start), var(--gradient-end));
+  }
+  .organizers-table th, 
+  .organizers-table td {
+    padding: 12px 16px;
+    text-align: left;
+    border-bottom: 1px solid #333;
+  }
+  .organizers-table th {
+    font-size: 1.1rem;
+  }
+  .organizers-table tbody tr:nth-child(even) {
+    background: #1a1a1a;
+  }
+  .organizers-table tbody tr:hover {
+    background: #333;
+  }
+  .organizers-table td:last-child {
+    text-align: center;
+  }
+</style>
+
+<!-- Modal Popup -->
+<div class="modal-overlay" id="adminModal">
+  <div class="modal">
+    <div class="modal-content">
+      <h1>Administrative Access Only</h1>
+      <p>
+        This page is strictly for the contract manager. If you are a participant, you are most likely looking for the
+        Event Zone, and if you are an organizer, please visit the Organiser Site.<br>
+        If you need any help, please contact us at <a href="mailto:339562@uwr.edu.pl">339562@uwr.edu.pl</a> 
+        <strong>I will be happy to help you!</strong>
+      </p>
+    </div>
+    <div class="modal-footer">
+      <div class="button-row">
+        <a class="btn btn-filled" href="/explore">
+          Take me to event zone
+        </a>
+        <a class="btn btn-outline" href="/organizer">
+          Take me to organiser site
+        </a>
+        <button class="btn btn-yellow" id="adminBtn" disabled>
+          im an admin
+        </button>
+      </div>
+      <div class="checkbox-container">
+        <input type="checkbox" id="ackCheckbox">
+        <label for="ackCheckbox">I understand</label>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Admin Interface with 3 Sections -->
+<div class="admin-sections" id="adminContent" style="display: none;">
+  <!-- Section 1: Initialization -->
+  <section class="section section-1" style="--bg-url: url('https://wallpaperaccess.com/full/8350974.jpg');">
+    <div class="section-content">
+      <h2>Initialise Event Registry and Organizer Pool</h2>
+      <button class="btn btn-filled" onclick="initializeAdmin()">Initialise</button>
+    </div>
+  </section>
+
+  <!-- Section 2: Add new organizer -->
+  <section class="section section-2" style="--bg-url: url('https://miro.medium.com/max/1200/0*ZOsMIEkHv_0iFGKs');">
+    <div class="section-content">
+      <h2>Add new organizer</h2>
+      <div class="input-row">
+        <input type="text" id="organizerAddress" class="styled-input" placeholder="Type new organiser">
+        <button class="btn btn-filled" onclick="addOrganizer()">Dodaj Organizatora</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- Section 3: Organizers list -->
+  <section class="section section-3" style="--bg-url: url('https://rejolut.com/wp-content/uploads/2022/03/solana.jpg');">
+    <div class="section-content">
+      <h2>Organizers List</h2>
+      <button class="btn btn-filled" onclick="fetchOrganizers()">Refresh</button>
+      <table class="organizers-table">
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Address</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody id="organizersList">
+          <tr><td colspan="3">No organizers found</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+</div>
+
+<!-- Scripts -->
+<script>
+  // Modal popup logic
+  const ackCheckbox = document.getElementById('ackCheckbox');
+  const adminBtn = document.getElementById('adminBtn');
+  const adminModal = document.getElementById('adminModal');
+  const adminContent = document.getElementById('adminContent');
+
+  if (ackCheckbox && adminBtn) {
+    ackCheckbox.addEventListener('change', function() {
+      adminBtn.disabled = !this.checked;
+    });
+  
+    adminBtn.addEventListener('click', function() {
+      adminModal.style.display = 'none';
+      adminContent.style.display = 'block';
+    });
+  }
+</script>
+<script src="https://cdn.jsdelivr.net/npm/@solana/web3.js@latest/lib/index.iife.min.js"></script>
+<script src="{% static 'js/getConstants_v4.js' %}"></script>
+<script src="{% static 'js/initConnection_v4.js' %}"></script>
+<script src="{% static 'js/adminPanel/initializeAdmin_v4.js' %}"></script>
+<script src="{% static 'js/adminPanel/addOrganizer_v4.js' %}"></script>
+<script src="{% static 'js/adminPanel/manageOrganizers_v4.js' %}"></script>
+{% endblock %}
