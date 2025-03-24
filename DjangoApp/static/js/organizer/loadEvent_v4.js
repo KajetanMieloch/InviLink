@@ -1,4 +1,11 @@
 async function loadEvent(eventId) {
+
+    const constants = await getConstants();
+    const PROGRAM_ID = new solanaWeb3.PublicKey(constants.PROGRAM_ID);
+    const NETWORK = constants.NETWORK;
+    const connection = new solanaWeb3.Connection(NETWORK, "confirmed");
+
+    await initConnection();
     
     // Obliczamy PDA dla eventu: seeds = [ "event", eventId ]
     const seed1 = new TextEncoder().encode("event");
