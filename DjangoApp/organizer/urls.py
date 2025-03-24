@@ -11,7 +11,10 @@ urlpatterns = [
     path('', views.home, name='home'),
     path('events', views.events, name='events'),
     path('create', views.create, name='create'),
+    path('explore', views.explore, name='explore'),
     
     path('events/', views.events, name='events'),
     path('create/', views.create, name='create'),
+    path('explore/', views.explore, name='explore'),
+
 ]

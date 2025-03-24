@@ -9,3 +9,6 @@ def events(request):
 
 def create(request):
     return render(request, 'organizer/create_event.html')
+
+def explore(request):
+    return render(request, 'organizer/explore_events.html')

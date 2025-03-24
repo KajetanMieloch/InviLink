@@ -39,4 +39,82 @@ function serializeString(str) {
   
     return buffer;
   }
-  
+
+  // Funkcja dekodująca rejestr eventów – teraz czyta dynamiczny wektor:
+  function decodeRegistry(data) {
+    let offset = 8; // pomijamy 8-bajtowy discriminator
+    const dv = new DataView(data.buffer, data.byteOffset, data.byteLength);
+    const eventCount = dv.getUint32(offset, true);
+    offset += 4;
+    // Odczytujemy długość wektora (u32)
+    const vecLen = dv.getUint32(offset, true);
+    offset += 4;
+    const events = [];
+    for (let i = 0; i < vecLen; i++) {
+      const pubkeyBytes = data.slice(offset, offset + 32);
+      const pubkey = new solanaWeb3.PublicKey(pubkeyBytes).toBase58();
+      offset += 32;
+      events.push(pubkey);
+    }
+    return { eventCount, events };
+  }
+
+ // Dekodowanie konta eventu zgodnie z formatem Anchor, uwzględniające nowe pole event_date
+ function decodeEvent(data) {
+  let offset = 8; // pomijamy 8-bajtowy discriminator
+  const dv = new DataView(data.buffer, data.byteOffset, data.byteLength);
+
+  function readString() {
+    if (offset + 4 > data.byteLength) return "";
+    const len = dv.getUint32(offset, true);
+    offset += 4;
+    if (offset + len > data.byteLength) return "";
+    const strBytes = data.slice(offset, offset + len);
+    offset += len;
+    return new TextDecoder().decode(strBytes);
+  }
+
+  const event_id = readString();
+  let organizer = "";
+  if (offset + 32 <= data.byteLength) {
+    const orgBytes = data.slice(offset, offset + 32);
+    organizer = new solanaWeb3.PublicKey(orgBytes).toBase58();
+    offset += 32;
+  }
+  const name = readString();
+  let event_date = 0;
+  if (offset + 8 <= data.byteLength) {
+    event_date = Number(dv.getBigUint64(offset, true));
+    offset += 8;
+  }
+  let available_tickets = "0";
+  if (offset + 8 <= data.byteLength) {
+    available_tickets = dv.getBigUint64(offset, true).toString();
+    offset += 8;
+  }
+  let sold_tickets = "0";
+  if (offset + 8 <= data.byteLength) {
+    sold_tickets = dv.getBigUint64(offset, true).toString();
+    offset += 8;
+  }
+  let seating_type = 0;
+  if (offset + 1 <= data.byteLength) {
+    seating_type = dv.getUint8(offset);
+    offset += 1;
+  }
+  let active = false;
+  if (offset + 1 <= data.byteLength) {
+    active = dv.getUint8(offset) !== 0;
+    offset += 1;
+  }
+  return {
+    event_id,
+    organizer,
+    name,
+    event_date,
+    available_tickets,
+    sold_tickets,
+    seating_type,
+    active,
+  };
+}
