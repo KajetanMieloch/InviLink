@@ -7,7 +7,7 @@ async function createNewEvent() {
 
     try {
       await initConnection();
-      const connection = new solanaWeb3.connection(NETWORK, "confirmed");
+      const connection = new solanaWeb3.Connection(NETWORK, "confirmed");
       const eventName = document.getElementById("eventName").value.trim();
       const eventDateInput = document.getElementById("eventDate").value;
       const ticketPriceSol = parseFloat(document.getElementById("ticketPrice").value);
