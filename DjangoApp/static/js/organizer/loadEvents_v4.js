@@ -38,13 +38,13 @@ async function loadEvents() {
         <td>${eventData.organizer}</td>
         <td id="action-${pubkeyStr}"></td>
         `;
-        tbody.appendChild(tr);
         if (eventData.organizer === walletPublicKey.toBase58()) {
+        tbody.appendChild(tr);
         const actionTd = document.getElementById("action-" + pubkeyStr);
             const btnManage = document.createElement("button");
             btnManage.textContent = "Manage Event";
             btnManage.onclick = () => {
-                window.location.href = "manageEvent.html?manage?event=" + eventData.event_id;
+                window.location.href = "manage/" + eventData.event_id;
             }
             actionTd.appendChild(btnManage);
         }
