@@ -5,18 +5,7 @@ async function initializeAdmin() {
     const PROGRAM_ID = new solanaWeb3.PublicKey(constants.PROGRAM_ID);
     const NETWORK = constants.NETWORK;
 
-   //Check if Phantom Wallet is available
-    if (!window.phantom || !window.phantom.solana) {
-      alert("Phantom Wallet is required!");
-      return;
-    }
-    const provider = window.phantom.solana;
-    if (!provider.isConnected) {
-      await provider.connect();
-    }
-    //Get user's public key
-    const walletPublicKey = provider.publicKey;
-    console.log("Your public key: " + walletPublicKey.toBase58());
+    await initConnection();
     //Connect to Solana Devnet
     const connection = new solanaWeb3.Connection(NETWORK, "confirmed");
     //ID of the Anchor program

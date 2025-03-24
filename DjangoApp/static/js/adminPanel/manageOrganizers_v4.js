@@ -1,22 +1,11 @@
 async function fetchOrganizers() {
 
-    const constants = await getConstants();
-    const PROGRAM_ID = new solanaWeb3.PublicKey(constants.PROGRAM_ID);
-    const NETWORK = constants.NETWORK;
+  const constants = await getConstants();
+  const PROGRAM_ID = new solanaWeb3.PublicKey(constants.PROGRAM_ID);
+  const NETWORK = constants.NETWORK;
 
 
-    if (!window.phantom || !window.phantom.solana) {
-    alert("Phantom Wallet is required!");
-    return;
-  }
-
-  const provider = window.phantom.solana;
-  if (!provider.isConnected) {
-    await provider.connect();
-  }
-
-  const walletPublicKey = provider.publicKey;
-  console.log("Your public key: " + walletPublicKey.toBase58());
+  await initConnection();
 
   const connection = new solanaWeb3.Connection(NETWORK, "confirmed");
 
