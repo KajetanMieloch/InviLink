@@ -7,7 +7,7 @@ async function loadEvents() {
     await initConnection();
 
     const [registryPDA] = await solanaWeb3.PublicKey.findProgramAddress(
-    [new TextEncoder().encode(REGISTRY_SEED)],
+    [new TextEncoder().encode("event_registry")],
     PROGRAM_ID
     );
     console.log("Registry PDA: " + registryPDA.toBase58());
