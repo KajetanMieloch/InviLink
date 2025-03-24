@@ -10,10 +10,9 @@ async function createNewEvent() {
       await initConnection();
       const eventName = document.getElementById("eventName").value.trim();
       const eventDateInput = document.getElementById("eventDate").value;
-      const ticketPriceSol = parseFloat(document.getElementById("ticketPrice").value);
       const availableTickets = parseInt(document.getElementById("availableTickets").value);
   
-      if (!eventName || !eventDateInput || isNaN(ticketPriceSol) || isNaN(availableTickets)) {
+      if (!eventName || !eventDateInput || isNaN(availableTickets)) {
         alert("All fields must be filled!");
         return;
       }
@@ -22,9 +21,7 @@ async function createNewEvent() {
       const eventDateTimestamp = Math.floor(new Date(eventDateInput).getTime() / 1000);
       console.log("Event date (timestamp): " + eventDateTimestamp);
   
-      // Convert SOL to lamports
-      const ticketPriceLamports = ticketPriceSol * solanaWeb3.LAMPORTS_PER_SOL;
-      const ticketPriceBN = new BN(ticketPriceLamports.toString());
+      //Use BN to handle large numbers
       const availableTicketsBN = new BN(availableTickets.toString());
   
       // Generate event_id
@@ -57,7 +54,6 @@ async function createNewEvent() {
         event_id: eventIdGenerated,
         name: eventName,
         event_date: eventDateTimestamp,
-        ticket_price: ticketPriceBN,
         available_tickets: availableTicketsBN
       });
       const instructionData = new Uint8Array(discriminator.length + serializedArgs.length);
