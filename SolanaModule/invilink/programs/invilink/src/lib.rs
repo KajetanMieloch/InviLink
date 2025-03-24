@@ -133,7 +133,6 @@ pub mod invilink {
     #[instruction(
         event_id: String,
         name: String,
-        ticket_price: u64,
         available_tickets: u64
     )]
     pub struct CreateEventSeating<'info> {
@@ -166,8 +165,7 @@ pub mod invilink {
         ctx: Context<CreateEventSeating>,
         event_id: String,
         name: String,
-        event_date: i64,        // NOWY parametr
-        ticket_price: u64,
+        event_date: i64,
         available_tickets: u64,
     ) -> Result<()> {
         let event = &mut ctx.accounts.event;
@@ -179,15 +177,16 @@ pub mod invilink {
             ErrorCode::Unauthorized
         );
     
+        require!(event_date > Clock::get()?.unix_timestamp, ErrorCode::InvalidEventDate);
+        require!(available_tickets > 0, ErrorCode::InvalidTicketQuantity);
+
         let expected_event_id = generate_event_id(&name, event_date, ctx.accounts.organizer.key);
         require!(event_id == expected_event_id, ErrorCode::InvalidEventId);
     
-        // Inicjalizacja eventu – przypisujemy również datę eventu
         event.event_id = event_id.clone();
         event.organizer = *ctx.accounts.organizer.key;
         event.name = name.clone();
-        event.event_date = event_date; // NOWE: ustawiamy datę eventu
-        event.ticket_price = ticket_price;
+        event.event_date = event_date;
         event.available_tickets = available_tickets;
         event.sold_tickets = 0;
         event.seating_type = 1;
@@ -209,7 +208,6 @@ pub mod invilink {
     pub fn update_event(
         ctx: Context<UpdateEvent>,
         new_name: Option<String>,
-        new_ticket_price: Option<u64>,
         new_available_tickets: Option<u64>,
     ) -> Result<()> {
         let event = &mut ctx.accounts.event;
@@ -218,9 +216,6 @@ pub mod invilink {
     
         if let Some(name) = new_name {
             event.name = name;
-        }
-        if let Some(price) = new_ticket_price {
-            event.ticket_price = price;
         }
         if let Some(available) = new_available_tickets {
             require!(available >= event.sold_tickets, ErrorCode::InvalidTicketQuantity);
@@ -309,7 +304,7 @@ pub mod invilink {
         section_type: u8,
         rows: u8,
         seats_per_row: u8,
-        ticket_price: u64, // NOWY parametr - cena w danej sekcji niezależna od ceny eventu
+        ticket_price: u64, //cena w danej sekcji niezależna od ceny eventu
     ) -> Result<()> {
         let seating_map = &mut ctx.accounts.seating_map;
         let section_account = &mut ctx.accounts.seating_section;
@@ -1057,8 +1052,10 @@ pub enum ErrorCode {
     ValidatorAlreadyAdded,
     #[msg("Caller is not a validator for this event.")]
     NotValidator,
-    #[msg("Bilet nie został aktywowany. Aktywuj bilet przed skanowaniem.")]
+    #[msg("Ticket not activated. Activate first.")]
     TicketNotActivated,
-    #[msg("Okres aktywacji biletu wygasł. Aktywuj ponownie.")]
+    #[msg("Ticket activation expired.")]
     TicketActivationExpired,
+    #[msg("Cannot create event with past date.")]
+    InvalidEventDate,
 }

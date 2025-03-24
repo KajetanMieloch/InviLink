@@ -228,10 +228,6 @@
           "type": "i64"
         },
         {
-          "name": "ticket_price",
-          "type": "u64"
-        },
-        {
           "name": "available_tickets",
           "type": "u64"
         }
@@ -936,12 +932,6 @@
           }
         },
         {
-          "name": "new_ticket_price",
-          "type": {
-            "option": "u64"
-          }
-        },
-        {
           "name": "new_available_tickets",
           "type": {
             "option": "u64"
@@ -1345,12 +1335,17 @@
     {
       "code": 6023,
       "name": "TicketNotActivated",
-      "msg": "Bilet nie został aktywowany. Aktywuj bilet przed skanowaniem."
+      "msg": "Ticket not activated. Activate first."
     },
     {
       "code": 6024,
       "name": "TicketActivationExpired",
-      "msg": "Okres aktywacji biletu wygasł. Aktywuj ponownie."
+      "msg": "Ticket activation expired."
+    },
+    {
+      "code": 6025,
+      "name": "InvalidEventDate",
+      "msg": "Cannot create event with past date."
     }
   ],
   "types": [
