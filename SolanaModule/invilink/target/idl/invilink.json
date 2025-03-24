@@ -932,6 +932,12 @@
           }
         },
         {
+          "name": "new_date",
+          "type": {
+            "option": "i64"
+          }
+        },
+        {
           "name": "new_available_tickets",
           "type": {
             "option": "u64"

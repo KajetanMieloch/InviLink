@@ -208,6 +208,7 @@ pub mod invilink {
     pub fn update_event(
         ctx: Context<UpdateEvent>,
         new_name: Option<String>,
+        new_date: Option<i64>,
         new_available_tickets: Option<u64>,
     ) -> Result<()> {
         let event = &mut ctx.accounts.event;
@@ -216,6 +217,10 @@ pub mod invilink {
     
         if let Some(name) = new_name {
             event.name = name;
+        }
+        if let Some(date) = new_date {
+            require!(date > Clock::get()?.unix_timestamp, ErrorCode::InvalidEventDate);
+            event.event_date = date;
         }
         if let Some(available) = new_available_tickets {
             require!(available >= event.sold_tickets, ErrorCode::InvalidTicketQuantity);
