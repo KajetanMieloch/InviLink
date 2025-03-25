@@ -13,10 +13,10 @@ use base64::{engine::general_purpose, Engine as _};
 use solana_program::program::invoke;
 use solana_program::system_instruction;
 
-declare_id!("2Yh2Jud5p81cVVM5Si2S53YcmtgErkuCTsX8RBhZ91ab");
+declare_id!("52dJ7bNGrgSg1mk26vWAXu9zSohcC899Qqdk3w9auMvY");
 
 // Stałe globalne
-const MASTER_ACCOUNT: Pubkey = pubkey!("4Wg5ZqjS3AktHzq34hK1T55aFNKSjBpmJ3PyRChpPNDh");
+const MASTER_ACCOUNT: Pubkey = pubkey!("ErwJPZrGJpyGyEtqJ3CGuwZ1JEn4uFiMTj6F4TYPbjqF");
 const FEE_PERCENTAGE: u64 = 5; // 5%
 
 // ---------------- FUNKCJE POMOCNICZE POZA CHAINEM ----------------
