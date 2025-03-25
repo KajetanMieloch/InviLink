@@ -15,3 +15,6 @@ def explore(request):
 
 def manage(request, event_id):
     return render(request, 'organizer/manage_event.html', {'event_id': event_id})
+
+def validate(request):
+    return render(request, 'organizer/validate.html')
