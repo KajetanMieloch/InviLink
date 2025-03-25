@@ -47,6 +47,11 @@
     }
     // Funkcja do obliczenia PDA dla konta seating_section
     async function getSeatingSectionPDA(eventPDA, sectionName) {
+
+      const constants = await getConstants();
+      const PROGRAM_ID = new solanaWeb3.PublicKey(constants.PROGRAM_ID);
+      await initConnection();
+
       const encoder = new TextEncoder();
       const seed = encoder.encode(sectionName);
       const [seatingSectionPDA, bump] = await solanaWeb3.PublicKey.findProgramAddress(
@@ -207,8 +212,7 @@
 
       const constants = await getConstants();
       const PROGRAM_ID = new solanaWeb3.PublicKey(constants.PROGRAM_ID);
-      const NETWORK = constants.NETWORK;
-      const connection = new solanaWeb3.Connection(NETWORK, "confirmed");
+
       await initConnection();
 
       const seed1 = new TextEncoder().encode("event");
