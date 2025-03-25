@@ -252,14 +252,14 @@ function decodeSeatingSectionAccount(data) {
 
 function encodeOptionString(str) {
   if (!str || str.trim() === "") {
-    return new Uint8Array([0]); // opcja "None"
+    return new Uint8Array([0]); // opcjon "None"
   }
   const encoder = new TextEncoder();
   const strBytes = encoder.encode(str);
   const len = strBytes.length;
   
   const result = new Uint8Array(1 + 4 + len);
-  result[0] = 1; // opcja "Some"
+  result[0] = 1; // opcjon "Some"
   result[1] = len & 0xff;
   result[2] = (len >> 8) & 0xff;
   result[3] = (len >> 16) & 0xff;
@@ -270,7 +270,20 @@ function encodeOptionString(str) {
 
 function encodeOptionU8(value) {
   if (value === null || isNaN(value)) {
-    return new Uint8Array([0]); // opcja None
+    return new Uint8Array([0]); // opcjon "None"
   }
-  return new Uint8Array([1, value & 0xff]); // opcja Some + wartość
+  return new Uint8Array([1, value & 0xff]); // opcjon "Some"
+}
+
+function encodeOptionU64(value) {
+  if (value === null || isNaN(value)) {
+    return new Uint8Array([0]); // Option::None
+  }
+
+  const bn = new BN(value); // using bn.js
+  const encoded = bn.toArray('le', 8); // 8 bytes little-endian
+  const result = new Uint8Array(1 + 8);
+  result[0] = 1; // Option::Some
+  result.set(encoded, 1);
+  return result;
 }
