@@ -1,5 +1,4 @@
     // Stałe – adresy programu i inne
-    const PROGRAM_ID = new solanaWeb3.PublicKey("2Yh2Jud5p81cVVM5Si2S53YcmtgErkuCTsX8RBhZ91ab");
     const MINT_TICKET_DISCRIMINATOR = new Uint8Array([212, 78, 142, 4, 188, 28, 203, 17]);
     const METADATA_PROGRAM_ID = new solanaWeb3.PublicKey("metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s");
     const TOKEN_PROGRAM_ID = new solanaWeb3.PublicKey("TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA");
@@ -7,13 +6,10 @@
     // Stałe MASTER_ACCOUNT zgodne z Twoim kontraktem
     const MASTER_ACCOUNT = new solanaWeb3.PublicKey("4Wg5ZqjS3AktHzq34hK1T55aFNKSjBpmJ3PyRChpPNDh");
 
-    let connection, provider, walletPublicKey;
+    let provider, walletPublicKey;
     let currentEventID = null; // ustawiane przy wpisaniu EventID
     let eventData = null;      // dane eventu pobrane z łańcucha
-    
-    (async () => {
-      await initConnection();
-    })();
+  
     
 
 
@@ -63,11 +59,12 @@
 
     // Ładowanie eventu – pobieramy event oraz seating_map
     async function loadEvent(currentEventID) {
-      try {
-        if (!currentEventID) {
-          console.log("Event ID nie został podany.");
-          return;
-        }
+      const constants = await getConstants();
+      const PROGRAM_ID = new solanaWeb3.PublicKey(constants.PROGRAM_ID);
+      const NETWORK = constants.NETWORK;
+      const connection = new solanaWeb3.Connection(NETWORK, "confirmed");
+      await initConnection();
+
         console.log("Ładowanie eventu: " + currentEventID);
         const eventSeed1 = new TextEncoder().encode("event");
         const eventSeed2 = new TextEncoder().encode(currentEventID);
@@ -94,10 +91,7 @@
         eventData.seating_map = decodeSeatingMap(seatingMapAcc.data);
         console.log("SeatingMap: " + JSON.stringify(eventData.seating_map, null, 2));
         loadSections(eventData.seating_map.sections);
-      } catch (err) {
-        console.log("Błąd ładowania eventu: " + err.message);
-      }
-    }
+      } 
 
     // Funkcja dekodująca event – rozszerzona o event_date
 
