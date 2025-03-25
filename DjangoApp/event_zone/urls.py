@@ -10,9 +10,13 @@ urlpatterns = [
     path('', views.home, name='home'),
     path('events', views.events, name='events'),
     path('event/<str:event_id>/', views.buy_ticket, name='buy_ticket'),
+    path('generate_metadata', views.generate_metadata, name="generate_metadata"),
+    path('tickets', views.tickets, name='tickets'),
 
     path('events/', views.events, name='events'),
     path('event/<str:event_id>/', views.buy_ticket, name='buy_ticket'),
+    path('generate_metadata/', views.generate_metadata, name="generate_metadata"),
+    path('tickets/', views.tickets, name='tickets'),
 
     
 ]
