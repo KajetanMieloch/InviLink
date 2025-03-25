@@ -392,3 +392,57 @@ function buildValidateTicketData(eventId, section, row, seat) {
     data.set(seatBytes, offset);
     return data;
   }
+
+  function decodeEventNFT(data) {
+    let offset = 8;
+    const dv = new DataView(data.buffer, data.byteOffset, data.byteLength);
+    const eventIdLen = dv.getUint32(offset, true); offset += 4;
+    const eventIdBytes = data.slice(offset, offset + eventIdLen); offset += eventIdLen;
+    const event_id = new TextDecoder().decode(eventIdBytes);
+    const organizerBytes = data.slice(offset, offset + 32); offset += 32;
+    const organizer = new solanaWeb3.PublicKey(organizerBytes).toBase58();
+    const nameLen = dv.getUint32(offset, true); offset += 4;
+    const nameBytes = data.slice(offset, offset + nameLen); offset += nameLen;
+    const name = new TextDecoder().decode(nameBytes);
+    let event_date = 0;
+    if (offset + 8 <= data.byteLength) {
+      event_date = Number(dv.getBigUint64(offset, true));
+      offset += 8;
+    }
+    let ticket_price = "0";
+    if (offset + 8 <= data.byteLength) {
+      ticket_price = dv.getBigUint64(offset, true).toString();
+      offset += 8;
+    }
+    let available_tickets = "0";
+    if (offset + 8 <= data.byteLength) {
+      available_tickets = dv.getBigUint64(offset, true).toString();
+      offset += 8;
+    }
+    let sold_tickets = "0";
+    if (offset + 8 <= data.byteLength) {
+      sold_tickets = dv.getBigUint64(offset, true).toString();
+      offset += 8;
+    }
+    let seating_type = 0;
+    if (offset + 1 <= data.byteLength) {
+      seating_type = dv.getUint8(offset);
+      offset += 1;
+    }
+    let active = false;
+    if (offset + 1 <= data.byteLength) {
+      active = dv.getUint8(offset) !== 0;
+      offset += 1;
+    }
+    return {
+      event_id,
+      organizer,
+      name,
+      event_date,
+      ticket_price,
+      available_tickets,
+      sold_tickets,
+      seating_type,
+      active
+    };
+  }

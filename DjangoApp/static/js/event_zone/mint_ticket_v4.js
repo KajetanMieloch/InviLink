@@ -1,53 +1,3 @@
-<!DOCTYPE html>
-<html lang="pl">
-<head>
-  <meta charset="UTF-8">
-  <title>Strona Eventu - InviLink (Mint NFT)</title>
-  <!-- Solana Web3 -->
-  <script src="https://cdn.jsdelivr.net/npm/@solana/web3.js@latest/lib/index.iife.min.js"></script>
-  <style>
-    body { font-family: Arial, sans-serif; padding: 20px; }
-    #log { margin: 20px 0; padding: 10px; border: 1px solid #ccc; width: 90%; white-space: pre-wrap; }
-    #eventDetails { margin-top: 20px; }
-    .seat-grid { display: grid; gap: 4px; margin-top: 10px; }
-    .seat-button { width: 30px; height: 30px; border: none; cursor: pointer; }
-    .seat-available { background-color: green; }
-    .seat-taken { background-color: red; cursor: not-allowed; }
-    .standing-section { margin-top: 10px; }
-    .standing-info { font-weight: bold; margin-right: 10px; }
-  </style>
-</head>
-<body>
-  <h1>Strona Eventu - InviLink (Mint NFT)</h1>
-  
-  <!-- Input do podania EventID -->
-  <div>
-    <label>
-      Event ID:
-      <input type="text" id="inputEventID" placeholder="Wpisz Event ID (np. 8NRTbKQ_D3eo)">
-    </label>
-    <button id="loadEventBtn">Load Event</button>
-  </div>
-  
-  <div id="log"></div>
-  <div id="eventDetails"></div>
-  <h2>Sekcje</h2>
-  <div id="sectionsContainer"></div>
-
-  <script>
-    // Logger – moduł diagnostyczny
-    const Logger = (function() {
-      const logEl = document.getElementById("log");
-      function log(message, level = "INFO") {
-        const timestamp = new Date().toLocaleTimeString();
-        const formatted = `[${timestamp}] [${level}] ${message}`;
-        console.log(formatted);
-        if (logEl) logEl.textContent += formatted + "\n";
-      }
-      return { info: log, warn: (msg) => log(msg, "WARN"), error: (msg) => log(msg, "ERROR") };
-    })();
-    Logger.info("Logger uruchomiony.");
-
     // Stałe – adresy programu i inne
     const PROGRAM_ID = new solanaWeb3.PublicKey("2Yh2Jud5p81cVVM5Si2S53YcmtgErkuCTsX8RBhZ91ab");
     const MINT_TICKET_DISCRIMINATOR = new Uint8Array([212, 78, 142, 4, 188, 28, 203, 17]);
@@ -60,37 +10,12 @@
     let connection, provider, walletPublicKey;
     let currentEventID = null; // ustawiane przy wpisaniu EventID
     let eventData = null;      // dane eventu pobrane z łańcucha
-
-    async function initConnection() {
-      if (!window.phantom || !window.phantom.solana) {
-        alert("Phantom Wallet jest wymagany!");
-        return;
-      }
-      provider = window.phantom.solana;
-      if (!provider.isConnected) await provider.connect();
-      walletPublicKey = provider.publicKey;
-      connection = new solanaWeb3.Connection("https://api.devnet.solana.com", "confirmed");
-      Logger.info("Połączono z Phantom. Wallet: " + walletPublicKey.toBase58());
-    }
-    async function init() {
+    
+    (async () => {
       await initConnection();
-    }
-    window.addEventListener("load", init);
+    })();
+    
 
-    // Serializacja zgodnie z Borsh: [4 bajty długości + dane]
-    function serializeString(str) {
-      const encoder = new TextEncoder();
-      const encoded = encoder.encode(str);
-      const lenBuffer = new Uint8Array(4);
-      new DataView(lenBuffer.buffer).setUint32(0, encoded.length, true);
-      let result = new Uint8Array(lenBuffer.length + encoded.length);
-      result.set(lenBuffer, 0);
-      result.set(encoded, lenBuffer.length);
-      return result;
-    }
-    function serializeU8(val) {
-      return new Uint8Array([val]);
-    }
 
     // Oblicza PDA dla mint NFT – seed'y: ["mint_ticket", event_id, event_name, section_name, [row], [seat]]
     async function getTestMintPDA(event_id, event_name, section_name, row, seat) {
@@ -105,7 +30,7 @@
         [seed1, seed2, seed3, seed4, seed5, seed6],
         PROGRAM_ID
       );
-      Logger.info("Obliczony mint PDA: " + mintPDA.toBase58() + " (bump: " + bump + ")");
+      console.log("Obliczony mint PDA: " + mintPDA.toBase58() + " (bump: " + bump + ")");
       return { mintPDA, bump };
     }
     async function getAssociatedTokenAddress(owner, mint) {
@@ -132,7 +57,7 @@
         [new TextEncoder().encode("seating_section"), eventPDA.toBytes(), seed],
         PROGRAM_ID
       );
-      Logger.info("Obliczony Seating Section PDA: " + seatingSectionPDA.toBase58() + " (bump: " + bump + ")");
+      console.log("Obliczony Seating Section PDA: " + seatingSectionPDA.toBase58() + " (bump: " + bump + ")");
       return seatingSectionPDA;
     }
 
@@ -140,147 +65,42 @@
     async function loadEvent() {
       try {
         if (!currentEventID) {
-          Logger.error("Event ID nie został podany.");
+          console.log("Event ID nie został podany.");
           return;
         }
-        Logger.info("Ładowanie eventu: " + currentEventID);
+        console.log("Ładowanie eventu: " + currentEventID);
         const eventSeed1 = new TextEncoder().encode("event");
         const eventSeed2 = new TextEncoder().encode(currentEventID);
         const [eventPDA] = await solanaWeb3.PublicKey.findProgramAddress([eventSeed1, eventSeed2], PROGRAM_ID);
-        Logger.info("Event PDA: " + eventPDA.toBase58());
+        console.log("Event PDA: " + eventPDA.toBase58());
         const eventAcc = await connection.getAccountInfo(eventPDA);
         if (!eventAcc) {
-          Logger.error("Nie znaleziono eventu.");
+          console.log("Nie znaleziono eventu.");
           document.getElementById("eventDetails").innerText = "Nie znaleziono eventu.";
           return;
         }
         eventData = decodeEventNFT(eventAcc.data);
-        Logger.info("Dane eventu: " + JSON.stringify(eventData, null, 2));
+        console.log("Dane eventu: " + JSON.stringify(eventData, null, 2));
         displayEvent(eventData);
         const seatingSeed1 = new TextEncoder().encode("seating_map");
         const seatingSeed2 = new TextEncoder().encode(currentEventID);
         const [seatingMapPDA] = await solanaWeb3.PublicKey.findProgramAddress([seatingSeed1, seatingSeed2], PROGRAM_ID);
-        Logger.info("Seating Map PDA: " + seatingMapPDA.toBase58());
+        console.log("Seating Map PDA: " + seatingMapPDA.toBase58());
         const seatingMapAcc = await connection.getAccountInfo(seatingMapPDA);
         if (!seatingMapAcc) {
-          Logger.error("Nie znaleziono mapy miejsc.");
+          console.log("Nie znaleziono mapy miejsc.");
           return;
         }
         eventData.seating_map = decodeSeatingMap(seatingMapAcc.data);
-        Logger.info("SeatingMap: " + JSON.stringify(eventData.seating_map, null, 2));
+        console.log("SeatingMap: " + JSON.stringify(eventData.seating_map, null, 2));
         loadSections(eventData.seating_map.sections);
       } catch (err) {
-        Logger.error("Błąd ładowania eventu: " + err.message);
+        console.log("Błąd ładowania eventu: " + err.message);
       }
     }
 
     // Funkcja dekodująca event – rozszerzona o event_date
-    function decodeEventNFT(data) {
-      let offset = 8; // pomijamy 8-bajtowy discriminator
-      const dv = new DataView(data.buffer, data.byteOffset, data.byteLength);
-      const eventIdLen = dv.getUint32(offset, true); offset += 4;
-      const eventIdBytes = data.slice(offset, offset + eventIdLen); offset += eventIdLen;
-      const event_id = new TextDecoder().decode(eventIdBytes);
-      const organizerBytes = data.slice(offset, offset + 32); offset += 32;
-      const organizer = new solanaWeb3.PublicKey(organizerBytes).toBase58();
-      const nameLen = dv.getUint32(offset, true); offset += 4;
-      const nameBytes = data.slice(offset, offset + nameLen); offset += nameLen;
-      const name = new TextDecoder().decode(nameBytes);
-      // Odczyt event_date (UNIX timestamp, i64)
-      let event_date = 0;
-      if (offset + 8 <= data.byteLength) {
-        event_date = Number(dv.getBigUint64(offset, true));
-        offset += 8;
-      }
-      let ticket_price = "0";
-      if (offset + 8 <= data.byteLength) {
-        ticket_price = dv.getBigUint64(offset, true).toString();
-        offset += 8;
-      }
-      let available_tickets = "0";
-      if (offset + 8 <= data.byteLength) {
-        available_tickets = dv.getBigUint64(offset, true).toString();
-        offset += 8;
-      }
-      let sold_tickets = "0";
-      if (offset + 8 <= data.byteLength) {
-        sold_tickets = dv.getBigUint64(offset, true).toString();
-        offset += 8;
-      }
-      let seating_type = 0;
-      if (offset + 1 <= data.byteLength) {
-        seating_type = dv.getUint8(offset);
-        offset += 1;
-      }
-      let active = false;
-      if (offset + 1 <= data.byteLength) {
-        active = dv.getUint8(offset) !== 0;
-        offset += 1;
-      }
-      return {
-        event_id,
-        organizer,
-        name,
-        event_date,
-        ticket_price,
-        available_tickets,
-        sold_tickets,
-        seating_type,
-        active
-      };
-    }
 
-    function decodeSeatingMap(data) {
-      let offset = 8; // pomijamy 8 bajtów dyskryminatora
-      const dv = new DataView(data.buffer, data.byteOffset, data.byteLength);
-      const eventIdLen = dv.getUint32(offset, true); 
-      offset += 4;
-      const eventIdBytes = data.slice(offset, offset + eventIdLen); 
-      offset += eventIdBytes.length;
-      const event_id = new TextDecoder().decode(eventIdBytes);
-      const organizerBytes = data.slice(offset, offset + 32); offset += 32;
-      const organizer = new solanaWeb3.PublicKey(organizerBytes).toBase58();
-      const active = dv.getUint8(offset) !== 0; offset += 1;
-      const vecLen = dv.getUint32(offset, true); offset += 4;
-      let sections = [];
-      for (let i = 0; i < vecLen; i++) {
-        const keyBytes = data.slice(offset, offset + 32);
-        sections.push(new solanaWeb3.PublicKey(keyBytes).toBase58());
-        offset += 32;
-      }
-      const total_seats = dv.getBigUint64(offset, true); offset += 8;
-      return { event_id, organizer, active, sections, total_seats: total_seats.toString() };
-    }
-
-    function decodeSeatingSectionAccount(data) {
-      let offset = 8;
-      const dv = new DataView(data.buffer, data.byteOffset, data.byteLength);
-      const eventIdLen = dv.getUint32(offset, true); offset += 4;
-      const eventIdBytes = data.slice(offset, offset + eventIdLen); offset += eventIdBytes.length;
-      const event_id = new TextDecoder().decode(eventIdBytes);
-      const sectionNameLen = dv.getUint32(offset, true); offset += 4;
-      const sectionNameBytes = data.slice(offset, offset + sectionNameLen); offset += sectionNameBytes.length;
-      const section_name = new TextDecoder().decode(sectionNameBytes);
-      const section_type = dv.getUint8(offset); offset += 1;
-      const rows = dv.getUint8(offset); offset += 1;
-      const seats_per_row = dv.getUint8(offset); offset += 1;
-      const ticket_price = dv.getBigUint64(offset, true); offset += 8;
-      const vecLen = dv.getUint32(offset, true); offset += 4;
-      let seat_status = [];
-      for (let i = 0; i < vecLen; i++) {
-        seat_status.push(dv.getUint8(offset));
-        offset += 1;
-      }
-      return { 
-        event_id, 
-        section_name, 
-        section_type, 
-        rows, 
-        seats_per_row, 
-        ticket_price: ticket_price.toString(),
-        seat_status 
-      };
-    }
 
     function displayEvent(ev) {
       // Konwersja event_date na czytelny format
@@ -327,7 +147,7 @@
           }
         }
       } catch (err) {
-        Logger.error("Błąd ładowania sekcji: " + err.message);
+        console.log("Błąd ładowania sekcji: " + err.message);
       }
     }
 
@@ -356,7 +176,7 @@
     function mintNFTForSeat(sectionData, seatIndex) {
       const row = Math.floor(seatIndex / sectionData.seats_per_row);
       const seat = seatIndex % sectionData.seats_per_row;
-      Logger.info(`Mint NFT dla sekcji "${sectionData.section_name}", row ${row}, seat ${seat}`);
+      console.log(`Mint NFT dla sekcji "${sectionData.section_name}", row ${row}, seat ${seat}`);
       processMintTicketNFT(sectionData.section_name, row, seat);
     }
 
@@ -372,10 +192,10 @@
         if (freeIndices.length === 0) { alert("Brak wolnych miejsc w sekcji " + sectionName); return; }
         const randomIndex = freeIndices[Math.floor(Math.random() * freeIndices.length)];
         const { row, seat } = validateSeatCoordinates(sectionData, randomIndex);
-        Logger.info(`Kupuję bilet dla sekcji stojącej "${sectionName}" – row: ${row}, seat: ${seat}`);
+        console.log(`Kupuję bilet dla sekcji stojącej "${sectionName}" – row: ${row}, seat: ${seat}`);
         processMintTicketNFT(sectionName, row, seat);
       } catch (err) {
-        Logger.error("Błąd kupowania biletu: " + err.message);
+        console.log("Błąd kupowania biletu: " + err.message);
         alert("Błąd kupowania biletu: " + err.message);
       }
     }
@@ -446,7 +266,7 @@
         const data = await response.json();
         return data.uri; // np. "ipfs://Qm..."
       } catch (error) {
-        Logger.error("Błąd pobierania metadata URI: " + error.message);
+        console.log("Błąd pobierania metadata URI: " + error.message);
         throw error;
       }
     }
@@ -463,7 +283,7 @@
       [seed1, seed2, seed3, seed4, seed5],
       PROGRAM_ID
     );
-    Logger.info("Obliczony TicketStatus PDA: " + ticketStatusPDA.toBase58() + " (bump: " + bump + ")");
+    console.log("Obliczony TicketStatus PDA: " + ticketStatusPDA.toBase58() + " (bump: " + bump + ")");
     return ticketStatusPDA;
   }
 
@@ -514,26 +334,26 @@
     async function processMintTicketNFT(sectionName, row, seat) {
   try {
     if (!eventData) { 
-      Logger.error("Brak danych eventu!"); 
+      console.log("Brak danych eventu!"); 
       return; 
     }
     const event_id = eventData.event_id;
     const event_name = eventData.name;
-    Logger.info(`Mint NFT: event_id=${event_id}, event_name=${event_name}, section=${sectionName}, row=${row}, seat=${seat}`);
+    console.log(`Mint NFT: event_id=${event_id}, event_name=${event_name}, section=${sectionName}, row=${row}, seat=${seat}`);
 
     if (!eventData.active) { 
-      Logger.error("Event nie jest aktywny!"); 
+      console.log("Event nie jest aktywny!"); 
       alert("Event nie jest aktywny. Mintowanie niemożliwe."); 
       return; 
     }
 
     // Pobieramy metadata URI (backend generuje metadane i dodaje je do IPFS)
     const metadataURI = await fetchMetadataUri(event_id, sectionName, row, seat, eventData.event_date, eventData.name);
-    Logger.info("Wygenerowany metadata URI (IPFS): " + metadataURI);
+    console.log("Wygenerowany metadata URI (IPFS): " + metadataURI);
 
     // Obliczamy potrzebne adresy PDA
     const eventPDA = await getEventPDA(event_id);
-    Logger.info("Obliczone Event PDA: " + eventPDA.toBase58());
+    console.log("Obliczone Event PDA: " + eventPDA.toBase58());
 
     const seatingSeed1 = new TextEncoder().encode("seating_map");
     const seatingSeed2 = new TextEncoder().encode(event_id);
@@ -541,14 +361,14 @@
       [seatingSeed1, seatingSeed2],
       PROGRAM_ID
     );
-    Logger.info("Obliczone Seating Map PDA: " + seatingMapPDA.toBase58());
+    console.log("Obliczone Seating Map PDA: " + seatingMapPDA.toBase58());
     
     const seatingSectionPDA = await getSeatingSectionPDA(eventPDA, sectionName);
     const { mintPDA } = await getTestMintPDA(event_id, event_name, sectionName, row, seat);
     const tokenAccount = await getAssociatedTokenAddress(walletPublicKey, mintPDA);
-    Logger.info("Obliczony ATA: " + tokenAccount.toBase58());
+    console.log("Obliczony ATA: " + tokenAccount.toBase58());
     const metadataPDA = await getMetadataPDA(mintPDA);
-    Logger.info("Obliczony metadata PDA: " + metadataPDA.toBase58());
+    console.log("Obliczony metadata PDA: " + metadataPDA.toBase58());
 
     // Budujemy dane instrukcji dla mint NFT
     const ixDataMint = buildInstructionData(event_id, event_name, sectionName, row, seat, metadataURI);
@@ -603,29 +423,18 @@ const initTicketStatusIx = new solanaWeb3.TransactionInstruction({
     const { blockhash } = await connection.getLatestBlockhash();
     transaction.recentBlockhash = blockhash;
     
-    Logger.info("Transakcja łączona – podpisuję...");
+    console.log("Transakcja łączona – podpisuję...");
     const signedTx = await provider.signTransaction(transaction);
-    Logger.info("Transakcja podpisana, wysyłam...");
+    console.log("Transakcja podpisana, wysyłam...");
     const txSignature = await connection.sendRawTransaction(signedTx.serialize());
-    Logger.info("Transakcja wysłana. Signature: " + txSignature);
+    console.log("Transakcja wysłana. Signature: " + txSignature);
     await connection.confirmTransaction(txSignature, "confirmed");
-    Logger.info("Transakcja łączona potwierdzona. NFT mintowane!");
+    console.log("Transakcja łączona potwierdzona. NFT mintowane!");
     alert("NFT mintowane! Tx Sig: " + txSignature);
     loadEvent();
   } catch (err) {
-    Logger.error("Błąd mintowania NFT: " + err.message);
+    console.log("Błąd mintowania NFT: " + err.message);
     alert("Błąd mintowania NFT: " + err.message);
   }
 }
 
-
-    // Obsługa przycisku Load Event
-    document.getElementById("loadEventBtn").addEventListener("click", () => {
-      const inputEventID = document.getElementById("inputEventID").value.trim();
-      if (!inputEventID) { alert("Podaj Event ID!"); return; }
-      currentEventID = inputEventID;
-      loadEvent();
-    });
-  </script>
-</body>
-</html>
