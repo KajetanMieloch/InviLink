@@ -80,11 +80,11 @@ await initConnection();
   console.error(err);
   showErrorAlert("Error: " + err.message);
 }
+}
 
 const scanner = new Html5QrcodeScanner("reader", { fps: 10, qrbox: 250 });
 scanner.render(async (decodedText, decodedResult) => {
   console.log("QR Scanned: " + decodedText);
-  scanner.clear(); // stop scanning
+  scanner.clear();
   await validateTicketFromQR(decodedText);
 });
-}
