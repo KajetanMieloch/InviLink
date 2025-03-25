@@ -61,37 +61,53 @@ async function addValidator() {
     }
   }
 
-async function listValidators() {
-  const constants = await getConstants();
-  const PROGRAM_ID = new solanaWeb3.PublicKey(constants.PROGRAM_ID);
-  const NETWORK = constants.NETWORK;
-  const connection = new solanaWeb3.Connection(NETWORK, "confirmed");
-
-  await initConnection();
-
-  const eventId = window.currentEvent.event_id;
-
-  const [eventPDA] = await solanaWeb3.PublicKey.findProgramAddress(
-    [new TextEncoder().encode("event"), new TextEncoder().encode(eventId)],
-    PROGRAM_ID
-  );
-  console.log("Computed Event PDA: " + eventPDA.toBase58());
-
-  const accountInfo = await connection.getAccountInfo(eventPDA);
-  if (!accountInfo) {
-    console.error("Event account not found.");
-    return;
-  }
-
-  const eventData = decodeEventWithValidators(accountInfo.data);
-  console.log("Event data decoded: ", eventData);
-
-  if (!eventData.validators || eventData.validators.length === 0) {
-    console.log("No validators found.");
-  } else {
-    console.log("Validators:");
-    eventData.validators.forEach((validator, index) => {
-      console.log(`${index + 1}: ${validator}`);
+  async function listValidators() {
+    const constants = await getConstants();
+    const PROGRAM_ID = new solanaWeb3.PublicKey(constants.PROGRAM_ID);
+    const NETWORK = constants.NETWORK;
+    const connection = new solanaWeb3.Connection(NETWORK, "confirmed");
+  
+    await initConnection();
+  
+    const eventId = window.currentEvent.event_id;
+  
+    const [eventPDA] = await solanaWeb3.PublicKey.findProgramAddress(
+      [new TextEncoder().encode("event"), new TextEncoder().encode(eventId)],
+      PROGRAM_ID
+    );
+    console.log("Computed Event PDA: " + eventPDA.toBase58());
+  
+    const accountInfo = await connection.getAccountInfo(eventPDA);
+    if (!accountInfo) {
+      console.error("Event account not found.");
+      document.getElementById("validatorTableBody").innerHTML =
+        "<tr><td colspan='3'>Event account not found.</td></tr>";
+      return;
+    }
+  
+    const eventData = decodeEventWithValidators(accountInfo.data);
+    const validators = eventData.validators || [];
+  
+    const tbody = document.getElementById("validatorTableBody");
+    tbody.innerHTML = "";
+  
+    if (validators.length === 0) {
+      tbody.innerHTML = "<tr><td colspan='3'>No validators added yet.</td></tr>";
+      return;
+    }
+  
+    validators.forEach((validator, index) => {
+      const tr = document.createElement("tr");
+      tr.innerHTML = `
+        <td>${index + 1}</td>
+        <td>${validator}</td>
+        <td>
+          <!-- You can later uncomment this if you want remove functionality -->
+          <!-- <button onclick="removeValidator('${validator}')">Remove</button> -->
+          <span style="color: gray;">(read-only)</span>
+        </td>
+      `;
+      tbody.appendChild(tr);
     });
   }
-}
+  
