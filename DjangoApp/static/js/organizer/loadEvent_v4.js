@@ -1,4 +1,4 @@
-async function showEventInfo(eventId) {
+async function loadEvent(eventId) {
 
     const constants = await getConstants();
     const PROGRAM_ID = new solanaWeb3.PublicKey(constants.PROGRAM_ID);
