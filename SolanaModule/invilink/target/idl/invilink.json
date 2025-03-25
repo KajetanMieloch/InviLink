@@ -1,5 +1,5 @@
 {
-  "address": "2Yh2Jud5p81cVVM5Si2S53YcmtgErkuCTsX8RBhZ91ab",
+  "address": "52dJ7bNGrgSg1mk26vWAXu9zSohcC899Qqdk3w9auMvY",
   "metadata": {
     "name": "invilink",
     "version": "0.1.0",
@@ -779,7 +779,7 @@
         {
           "name": "master_account",
           "writable": true,
-          "address": "4Wg5ZqjS3AktHzq34hK1T55aFNKSjBpmJ3PyRChpPNDh"
+          "address": "ErwJPZrGJpyGyEtqJ3CGuwZ1JEn4uFiMTj6F4TYPbjqF"
         },
         {
           "name": "organizer_wallet",
