@@ -370,3 +370,25 @@ function encodeOptionU64(value) {
   result.set(encoded, 1);
   return result;
 }
+
+function serializeU8(val) {
+  return new Uint8Array([val]);
+}
+
+
+function buildValidateTicketData(eventId, section, row, seat) {
+  const VALIDATE_TICKET_DISCRIMINATOR = new Uint8Array([222, 125, 246, 215, 10, 163, 159, 200]);
+    const eventIdBytes = serializeString(eventId);
+    const sectionBytes = serializeString(section);
+    const rowBytes = serializeU8(row);
+    const seatBytes = serializeU8(seat);
+    const totalLength = VALIDATE_TICKET_DISCRIMINATOR.length + eventIdBytes.length + sectionBytes.length + rowBytes.length + seatBytes.length;
+    const data = new Uint8Array(totalLength);
+    let offset = 0;
+    data.set(VALIDATE_TICKET_DISCRIMINATOR, offset); offset += VALIDATE_TICKET_DISCRIMINATOR.length;
+    data.set(eventIdBytes, offset); offset += eventIdBytes.length;
+    data.set(sectionBytes, offset); offset += sectionBytes.length;
+    data.set(rowBytes, offset); offset += rowBytes.length;
+    data.set(seatBytes, offset);
+    return data;
+  }

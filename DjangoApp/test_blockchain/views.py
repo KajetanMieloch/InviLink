@@ -78,14 +78,13 @@ def generate_metadata(request):
                 human_readable_date = "Unknown"
 
             # 1. Generujemy QR code z instrukcją / linkiem do dezaktywacji biletu
-            qr_url = (
-                f"https://invilink.bieda.it/test_blockchain/deactivate_ticket"
-                f"?eventId={urllib.parse.quote(str(event_id))}"
+            qr_data = (
+                f"eventId={urllib.parse.quote(str(event_id))}"
                 f"&section={section.replace(' ', '!(_)!')}"
                 f"&row={urllib.parse.quote(str(row))}"
                 f"&seat={urllib.parse.quote(str(seat))}"
             )
-            qr_img = qrcode.make(qr_url).convert("RGBA")
+            qr_img = qrcode.make(qr_data).convert("RGBA")
 
             base_dir = os.path.dirname(os.path.abspath(__file__))
             background_path = os.path.join(base_dir, "BiletInvilink.png")

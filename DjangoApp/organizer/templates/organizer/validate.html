@@ -1,9 +1,7 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <title>Ticket Validator - InviLink</title>
-  <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+{% extends "base.html" %}
+{% block content %}
+{% load static %}
+  <script src="https://unpkg.com/html5-qrcode"></script>
   <style>
     body {
       background-color: #111;
@@ -17,28 +15,28 @@
       max-width: 400px;
       margin: auto;
     }
-    #status {
+    #log {
+      white-space: pre-line;
       margin-top: 20px;
-      font-size: 1.2rem;
+      font-size: 1rem;
+      background: rgba(255,255,255,0.05);
+      padding: 15px;
+      border-radius: 8px;
     }
   </style>
 </head>
 <body>
   <h1>Scan Ticket QR Code</h1>
   <div id="reader"></div>
-  <div id="status">Waiting for scan...</div>
+  <div id="log">Waiting for scan...</div>
 
-  <script>
-    function onScanSuccess(decodedText, decodedResult) {
-      console.log(`QR Code decoded: ${decodedText}`);
-      document.getElementById('status').innerText = `✅ QR Code scanned:\n${decodedText}`;
-      html5QrcodeScanner.clear(); // comment this line if you want continuous scanning
-    }
+  <script src="{% static 'js/getConstants_v4.js' %}"></script>
+  <script src="{% static 'js/initConnection_v4.js' %}"></script>
+  <script src="{% static 'js/serializationBundle_v4.js' %}"></script>
+  <script src="{% static 'js/getUSDRate_v4.js' %}"></script>
+
+  <script src="{% static 'js/organizer/QRScan_v4.js' %}"></script>
   
-    const html5QrcodeScanner = new Html5QrcodeScanner(
-      "reader", { fps: 10, qrbox: 250 });
-    html5QrcodeScanner.render(onScanSuccess);
-  </script>
-  
-</body>
-</html>
+
+
+  {% endblock %}
