@@ -409,11 +409,6 @@ function buildValidateTicketData(eventId, section, row, seat) {
       event_date = Number(dv.getBigUint64(offset, true));
       offset += 8;
     }
-    let ticket_price = "0";
-    if (offset + 8 <= data.byteLength) {
-      ticket_price = dv.getBigUint64(offset, true).toString();
-      offset += 8;
-    }
     let available_tickets = "0";
     if (offset + 8 <= data.byteLength) {
       available_tickets = dv.getBigUint64(offset, true).toString();
@@ -439,7 +434,6 @@ function buildValidateTicketData(eventId, section, row, seat) {
       organizer,
       name,
       event_date,
-      ticket_price,
       available_tickets,
       sold_tickets,
       seating_type,
