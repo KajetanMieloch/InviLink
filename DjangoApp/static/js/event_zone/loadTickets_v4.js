@@ -102,6 +102,21 @@ async function loadNFTs() {
       attributesHtml += "</ul>";
     }
 
+    let dateValue = "";
+    if (metadataJSON.attributes && Array.isArray(metadataJSON.attributes)) {
+      for (const attr of metadataJSON.attributes) {
+        if (attr.trait_type.toLowerCase() === "date") {
+          const parsedDate = new Date(attr.value);
+          if (!isNaN(parsedDate)) {
+            dateValue = parsedDate.toISOString().slice(0, 10); // tylko YYYY-MM-DD
+          } else {
+            dateValue = attr.value; // fallback, jakby była zła data
+          }
+        }
+      }
+    }
+
+
     nftDiv.className = "card";
     nftDiv.innerHTML = `
       <img src="${imageUrl}" alt="${metadataJSON.name || metadata.name}">
