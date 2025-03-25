@@ -286,6 +286,11 @@
 
   // Funkcja pomocnicza do obliczenia PDA dla konta TicketStatus
   async function getTicketStatusPDA(event_id, sectionName, row, seat) {
+
+    const constants = await getConstants();
+    const PROGRAM_ID = new solanaWeb3.PublicKey(constants.PROGRAM_ID);
+    await initConnection();
+
     const encoder = new TextEncoder();
     const seed1 = encoder.encode("ticket_status");
     const seed2 = encoder.encode(event_id);
