@@ -146,7 +146,11 @@
   }
 </style>
 
-<div id="eventDetails" class="info-box"></div>
+
+
+<div class="container">
+
+  <div id="eventDetails" class="info-box"></div>
 
 <div class="info-box event-actions" id="eventActionButtons">
   <h3>Manage Event</h3>
@@ -157,7 +161,11 @@
   </div>
 </div>
 
-<div class="container">
+
+<div id="sectionsTable" class="info-box"></div>
+
+<div id="seatingCounter" class="info-box"></div>
+
   <div id="addSectionForm" class="info-box">
     <h3>Add Seating Section</h3>
     <label>Section Name:
@@ -183,9 +191,8 @@
     <button onclick="addSeatingSection()">Add Section</button>
   </div>
   
-  <div id="seatingCounter" class="info-box"></div>
 
-  <div id="sectionsTable" class="info-box"></div>
+
 
   <div id="validatorTable" class="info-box">
     <h3>Current Validators</h3>
@@ -227,17 +234,7 @@
 
 <script>
 
-let exchangeRate = 0;
-
-async function fetchSolPrice() {
-  try {
-    const res = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=solana&vs_currencies=usd');
-    const data = await res.json();
-    exchangeRate = data.solana.usd;
-  } catch (err) {
-    console.error('Error fetching SOL/USD exchange rate:', err);
-  }
-}
+let exchangeRate = fetchSolPrice();
 
 function syncPrices(e) {
   const solInput = document.getElementById('ticketPriceInput');

@@ -54,13 +54,21 @@ function showSeatingSections(sections) {
       <th>Type</th>
       <th>Rows</th>
       <th>Seats per Row</th>
-      <th>Ticket Price</th>
+      <th>Price (Lamports)</th>
+      <th>Price (USD)</th>
       <th>Seat Preview</th>
       <th>Actions</th>
     </tr>`;
 
   sections.forEach(sec => {
     const typeStr = sec.section_type === 1 ? "Numbered" : "Standing";
+
+    const lamports = parseInt(sec.ticket_price);
+    exchangeRate = fetchSolPrice();
+    const usd = exchangeRate
+      ? `$${((lamports / 1e9) * exchangeRate).toFixed(2)}`
+      : "N/A";
+
     let previewHTML = `<div class="seat-preview" style="grid-template-columns: repeat(${sec.seats_per_row}, 10px);">`;
     const totalSeats = sec.rows * sec.seats_per_row;
 
@@ -76,7 +84,8 @@ function showSeatingSections(sections) {
       <td>${typeStr}</td>
       <td>${sec.rows}</td>
       <td>${sec.seats_per_row}</td>
-      <td>${sec.ticket_price}</td>
+      <td>${lamports}</td>
+      <td>${usd}</td>
       <td>${previewHTML}</td>
       <td>
         <button onclick="editSection('${sec.section_name}')">Edit</button>
