@@ -114,7 +114,13 @@
     }
 
     async function loadSections(sectionPubkeys) {
-      try {
+
+      const constants = await getConstants();
+      const PROGRAM_ID = new solanaWeb3.PublicKey(constants.PROGRAM_ID);
+      const NETWORK = constants.NETWORK;
+      const connection = new solanaWeb3.Connection(NETWORK, "confirmed");
+      await initConnection();
+
         const container = document.getElementById("sectionsContainer");
         container.innerHTML = "";
         if (sectionPubkeys.length === 0) {
@@ -140,10 +146,7 @@
             container.appendChild(div);
           }
         }
-      } catch (err) {
-        console.log("Błąd ładowania sekcji: " + err.message);
       }
-    }
 
     function createInteractiveMapForElement(container, sectionData) {
       const grid = document.createElement("div");
