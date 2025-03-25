@@ -87,7 +87,7 @@
     font-size: 1rem;
     cursor: pointer;
     transition: background 0.3s;
-    margin: 20px 0;
+    margin: 10px 0;
   }
 
   button:hover {
@@ -175,6 +175,16 @@
   <h1>Seating Manager - Event Details</h1>
 
   <div id="eventDetails" class="info-box"></div>
+
+  <div class="info-box event-actions" id="eventActionButtons" style="display:none;">
+    <h3>Manage Event</h3>
+    <div style="display: flex; gap: 10px; flex-wrap: wrap; justify-content: center;">
+      <button onclick="updateEvent('{{ event_id }}')">Update Event</button>
+      <button onclick="activateEvent('{{ event_id }}')">Activate Event</button>
+      <button onclick="deactivateEvent('{{ event_id }}')">Deactivate Event</button>
+    </div>
+  </div>
+  
   <div id="seatingCounter" class="info-box"></div>
   <div id="sectionsTable" class="info-box"></div>
 </div>
