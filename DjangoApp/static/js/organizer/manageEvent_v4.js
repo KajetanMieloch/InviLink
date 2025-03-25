@@ -176,7 +176,7 @@ async function updateEvent() {
 
 
   const [registryPDA] = await solanaWeb3.PublicKey.findProgramAddress(
-    [new TextEncoder().encode(REGISTRY_SEED)],
+    [new TextEncoder().encode("event_registry")],
     PROGRAM_ID
   );
   
