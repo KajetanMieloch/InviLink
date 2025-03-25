@@ -146,6 +146,17 @@
   }
 </style>
 
+<div id="eventDetails" class="info-box"></div>
+
+<div class="info-box event-actions" id="eventActionButtons">
+  <h3>Manage Event</h3>
+  <div style="display: flex; gap: 10px; flex-wrap: wrap; justify-content: center;">
+    <button onclick="updateEvent()">Update Event</button>
+    <button onclick="activateEvent()">Activate Event</button>
+    <button onclick="deactivateEvent()">Deactivate Event</button>
+  </div>
+</div>
+
 <div class="container">
   <div id="addSectionForm" class="info-box">
     <h3>Add Seating Section</h3>
@@ -171,32 +182,11 @@
     </label>
     <button onclick="addSeatingSection()">Add Section</button>
   </div>
-
-  <h1>Seating Manager - Event Details</h1>
-
-  <div id="eventDetails" class="info-box"></div>
-
-  <div class="info-box event-actions" id="eventActionButtons">
-    <h3>Manage Event</h3>
-    <div style="display: flex; gap: 10px; flex-wrap: wrap; justify-content: center;">
-      <button onclick="updateEvent()">Update Event</button>
-      <button onclick="activateEvent()">Activate Event</button>
-      <button onclick="deactivateEvent()">Deactivate Event</button>
-    </div>
-  </div>
   
   <div id="seatingCounter" class="info-box"></div>
 
-  <div id="validatorBox" class="info-box">
-    <h3>Add Validator to Event</h3>
-    <label>
-      Validator PublicKey:
-      <input type="text" id="validatorInput" placeholder="Enter validator's PublicKey">
-    </label>
-    <button id="addValidatorBtn" onclick="addValidator()">Add Validator</button>
-  </div>
-  
-  <!-- 👇 DODAJ TO TUTAJ 👇 -->
+  <div id="sectionsTable" class="info-box"></div>
+
   <div id="validatorTable" class="info-box">
     <h3>Current Validators</h3>
     <table>
@@ -212,8 +202,16 @@
       </tbody>
     </table>
   </div>
-  
-  <div id="sectionsTable" class="info-box"></div>
+
+  <div id="validatorBox" class="info-box">
+    <h3>Add Validator to Event</h3>
+    <label>
+      Validator PublicKey:
+      <input type="text" id="validatorInput" placeholder="Enter validator's PublicKey">
+    </label>
+    <button id="addValidatorBtn" onclick="addValidator()">Add Validator</button>
+  </div>
+
 </div>
 
 <script src="{% static 'js/getConstants_v4.js' %}"></script>
@@ -228,6 +226,33 @@
 <script src="{% static 'js/organizer/validators_v4.js' %}"></script>
 
 <script>
+
+let exchangeRate = 0;
+
+async function fetchSolPrice() {
+  try {
+    const res = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=solana&vs_currencies=usd');
+    const data = await res.json();
+    exchangeRate = data.solana.usd;
+  } catch (err) {
+    console.error('Error fetching SOL/USD exchange rate:', err);
+  }
+}
+
+function syncPrices(e) {
+  const solInput = document.getElementById('ticketPriceInput');
+  const usdInput = document.getElementById('ticketPriceUSDInput');
+
+  if (!exchangeRate) return;
+
+  if (e.target.id === 'ticketPriceInput') {
+    const sol = parseFloat(solInput.value);
+    if (!isNaN(sol)) usdInput.value = ((sol / 1e9) * exchangeRate).toFixed(2);
+  } else {
+    const usd = parseFloat(usdInput.value);
+    if (!isNaN(usd)) solInput.value = Math.round((usd / exchangeRate) * 1e9);
+  }
+}
 document.addEventListener("DOMContentLoaded", async () => {
     await fetchSolPrice();
     await loadEvent("{{ event_id }}");

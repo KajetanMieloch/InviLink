@@ -102,12 +102,66 @@ async function addValidator() {
         <td>${index + 1}</td>
         <td>${validator}</td>
         <td>
-          <!-- You can later uncomment this if you want remove functionality -->
-          <!-- <button onclick="removeValidator('${validator}')">Remove</button> -->
-          <span style="color: gray;">(read-only)</span>
+          <button onclick="removeValidator('${validator}')">Remove</button>
         </td>
       `;
       tbody.appendChild(tr);
+    });    
+  }
+
+  async function removeValidator(pubkeyStr) {
+    const eventId = window.currentEvent.event_id;
+  
+    const constants = await getConstants();
+    const PROGRAM_ID = new solanaWeb3.PublicKey(constants.PROGRAM_ID);
+    const NETWORK = constants.NETWORK;
+    const connection = new solanaWeb3.Connection(NETWORK, "confirmed");
+  
+    await initConnection();
+  
+    const REMOVE_VALIDATOR_DISCRIMINATOR = new Uint8Array([25, 96, 211, 155, 161, 14, 168, 188]);
+  
+    let validatorPubkey;
+    try {
+      validatorPubkey = new solanaWeb3.PublicKey(pubkeyStr);
+    } catch (err) {
+      alert("Invalid PublicKey format.");
+      return;
+    }
+  
+    const [eventPDA] = await solanaWeb3.PublicKey.findProgramAddress(
+      [new TextEncoder().encode("event"), new TextEncoder().encode(eventId)],
+      PROGRAM_ID
+    );
+  
+    // Build instruction data
+    const data = new Uint8Array(REMOVE_VALIDATOR_DISCRIMINATOR.length + 32);
+    data.set(REMOVE_VALIDATOR_DISCRIMINATOR, 0);
+    data.set(validatorPubkey.toBytes(), REMOVE_VALIDATOR_DISCRIMINATOR.length);
+  
+    const instruction = new solanaWeb3.TransactionInstruction({
+      keys: [
+        { pubkey: eventPDA, isWritable: true, isSigner: false },
+        { pubkey: walletPublicKey, isWritable: false, isSigner: true }
+      ],
+      programId: PROGRAM_ID,
+      data: data
     });
+  
+    const transaction = new solanaWeb3.Transaction().add(instruction);
+    transaction.feePayer = walletPublicKey;
+    const { blockhash } = await connection.getLatestBlockhash();
+    transaction.recentBlockhash = blockhash;
+  
+    try {
+      const signedTx = await provider.signTransaction(transaction);
+      const txSig = await connection.sendRawTransaction(signedTx.serialize());
+      await connection.confirmTransaction(txSig, "confirmed");
+      alert("Validator removed! Tx Sig: " + txSig);
+      await listValidators(); // Refresh table
+    } catch (err) {
+      alert("Error removing validator: " + err.message);
+      console.error(err);
+    }
   }
   
