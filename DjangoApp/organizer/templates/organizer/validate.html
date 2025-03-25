@@ -29,38 +29,16 @@
   <div id="status">Waiting for scan...</div>
 
   <script>
-    function handleTicketValidation(url) {
-      const statusDiv = document.getElementById('status');
-      statusDiv.innerText = "Validating ticket...";
-
-      fetch(url)
-        .then(res => res.json())
-        .then(data => {
-          if (data.success) {
-            statusDiv.innerText = "✅ Ticket is valid and deactivated!";
-          } else {
-            statusDiv.innerText = "❌ " + (data.error || "Invalid ticket.");
-          }
-        })
-        .catch(err => {
-          statusDiv.innerText = "❌ Error validating ticket.";
-          console.error(err);
-        });
-    }
-
     function onScanSuccess(decodedText, decodedResult) {
       console.log(`QR Code decoded: ${decodedText}`);
-      if (decodedText.includes("/deactivate_ticket/?")) {
-        html5QrcodeScanner.clear();
-        handleTicketValidation(decodedText);
-      } else {
-        document.getElementById('status').innerText = "❌ Invalid QR Code.";
-      }
+      document.getElementById('status').innerText = `✅ QR Code scanned:\n${decodedText}`;
+      html5QrcodeScanner.clear(); // comment this line if you want continuous scanning
     }
-
+  
     const html5QrcodeScanner = new Html5QrcodeScanner(
       "reader", { fps: 10, qrbox: 250 });
     html5QrcodeScanner.render(onScanSuccess);
   </script>
+  
 </body>
 </html>
