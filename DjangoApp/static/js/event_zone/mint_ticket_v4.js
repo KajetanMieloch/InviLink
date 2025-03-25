@@ -134,21 +134,28 @@ async function loadSections(sectionPubkeys) {
     if (sectionAcc) {
       const sectionData = decodeSeatingSectionAccount(sectionAcc.data);
       let div = document.createElement("div");
-      div.innerHTML = `<h3>Section: ${sectionData.section_name}</h3>`;
+      // Dodajemy nagłówek z nazwą sekcji oraz informację o koszcie biletu
+      div.innerHTML = `
+        <h3>Section: ${sectionData.section_name}</h3>
+        <p><strong>Ticket Price:</strong> ${sectionData.ticket_price} lamports</p>
+      `;
       if (sectionData.section_type === 1) {
         createInteractiveMapForElement(div, sectionData);
       } else {
         const totalSeats = sectionData.rows * sectionData.seats_per_row;
         const freeSeats = sectionData.seat_status.filter(status => status === 0).length;
-        div.innerHTML += `<div class="standing-section">
+        div.innerHTML += `
+          <div class="standing-section">
             <span class="standing-info">Free seats: ${freeSeats} / ${totalSeats}</span>
             <button class='action' onclick='buyStandingTicket("${sectionData.section_name}")'>Buy Ticket</button>
-          </div>`;
+          </div>
+        `;
       }
       container.appendChild(div);
     }
   }
 }
+
 
 function createInteractiveMapForElement(container, sectionData) {
   const grid = document.createElement("div");
