@@ -2,28 +2,125 @@
 {% block content %}
 {% load static %}
 <style>
-    body { font-family: Arial, sans-serif; padding: 20px; }
-    #log { margin: 20px 0; padding: 10px; border: 1px solid #ccc; width: 90%; white-space: pre-wrap; }
-    #eventDetails { margin-top: 20px; }
-    .seat-grid { display: grid; gap: 4px; margin-top: 10px; }
-    .seat-button { width: 30px; height: 30px; border: none; cursor: pointer; }
-    .seat-available { background-color: green; }
-    .seat-taken { background-color: red; cursor: not-allowed; }
-    .standing-section { margin-top: 10px; }
-    .standing-info { font-weight: bold; margin-right: 10px; }
+    :root {
+      --gradient-start: #1e90ff;
+      --gradient-end: #8e44ad;
+      --primary-yellow: #f1c40f;
+    }
+
+    html, body {
+    margin: 0;
+    padding: 0;
+    overflow-x: hidden;
+    font-family: sans-serif;
+    width: 100vw;
+    height: 100vh;
+    position: relative;
+    z-index: 1;
+}
+
+body::before {
+    content: "";
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: url("https://backend.bestebank.org/wp-content/uploads/2020/09/Solana-background.png") center/cover no-repeat;
+    filter: blur(8px) brightness(0.3);
+    z-index: -1;
+}
+
+    .container {
+      max-width: 900px;
+      margin: auto;
+      padding: 40px 20px;
+      background-color: rgba(0, 0, 0, 0.7);
+      border-radius: 15px;
+      box-shadow: 0 8px 20px rgba(0, 0, 0, 0.6);
+      margin-top: 60px;
+    }
+
+    h1, h2 {
+      text-align: center;
+      background: linear-gradient(45deg, var(--gradient-start), var(--gradient-end));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      margin-bottom: 30px;
+    }
+
+    p {
+      font-size: 1.1rem;
+      margin: 8px 0;
+    }
+
+    .section {
+      margin-top: 30px;
+    }
+
+    .seat-grid {
+      display: grid;
+      gap: 6px;
+      justify-content: center;
+    }
+
+    .seat-button {
+      width: 30px;
+      height: 30px;
+      border: none;
+      border-radius: 6px;
+      font-weight: bold;
+      cursor: pointer;
+    }
+
+    .seat-available {
+      background-color: #2ecc71;
+      color: black;
+    }
+
+    .seat-taken {
+      background-color: #e74c3c;
+      color: white;
+    }
+
+    button.action {
+      background: linear-gradient(45deg, var(--gradient-start), var(--gradient-end));
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      font-size: 1rem;
+      border-radius: 10px;
+      cursor: pointer;
+      margin-top: 20px;
+      width: 100%;
+      transition: background 0.3s;
+    }
+
+    button.action:hover {
+      background: linear-gradient(45deg, #3aa0ff, #a262d4);
+    }
+
+    .standing-section {
+      text-align: center;
+      padding: 15px;
+      background-color: #222;
+      border-radius: 10px;
+      margin-top: 20px;
+    }
+
+    .standing-info {
+      display: block;
+      font-size: 1.1rem;
+      margin-bottom: 10px;
+    }
   </style>
 </head>
 <body>
-  <h1>Strona Eventu - InviLink (Mint NFT)</h1>
-  
-  <!-- Input do podania EventID -->
-  <div>
-    <button id="loadEventBtn" onclick="loadEvent('{{event_id}}')">Załaduj Event</button>
+  <div class="container">
+    <h1>Mint Your NFT Ticket</h1>
+    <div id="eventDetails"></div>
+    <div id="sectionsContainer" class="section"></div>
   </div>
-
-  <div id="eventDetails"></div>
-  <h2>Sekcje</h2>
-  <div id="sectionsContainer"></div>
 
 
   <script src="https://cdn.jsdelivr.net/npm/@solana/web3.js@latest/lib/index.iife.min.js"></script>
@@ -32,5 +129,13 @@
   <script src="/static/js/serializationBundle_v4.js"></script>
 
   <script src="/static/js/event_zone/mint_ticket_v4.js"></script>
+
+  <script>
+    window.onload = () => {
+    loadEvent('{{event_id}}');
+    };
+  </script>
+
+
 
 {% endblock %}

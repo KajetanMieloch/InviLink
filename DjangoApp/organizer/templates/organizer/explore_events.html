@@ -113,7 +113,9 @@ body::before {
 <script src="{% static 'js/organizer/loadEvents_v4.js' %}"></script>
 
 <script>
-  loadEvents();
+  Window.onload = () => {
+    loadEvents();
+  };
 </script>
 
 
