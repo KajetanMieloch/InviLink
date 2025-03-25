@@ -188,7 +188,12 @@
     }
 
     async function buyStandingTicket(sectionName) {
-      try {
+
+      const constants = await getConstants();
+      const NETWORK = constants.NETWORK;
+      const connection = new solanaWeb3.Connection(NETWORK, "confirmed");
+      await initConnection();
+
         const eventPDA = await getEventPDA(eventData.event_id);
         const seatingSectionPDA = await getSeatingSectionPDA(eventPDA, sectionName);
         const sectionAcc = await connection.getAccountInfo(seatingSectionPDA);
@@ -201,11 +206,7 @@
         const { row, seat } = validateSeatCoordinates(sectionData, randomIndex);
         console.log(`Kupuję bilet dla sekcji stojącej "${sectionName}" – row: ${row}, seat: ${seat}`);
         processMintTicketNFT(sectionName, row, seat);
-      } catch (err) {
-        console.log("Błąd kupowania biletu: " + err.message);
-        alert("Błąd kupowania biletu: " + err.message);
       }
-    }
 
     function validateSeatCoordinates(sectionData, seatIndex) {
       const maxSeats = sectionData.rows * sectionData.seats_per_row;
