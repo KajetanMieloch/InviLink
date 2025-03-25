@@ -102,41 +102,20 @@ async function loadNFTs() {
       attributesHtml += "</ul>";
     }
 
-    let dateValue = "";
-    if (metadataJSON.attributes && Array.isArray(metadataJSON.attributes)) {
-      for (const attr of metadataJSON.attributes) {
-        if (attr.trait_type.toLowerCase() === "date") {
-          const parsedDate = new Date(attr.value);
-          if (!isNaN(parsedDate)) {
-            dateValue = parsedDate.toISOString().slice(0, 10); // tylko YYYY-MM-DD
-          } else {
-            dateValue = attr.value; // fallback, jakby była zła data
-          }
-        }
-      }
-    }
-
-
-    nftDiv.className = "card";
+    nftDiv.className = "card"; // ważne – to włącza stylizację
     nftDiv.innerHTML = `
       <img src="${imageUrl}" alt="${metadataJSON.name || metadata.name}">
       <div class="card-body">
         <p class="gradient-text"><strong>Nazwa:</strong> ${metadataJSON.name || metadata.name}</p>
         <p class="gradient-text"><strong>Symbol:</strong> ${metadataJSON.symbol || metadata.symbol}</p>
-    
-        <p style="color: #f1c40f; font-size: 1rem; font-weight: bold;"><strong>Section:</strong> ${sectionValue}</p>
-        <p style="color: #f1c40f; font-size: 1rem; font-weight: bold;"><strong>Row:</strong> ${rowValue}</p>
-        <p style="color: #f1c40f; font-size: 1rem; font-weight: bold;"><strong>Seat:</strong> ${seatValue}</p>
-        <p style="color: #f1c40f; font-size: 1rem; font-weight: bold;"><strong>Date of the event:</strong> ${dateValue}</p>
-    
         <p class="gradient-text"><strong>Opis:</strong> ${metadataJSON.description || "Brak opisu"}</p>
         <p class="gradient-text"><strong>URI:</strong> <a href="${fixIpfsUri(metadata.uri)}" target="_blank" style="color:#1e90ff">${fixIpfsUri(metadata.uri).slice(0, 35)}...</a></p>
-    
+        ${attributesHtml}
         <button class="btn btn-invilink mt-3" onclick='activateNFT("${eventIdFromName}", "${sectionValue}", ${rowValue}, ${seatValue})'>Aktywuj NFT</button>
       </div>
     `;
     
-    
+    <p style="color: #f1c40f; font-size: 1rem; font-weight: bold;"><strong>Date of the event:</strong> ${dateValue}</p>
     
     nftContainer.appendChild(nftDiv);
   }
