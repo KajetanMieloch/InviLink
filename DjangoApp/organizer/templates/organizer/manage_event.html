@@ -1,37 +1,155 @@
 {% extends "base.html" %}
 {% block content %}
 {% load static %}
-<!DOCTYPE html>
-<html lang="pl">
-<head>
-  <meta charset="UTF-8">
-  <title>Menadżer Seating - InviLink</title>
-  <!-- Solana Web3 -->
-  <script src="https://cdn.jsdelivr.net/npm/@solana/web3.js@latest/lib/index.iife.min.js"></script>
-  <!-- bn.js – globalna zmienna BN -->
-  <script src="https://cdn.jsdelivr.net/npm/bn.js@5.2.0/lib/bn.min.js"></script>
-  <style>
-    body { font-family: Arial, sans-serif; padding: 20px; }
-    label { display: block; margin: 10px 0; }
-    input, select { width: 300px; padding: 8px; font-size: 16px; }
-    button { margin: 10px 0; padding: 10px 15px; font-size: 16px; }
-    #log { margin: 20px 0; padding: 10px; border: 1px solid #ccc; width: 90%; white-space: pre-wrap; }
-    #eventDetails, #seatingCounter { margin-top: 20px; }
-    table { border-collapse: collapse; width: 90%; margin-top: 20px; }
-    th, td { border: 1px solid #ddd; padding: 8px; text-align: center; }
-    .seat-preview { display: grid; gap: 2px; }
-    .seat-preview div { width: 10px; height: 10px; }
-    #addSectionForm { margin-top: 20px; padding: 10px; border: 1px solid #aaa; width: 90%; display: none; }
-  </style>
+<style>
+  :root {
+    --gradient-start: #1e90ff;
+    --gradient-end: #8e44ad;
+    --primary-yellow: #f1c40f;
+    --background-dark: #000000;
+  }
+
+  body {
+    background-color: var(--background-dark);
+    color: white;
+    font-family: 'Segoe UI', sans-serif;
+    padding-top: 80px;
+  }
+
+  .navbar {
+    position: fixed;
+    top: 0;
+    width: 100%;
+    z-index: 1000;
+    background-color: var(--background-dark) !important;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.6);
+  }
+
+  .navbar-brand, .nav-link {
+    color: var(--primary-yellow) !important;
+    font-weight: 600;
+  }
+
+  .navbar-brand:hover, .nav-link:hover {
+    color: var(--gradient-end) !important;
+  }
+
+  h1, h2, h3 {
+    text-align: center;
+    background: linear-gradient(45deg, var(--gradient-start), var(--gradient-end));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    margin-bottom: 30px;
+  }
+
+  label {
+    display: block;
+    margin: 10px 0;
+  }
+
+  input, select {
+    width: 100%;
+    max-width: 400px;
+    padding: 10px;
+    background: #111;
+    color: white;
+    border: 1px solid #444;
+    border-radius: 5px;
+    margin-bottom: 10px;
+  }
+
+  button {
+    background: linear-gradient(45deg, var(--gradient-start), var(--gradient-end));
+    border: none;
+    color: white;
+    padding: 10px 20px;
+    border-radius: 5px;
+    font-size: 1rem;
+    cursor: pointer;
+    transition: background 0.3s;
+  }
+
+  button:hover {
+    background: linear-gradient(45deg, #3aa0ff, #a262d4);
+  }
+
+  #eventDetails, #seatingCounter, #addSectionForm {
+    max-width: 1000px;
+    margin: 20px auto;
+    background: rgba(0, 0, 0, 0.8);
+    padding: 20px;
+    border-radius: 8px;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.6);
+  }
+
+  table {
+    border-collapse: collapse;
+    width: 100%;
+    margin-top: 20px;
+    background: rgba(0, 0, 0, 0.8);
+    color: white;
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+  }
+
+  th, td {
+    padding: 12px;
+    text-align: center;
+    border-bottom: 1px solid rgba(255,255,255,0.1);
+  }
+
+  th {
+    background: linear-gradient(45deg, var(--gradient-start), var(--gradient-end));
+  }
+
+  .seat-preview {
+    display: grid;
+    gap: 2px;
+    justify-content: center;
+  }
+
+  .seat-preview div {
+    width: 10px;
+    height: 10px;
+  }
+
+  #addSectionForm {
+    display: block;
+  }
+</style>
 </head>
 <body>
+<nav class="navbar navbar-expand-lg">
+  <a class="navbar-brand" href="/">InviLink</a>
+  <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarNav">
+    <span class="navbar-toggler-icon"></span>
+  </button>
+  <div class="collapse navbar-collapse" id="navbarNav">
+    <ul class="navbar-nav ml-auto">
+      <li class="nav-item">
+        <a class="nav-link" href="/explore/">Event Zone</a>
+      </li>
+      <li class="nav-item">
+        <a class="nav-link" href="/organizer/">Organizer</a>
+      </li>
+      <li class="nav-item">
+        <a class="nav-link" href="/admin_panel/">Admin Panel</a>
+      </li>
+    </ul>
+  </div>
+</nav>
+
+<div class="container">
   <h1>Menadżer Seating - Szczegóły Eventu</h1>
-  <button onclick="loadEvent('{{ event_id }}')">Załaduj Event</button>
+  <div style="text-align:center; margin-bottom: 20px;">
+    <button onclick="loadEvent('jH5Hhiqniu3z')">Załaduj Event</button>
+  </div>
+
   <div id="eventDetails"></div>
   <div id="seatingCounter"></div>
   <div id="sectionsTable"></div>
-  
-  <!-- Formularz dodania sekcji siedzeniowej (widoczny tylko, gdy event.seating_type jest 1 lub 2) -->
+
   <div id="addSectionForm">
     <h3>Dodaj Sekcję Siedzeniową</h3>
     <label>Nazwa sekcji:
@@ -54,7 +172,7 @@
     </label>
     <button onclick="addSeatingSection()">Dodaj Sekcję</button>
   </div>
-
+</div>
 
   <script src="{% static 'js/getConstants_v4.js' %}"></script>
   <script src="{% static 'js/initConnection_v4.js' %}"></script>
