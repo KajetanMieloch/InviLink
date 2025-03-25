@@ -8,19 +8,19 @@ async function updateEvent(eventPubkey) {
   
     console.log("Updating event: " + eventPubkey.toBase58());
     const newName = prompt("Enter new event name (leave empty to keep current):");
-    const newTicketPrice = prompt("Enter new ticket price (lamports) (leave empty to keep current):");
+    const newDate = prompt("Enter new event date (leave empty to keep current):");
     const newAvailableTickets = prompt("Enter new available tickets (leave empty to keep current):");
   
     const encodedName = encodeOptionString(newName);
-    const encodedTicketPrice = encodeOptionU64(newTicketPrice);
+    const encodedDate = encodeOptionU64(newDate);
     const encodedAvailable = encodeOptionU64(newAvailableTickets);
   
-    const totalLength = UPDATE_EVENT_DISCRIMINATOR.length + encodedName.length + encodedTicketPrice.length + encodedAvailable.length;
+    const totalLength = UPDATE_EVENT_DISCRIMINATOR.length + encodedName.length + encodedDate.length + encodedAvailable.length;
     const updateData = new Uint8Array(totalLength);
     let offset = 0;
     updateData.set(UPDATE_EVENT_DISCRIMINATOR, offset); offset += UPDATE_EVENT_DISCRIMINATOR.length;
     updateData.set(encodedName, offset); offset += encodedName.length;
-    updateData.set(encodedTicketPrice, offset); offset += encodedTicketPrice.length;
+    updateData.set(encodedDate, offset); offset += encodedDate.length;
     updateData.set(encodedAvailable, offset);
   
     const instruction = new solanaWeb3.TransactionInstruction({
