@@ -37,10 +37,10 @@ async function loadEvents() {
           <img src="/static/images/favicon.ico" class="card-img-top" alt="Event Image">
           <div class="card-body">
             <h5 class="card-title gradient-text">${eventData.name}</h5>
-            <p class="gradient-text small mb-1"><strong>📅 ${dateStr}</strong></p>
-            <p class="card-text">🎟️ Tickets: ${eventData.available_tickets}</p>
+            <p class="gradient-text small mb-1"><strong>${dateStr}</strong></p>
+            <p class="gradient-text">Tickets: ${eventData.available_tickets}</p>
             <p class="gradient-text text-muted small">Organizer: ${eventData.organizer}</p>
-            <button class="btn btn-invilink mt-3" onclick="window.location.href='/event/${eventData.event_id}'">Pokaż szczegóły</button>
+            <button class="btn btn-invilink mt-3" onclick="window.location.href='/explore/${eventData.event_id}'">Pokaż szczegóły</button>
           </div>
         </div>
       `;
