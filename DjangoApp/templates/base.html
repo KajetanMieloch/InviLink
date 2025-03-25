@@ -54,39 +54,43 @@
 
     /* Custom Alert Styles */
     .custom-alert {
-      position: fixed;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%);
-      background-color: #000;
-      color: white;
-      border: 3px solid;
-      padding: 20px;
-      border-radius: 10px;
-      z-index: 9999;
-      text-align: center;
-      max-width: 400px;
-      box-shadow: 0 4px 20px rgba(0,0,0,0.6);
-    }
+    position: fixed;
+    top: 20%;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 9999;
+    background-color: #111;
+    padding: 30px;
+    border-radius: 12px;
+    max-width: 90vw;
+    text-align: center;
+    box-shadow: 0 0 20px rgba(0,0,0,0.5);
+    transition: all 0.3s ease;
+    word-wrap: break-word;
+  }
 
-    .custom-alert.success {
-      border-color: #2ecc71;
-    }
+  .alert-text {
+    max-width: 90vw;
+    word-break: break-word;
+    overflow-wrap: break-word;
+    margin-bottom: 10px;
+  }
 
-    .custom-alert.error {
-      border-color: #e74c3c;
-    }
+  .success-alert {
+    border: 2px solid #2ecc71;
+    color: #2ecc71;
+  }
 
-    .custom-alert button {
-      margin-top: 15px;
-      background: linear-gradient(45deg, #1e90ff, #8e44ad);
-      border: none;
-      color: white;
-      padding: 8px 16px;
-      font-weight: bold;
-      border-radius: 6px;
-      cursor: pointer;
-    }
+  .error-alert {
+    border: 2px solid #e74c3c;
+    color: #e74c3c;
+  }
+
+  .custom-alert button {
+    background-color: transparent;
+    border: 1px solid currentColor;
+    color: inherit;
+  }
   </style>
 </head>
 <body>

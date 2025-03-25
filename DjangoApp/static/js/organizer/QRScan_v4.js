@@ -87,3 +87,4 @@ scanner.render(async (decodedText, decodedResult) => {
   scanner.clear(); // stop scanning
   await validateTicketFromQR(decodedText);
 });
+}
