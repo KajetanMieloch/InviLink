@@ -329,7 +329,13 @@
 
     // Funkcja realizująca mint NFT
     async function processMintTicketNFT(sectionName, row, seat) {
-  try {
+
+    const constants = await getConstants();
+    const PROGRAM_ID = new solanaWeb3.PublicKey(constants.PROGRAM_ID);
+    const NETWORK = constants.NETWORK;
+    const connection = new solanaWeb3.Connection(NETWORK, "confirmed");
+    await initConnection();
+
     if (!eventData) { 
       console.log("Brak danych eventu!"); 
       return; 
@@ -429,9 +435,5 @@ const initTicketStatusIx = new solanaWeb3.TransactionInstruction({
     console.log("Transakcja łączona potwierdzona. NFT mintowane!");
     alert("NFT mintowane! Tx Sig: " + txSignature);
     loadEvent();
-  } catch (err) {
-    console.log("Błąd mintowania NFT: " + err.message);
-    alert("Błąd mintowania NFT: " + err.message);
   }
-}
 
