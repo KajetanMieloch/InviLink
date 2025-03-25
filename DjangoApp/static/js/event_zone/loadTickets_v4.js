@@ -102,18 +102,25 @@ async function loadNFTs() {
       attributesHtml += "</ul>";
     }
 
-    nftDiv.className = "card"; // ważne – to włącza stylizację
+    nftDiv.className = "card";
     nftDiv.innerHTML = `
       <img src="${imageUrl}" alt="${metadataJSON.name || metadata.name}">
       <div class="card-body">
-        <p><strong>Nazwa:</strong> ${metadataJSON.name || metadata.name}</p>
-        <p><strong>Symbol:</strong> ${metadataJSON.symbol || metadata.symbol}</p>
-        <p><strong>Opis:</strong> ${metadataJSON.description || "Brak opisu"}</p>
-        <p><strong>URI:</strong> <a href="${fixIpfsUri(metadata.uri)}" target="_blank" style="color:#1e90ff">${fixIpfsUri(metadata.uri).slice(0, 35)}...</a></p>
+        <p class="gradient-text"><strong>Section:</strong> ${sectionValue}</p>
+        <p class="gradient-text"><strong>Row:</strong> ${rowValue}</p>
+        <p class="gradient-text"><strong>Seat:</strong> ${seatValue}</p>
+        <p class="gradient-text"><strong>Date of the event:</strong> ${new Date(metadataJSON.date * 1000).toISOString().slice(0, 10)}</p>
+    
+        <p class="gradient-text"><strong>Name:</strong> ${metadataJSON.name || metadata.name}</p>
+        <p class="gradient-text"><strong>Symbol:</strong> ${metadataJSON.symbol || metadata.symbol}</p>
+        <p class="gradient-text"><strong>Description:</strong> ${metadataJSON.description || "Brak opisu"}</p>
+        <p class="gradient-text"><strong>URI:</strong> <a href="${fixIpfsUri(metadata.uri)}" target="_blank" style="color:#1e90ff">${fixIpfsUri(metadata.uri).slice(0, 35)}...</a></p>
+    
         ${attributesHtml}
         <button class="btn btn-invilink mt-3" onclick='activateNFT("${eventIdFromName}", "${sectionValue}", ${rowValue}, ${seatValue})'>Aktywuj NFT</button>
       </div>
     `;
+    
     
     nftContainer.appendChild(nftDiv);
   }
