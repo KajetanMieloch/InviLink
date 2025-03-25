@@ -1,13 +1,6 @@
-const PROGRAM_ID = new solanaWeb3.PublicKey("2Yh2Jud5p81cVVM5Si2S53YcmtgErkuCTsX8RBhZ91ab");
-const connection = new solanaWeb3.Connection("https://api.devnet.solana.com", "confirmed");
 let walletPublicKey = null;
 const TOKEN_PROGRAM_ID = new solanaWeb3.PublicKey("TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA");
 const METADATA_PROGRAM_ID = new solanaWeb3.PublicKey("metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s");
-
-// Dyskryminator funkcji activate_ticket: [110, 8, 92, 34, 61, 23, 0, 151]
-const ACTIVATE_TICKET_DISCRIMINATOR = new Uint8Array([110, 8, 92, 34, 61, 23, 0, 151]);
-
-
 
 // Funkcja poprawiająca URI z IPFS
 function fixIpfsUri(uri) {

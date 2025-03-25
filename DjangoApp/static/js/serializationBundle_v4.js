@@ -480,6 +480,9 @@ function customDeserializeMetadata(buffer) {
 // Funkcja budująca dane dla instrukcji activate_ticket:
 // Format: [discriminator (8 bajtów)] || [serializeString(event_id)] || [serializeString(section)] || [serializeU8(row)] || [serializeU8(seat)]
 function buildActivateTicketData(eventId, section, row, seat) {
+  
+  const ACTIVATE_TICKET_DISCRIMINATOR = new Uint8Array([110, 8, 92, 34, 61, 23, 0, 151]);
+
   const eventIdBytes = serializeString(eventId);
   const sectionBytes = serializeString(section);
   const rowBytes = serializeU8(row);
