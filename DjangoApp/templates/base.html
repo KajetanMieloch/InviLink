@@ -153,34 +153,60 @@
     function showSuccessAlert(message) {
       const box = document.getElementById('customAlert');
       box.className = 'custom-alert success show';
-      box.innerHTML = `<div class="alert-icon">✅</div><h4>Success</h4><p class="alert-text">${message}</p><button onclick="hideAlert()">OK</button>`;
+      box.innerHTML = `
+        <div class="alert-icon">✅</div>
+        <h4>Success</h4>
+        <p class="alert-text">${message}</p>
+        <button onclick="hideAlert()">OK</button>`;
+      document.body.addEventListener('click', hideOnOutsideClick);
     }
-
+  
     function showErrorAlert(rawMsg) {
       const msgMatch = rawMsg.match(/Error Message: (.*?)(\.|$)/);
       const extracted = msgMatch ? msgMatch[1] : "Unknown error occurred.";
       const box = document.getElementById('customAlert');
       box.className = 'custom-alert error show';
-      box.innerHTML = `<div class="alert-icon">❌</div><h4>Error</h4><p class="alert-text">${extracted}</p><button onclick="hideAlert()">OK</button>`;
+      box.innerHTML = `
+        <div class="alert-icon">❌</div>
+        <h4>Error</h4>
+        <p class="alert-text">${extracted}</p>
+        <button onclick="hideAlert()">OK</button>`;
+      document.body.addEventListener('click', hideOnOutsideClick);
     }
-
-
+  
     function showErrorAlertwithMSG(msg) {
       const box = document.getElementById('customAlert');
       box.className = 'custom-alert error show';
-      box.innerHTML = `<div class="alert-icon">❌</div><h4>Error</h4><p class="alert-text">${msg}</p><button onclick="hideAlert()">OK</button>`;
+      box.innerHTML = `
+        <div class="alert-icon">❌</div>
+        <h4>Error</h4>
+        <p class="alert-text">${msg}</p>
+        <button onclick="hideAlert()">OK</button>`;
+      document.body.addEventListener('click', hideOnOutsideClick);
     }
+  
     function hideAlert() {
       const box = document.getElementById('customAlert');
+      box.classList.remove('show');
       box.classList.add('fade-out');
+  
       setTimeout(() => {
         box.className = 'custom-alert';
+        document.body.removeEventListener('click', hideOnOutsideClick);
         if (typeof startScanner === 'function') {
           startScanner();
         }
       }, 400);
     }
+  
+    function hideOnOutsideClick(e) {
+      const alertBox = document.getElementById('customAlert');
+      if (!alertBox.contains(e.target)) {
+        hideAlert();
+      }
+    }
   </script>
+  
 
   <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/popper.js@1.16.1/dist/umd/popper.min.js"></script>
