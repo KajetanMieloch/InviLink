@@ -26,10 +26,6 @@
 </head>
 <body>
   <h1>Menadżer Seating - Szczegóły Eventu</h1>
-  
-  <label>Podaj Event ID:
-    <input id="eventIdInput" type="text" placeholder="Wprowadź Event ID">
-  </label>
   <button onclick="loadEvent('{{ event_id }}')">Załaduj Event</button>
   <div id="eventDetails"></div>
   <div id="seatingCounter"></div>
@@ -65,6 +61,7 @@
   <script src="{% static 'js/serializationBundle_v4.js' %}"></script>
 
   <script src="{% static 'js/organizer/loadEvent_v4.js' %}"></script>
+  <script src="{% static 'js/organizer/manageSections_v4.js' %}"></script>
 
 
 {% endblock %}

@@ -118,3 +118,95 @@ function serializeString(str) {
     active,
   };
 }
+
+    // Funkcja pomocnicza do serializacji opcjonalnych wartości dla typów u8
+function serializeOptionU8(value) {
+  if (value === null || isNaN(value)) {
+    return new Uint8Array([0]);
+  } else {
+    return new Uint8Array([1, value]);
+  }
+}
+
+// Funkcja pomocnicza do serializacji opcjonalnych wartości dla u64
+function serializeOptionU64(value) {
+  if (value === null || isNaN(value)) {
+    return new Uint8Array([0]);
+  } else {
+    const flag = new Uint8Array([1]);
+    const valueBytes = serializeU64(new BN(value));
+    const combined = new Uint8Array(1 + valueBytes.length);
+    combined.set(flag, 0);
+    combined.set(valueBytes, 1);
+    return combined;
+  }
+}
+
+// Funkcja serializująca argumenty dla initialize_seating_section:
+// (section_name: string, section_type: u8, rows: u8, seats_per_row: u8, ticket_price: u64)
+function serializeInitializeSeatingSectionArgs({ section_name, section_type, rows, seats_per_row, ticket_price }) {
+  const sectionNameBytes = serializeString(section_name);
+  const sectionTypeByte = new Uint8Array([section_type]);
+  const rowsByte = new Uint8Array([rows]);
+  const seatsByte = new Uint8Array([seats_per_row]);
+  const ticketPriceBytes = serializeU64(new BN(ticket_price));
+  const totalLen = sectionNameBytes.length + sectionTypeByte.length + rowsByte.length + seatsByte.length + ticketPriceBytes.length;
+  const buffer = new Uint8Array(totalLen);
+  let offset = 0;
+  buffer.set(sectionNameBytes, offset); offset += sectionNameBytes.length;
+  buffer.set(sectionTypeByte, offset); offset += sectionTypeByte.length;
+  buffer.set(rowsByte, offset); offset += rowsByte.length;
+  buffer.set(seatsByte, offset); offset += seatsByte.length;
+  buffer.set(ticketPriceBytes, offset);
+  return buffer;
+}
+
+    // Dekodowanie SeatingMap – zakładamy: event_id, vec<Pubkey>, total_seats
+    function decodeSeatingMap(data) {
+      let offset = 8; // pomijamy 8 bajtów dyskryminatora
+      const dv = new DataView(data.buffer, data.byteOffset, data.byteLength);
+      const eventIdLen = dv.getUint32(offset, true); 
+      offset += 4;
+      const eventIdBytes = data.slice(offset, offset + eventIdLen); 
+      offset += eventIdLen;
+      const event_id = new TextDecoder().decode(eventIdBytes);
+      const organizerBytes = data.slice(offset, offset + 32);
+      offset += 32;
+      const organizer = new solanaWeb3.PublicKey(organizerBytes).toBase58();
+      const active = dv.getUint8(offset) !== 0;
+      offset += 1;
+      const vecLen = dv.getUint32(offset, true);
+      offset += 4;
+      let sections = [];
+      for (let i = 0; i < vecLen; i++) {
+        const keyBytes = data.slice(offset, offset + 32);
+        sections.push(new solanaWeb3.PublicKey(keyBytes).toBase58());
+        offset += 32;
+      }
+      const total_seats = dv.getBigUint64(offset, true);
+      offset += 8;
+      return { event_id, organizer, active, sections, total_seats: total_seats.toString() };
+    }
+
+    // Dekodowanie SeatingSectionAccount
+    function decodeSeatingSectionAccount(data) {
+      let offset = 8;
+      const dv = new DataView(data.buffer, data.byteOffset, data.byteLength);
+      const eventIdLen = dv.getUint32(offset, true); offset += 4;
+      const eventIdBytes = data.slice(offset, offset + eventIdLen); offset += eventIdLen;
+      const event_id = new TextDecoder().decode(eventIdBytes);
+      const sectionNameLen = dv.getUint32(offset, true); offset += 4;
+      const sectionNameBytes = data.slice(offset, offset + sectionNameLen); offset += sectionNameLen;
+      const section_name = new TextDecoder().decode(sectionNameBytes);
+      const section_type = dv.getUint8(offset); offset += 1;
+      const rows = dv.getUint8(offset); offset += 1;
+      const seats_per_row = dv.getUint8(offset); offset += 1;
+      const ticket_price = dv.getBigUint64(offset, true); offset += 8;
+      const vecLen = dv.getUint32(offset, true); offset += 4;
+      let seat_status = [];
+      for (let i = 0; i < vecLen; i++) {
+        seat_status.push(dv.getUint8(offset));
+        offset += 1;
+      }
+      return { event_id, section_name, section_type, rows, seats_per_row, ticket_price: ticket_price.toString(), seat_status };
+    }

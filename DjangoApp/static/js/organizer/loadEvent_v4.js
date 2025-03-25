@@ -1,9 +1,10 @@
-async function loadEvent(eventId) {
+async function showEventInfo(eventId) {
 
     const constants = await getConstants();
     const PROGRAM_ID = new solanaWeb3.PublicKey(constants.PROGRAM_ID);
     const NETWORK = constants.NETWORK;
     const connection = new solanaWeb3.Connection(NETWORK, "confirmed");
+    window.currentEvent = null;
 
     await initConnection();
     
@@ -50,7 +51,6 @@ function showEventInfo(eventData) {
       <p><b>EventID:</b> ${eventData.event_id}</p>
       <p><b>Organizer:</b> ${eventData.organizer}</p>
       <p><b>Data:</b> ${eventDateStr}</p>
-      <p><b>Ticket Price:</b> ${eventData.ticket_price} lamportów</p>
       <p><b>Available Tickets:</b> ${eventData.available_tickets}</p>
       <p><b>Sold Tickets:</b> ${eventData.sold_tickets}</p>
       <p><b>Seating Type:</b> ${eventData.seating_type}</p>
