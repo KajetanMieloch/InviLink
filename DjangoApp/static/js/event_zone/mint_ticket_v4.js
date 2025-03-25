@@ -118,11 +118,12 @@ function displayEvent(ev) {
 
 async function loadSections(sectionPubkeys) {
   const constants = await getConstants();
-  const PROGRAM_ID = new solanaWeb3.PublicKey(constants.PROGRAM_ID);
   const NETWORK = constants.NETWORK;
   const connection = new solanaWeb3.Connection(NETWORK, "confirmed");
   await initConnection();
 
+  const solPrice = await fetchSolPrice();
+  
   const container = document.getElementById("sectionsContainer");
   container.innerHTML = "";
   if (sectionPubkeys.length === 0) {
@@ -133,11 +134,14 @@ async function loadSections(sectionPubkeys) {
     const sectionAcc = await connection.getAccountInfo(new solanaWeb3.PublicKey(pubkeyStr));
     if (sectionAcc) {
       const sectionData = decodeSeatingSectionAccount(sectionAcc.data);
+      const ticketPriceLamports = Number(sectionData.ticket_price);
+      const ticketPriceInSOL = ticketPriceLamports / 1e9;
+      const ticketPriceInUSD = (ticketPriceInSOL * solPrice).toFixed(2);
+      
       let div = document.createElement("div");
-      // Dodajemy nagłówek z nazwą sekcji oraz informację o koszcie biletu
       div.innerHTML = `
         <h3>Section: ${sectionData.section_name}</h3>
-        <p><strong>Ticket Price:</strong> ${sectionData.ticket_price} lamports</p>
+        <p><strong>Ticket Price:</strong> ${ticketPriceLamports} lamports (~${ticketPriceInUSD} USD)</p>
       `;
       if (sectionData.section_type === 1) {
         createInteractiveMapForElement(div, sectionData);
@@ -155,6 +159,7 @@ async function loadSections(sectionPubkeys) {
     }
   }
 }
+
 
 
 function createInteractiveMapForElement(container, sectionData) {
