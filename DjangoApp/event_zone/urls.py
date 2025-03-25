@@ -8,4 +8,11 @@ app_name = 'event_zone'
 
 urlpatterns = [
     path('', views.home, name='home'),
+    path('events', views.events, name='events'),
+    #path('event/<int:event_id>', views.event, name='event'),
+
+    path('events/', views.events, name='events'),
+    #path('event/<int:event_id>/', views.event, name='event'),
+
+    
 ]
