@@ -109,7 +109,6 @@ function displayEvent(ev) {
     <p><strong>Event ID:</strong> ${ev.event_id}</p>
     <p><strong>Organizer:</strong> ${ev.organizer}</p>
     <p><strong>Date:</strong> ${eventDateStr}</p>
-    <p><strong>Ticket Price:</strong> ${ev.ticket_price} lamports</p>
     <p><strong>Available Tickets:</strong> ${ev.available_tickets}</p>
     <p><strong>Sold Tickets:</strong> ${ev.sold_tickets}</p>
     <p><strong>Seat Type:</strong> ${ev.seating_type === 1 ? "Numbered" : "Standing"}</p>
@@ -143,7 +142,7 @@ async function loadSections(sectionPubkeys) {
         const freeSeats = sectionData.seat_status.filter(status => status === 0).length;
         div.innerHTML += `<div class="standing-section">
             <span class="standing-info">Free seats: ${freeSeats} / ${totalSeats}</span>
-            <button onclick='buyStandingTicket("${sectionData.section_name}")'>Buy Ticket</button>
+            <button class='action' onclick='buyStandingTicket("${sectionData.section_name}")'>Buy Ticket</button>
           </div>`;
       }
       container.appendChild(div);
