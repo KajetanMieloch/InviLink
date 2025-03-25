@@ -142,9 +142,6 @@
 
 <div class="container">
   <h1>Menadżer Seating - Szczegóły Eventu</h1>
-  <div style="text-align:center; margin-bottom: 20px;">
-    <button onclick="loadEvent('jH5Hhiqniu3z')">Załaduj Event</button>
-  </div>
 
   <div id="eventDetails"></div>
   <div id="seatingCounter"></div>
@@ -182,5 +179,10 @@
   <script src="{% static 'js/organizer/manageSections_v4.js' %}"></script>
   <script src="{% static 'js/organizer/seatingSections_v4.js' %}"></script>
 
+  <script>
+    document.addEventListener("DOMContentLoaded", () => {
+      loadEvent("{{ event_id }}");
+    });
+  </script>  
 
 {% endblock %}
