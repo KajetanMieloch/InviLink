@@ -15,6 +15,11 @@
 
     // Oblicza PDA dla mint NFT – seed'y: ["mint_ticket", event_id, event_name, section_name, [row], [seat]]
     async function getTestMintPDA(event_id, event_name, section_name, row, seat) {
+
+      const constants = await getConstants();
+      const PROGRAM_ID = new solanaWeb3.PublicKey(constants.PROGRAM_ID);
+      await initConnection();
+
       const encoder = new TextEncoder();
       const seed1 = encoder.encode("mint_ticket");
       const seed2 = encoder.encode(event_id);
