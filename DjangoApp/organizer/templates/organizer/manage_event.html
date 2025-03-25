@@ -87,6 +87,7 @@
     font-size: 1rem;
     cursor: pointer;
     transition: background 0.3s;
+    margin: 20px 0;
   }
 
   button:hover {
@@ -147,31 +148,31 @@
 
 <div class="container">
   <div id="addSectionForm" class="info-box">
-    <h3>Dodaj Sekcję Siedzeniową</h3>
-    <label>Nazwa sekcji:
-      <input id="sectionNameInput" type="text" placeholder="np. Front Stage" required>
+    <h3>Add Seating Section</h3>
+    <label>Section Name:
+      <input id="sectionNameInput" type="text" placeholder="e.g. Front Stage" required>
     </label>
-    <label>Typ sekcji:
+    <label>Section Type:
       <select id="sectionTypeInput" required>
-        <option value="1">Numerowane</option>
-        <option value="0">Stojące</option>
+        <option value="1">Numbered</option>
+        <option value="0">Standing</option>
       </select>
     </label>
-    <label>Cena biletu:</label>
+    <label>Ticket Price LAMPORTS/USD</label>
     <div class="price-group">
-      <input id="ticketPriceInput" type="number" placeholder="Cena w lamportach (np. 100000)" min="0" required>
-      <input id="ticketPriceUSDInput" type="number" placeholder="Cena w USD" min="0" step="0.01">
+      <input id="ticketPriceInput" type="number" placeholder="Price in lamports (e.g. 100000)" min="0" required>
+      <input id="ticketPriceUSDInput" type="number" placeholder="Price in USD" min="0" step="0.01">
     </div>
-    <label>Liczba wierszy:
-      <input id="rowsInput" type="number" placeholder="np. 5" min="1" required>
+    <label>Number of Rows:
+      <input id="rowsInput" type="number" placeholder="e.g. 5" min="1" required>
     </label>
-    <label>Liczba miejsc w wierszu:
-      <input id="seatsPerRowInput" type="number" placeholder="np. 10" min="1" required>
+    <label>Seats per Row:
+      <input id="seatsPerRowInput" type="number" placeholder="e.g. 10" min="1" required>
     </label>
-    <button onclick="addSeatingSection()">Dodaj Sekcję</button>
+    <button onclick="addSeatingSection()">Add Section</button>
   </div>
 
-  <h1>Menadżer Seating - Szczegóły Eventu</h1>
+  <h1>Seating Manager - Event Details</h1>
 
   <div id="eventDetails" class="info-box"></div>
   <div id="seatingCounter" class="info-box"></div>
@@ -181,7 +182,6 @@
 <script src="{% static 'js/getConstants_v4.js' %}"></script>
 <script src="{% static 'js/initConnection_v4.js' %}"></script>
 <script src="{% static 'js/serializationBundle_v4.js' %}"></script>
-
 <script src="{% static 'js/organizer/loadEvent_v4.js' %}"></script>
 <script src="{% static 'js/organizer/manageSections_v4.js' %}"></script>
 <script src="{% static 'js/organizer/seatingSections_v4.js' %}"></script>
@@ -195,7 +195,7 @@
       const data = await res.json();
       exchangeRate = data.solana.usd;
     } catch (err) {
-      console.error('Błąd pobierania kursu SOL/USD:', err);
+      console.error('Error fetching SOL/USD exchange rate:', err);
     }
   }
 

@@ -40,28 +40,31 @@ function serializeString(str) {
     return buffer;
   }
 
-  // Funkcja dekodująca rejestr eventów – teraz czyta dynamiczny wektor:
-  function decodeRegistry(data) {
-    let offset = 8; // pomijamy 8-bajtowy discriminator
-    const dv = new DataView(data.buffer, data.byteOffset, data.byteLength);
-    const eventCount = dv.getUint32(offset, true);
-    offset += 4;
-    // Odczytujemy długość wektora (u32)
-    const vecLen = dv.getUint32(offset, true);
-    offset += 4;
-    const events = [];
-    for (let i = 0; i < vecLen; i++) {
-      const pubkeyBytes = data.slice(offset, offset + 32);
-      const pubkey = new solanaWeb3.PublicKey(pubkeyBytes).toBase58();
-      offset += 32;
-      events.push(pubkey);
-    }
-    return { eventCount, events };
+ // Decode event registry – reads a dynamic vector of Pubkeys
+function decodeRegistry(data) {
+  let offset = 8; // skip 8-byte discriminator
+  const dv = new DataView(data.buffer, data.byteOffset, data.byteLength);
+  const eventCount = dv.getUint32(offset, true);
+  offset += 4;
+
+  // Read vector length (u32)
+  const vecLen = dv.getUint32(offset, true);
+  offset += 4;
+  const events = [];
+
+  for (let i = 0; i < vecLen; i++) {
+    const pubkeyBytes = data.slice(offset, offset + 32);
+    const pubkey = new solanaWeb3.PublicKey(pubkeyBytes).toBase58();
+    offset += 32;
+    events.push(pubkey);
   }
 
- // Dekodowanie konta eventu zgodnie z formatem Anchor, uwzględniające nowe pole event_date
- function decodeEvent(data) {
-  let offset = 8; // pomijamy 8-bajtowy discriminator
+  return { eventCount, events };
+}
+
+// Decode event account according to Anchor layout – includes event_date
+function decodeEvent(data) {
+  let offset = 8; // skip 8-byte discriminator
   const dv = new DataView(data.buffer, data.byteOffset, data.byteLength);
 
   function readString() {
@@ -75,38 +78,46 @@ function serializeString(str) {
   }
 
   const event_id = readString();
+
   let organizer = "";
   if (offset + 32 <= data.byteLength) {
     const orgBytes = data.slice(offset, offset + 32);
     organizer = new solanaWeb3.PublicKey(orgBytes).toBase58();
     offset += 32;
   }
+
   const name = readString();
+
   let event_date = 0;
   if (offset + 8 <= data.byteLength) {
     event_date = Number(dv.getBigUint64(offset, true));
     offset += 8;
   }
+
   let available_tickets = "0";
   if (offset + 8 <= data.byteLength) {
     available_tickets = dv.getBigUint64(offset, true).toString();
     offset += 8;
   }
+
   let sold_tickets = "0";
   if (offset + 8 <= data.byteLength) {
     sold_tickets = dv.getBigUint64(offset, true).toString();
     offset += 8;
   }
+
   let seating_type = 0;
   if (offset + 1 <= data.byteLength) {
     seating_type = dv.getUint8(offset);
     offset += 1;
   }
+
   let active = false;
   if (offset + 1 <= data.byteLength) {
     active = dv.getUint8(offset) !== 0;
     offset += 1;
   }
+
   return {
     event_id,
     organizer,
@@ -119,7 +130,7 @@ function serializeString(str) {
   };
 }
 
-    // Funkcja pomocnicza do serializacji opcjonalnych wartości dla typów u8
+// Helper function for serializing optional u8 values
 function serializeOptionU8(value) {
   if (value === null || isNaN(value)) {
     return new Uint8Array([0]);
@@ -128,7 +139,7 @@ function serializeOptionU8(value) {
   }
 }
 
-// Funkcja pomocnicza do serializacji opcjonalnych wartości dla u64
+// Helper function for serializing optional u64 values
 function serializeOptionU64(value) {
   if (value === null || isNaN(value)) {
     return new Uint8Array([0]);
@@ -142,7 +153,7 @@ function serializeOptionU64(value) {
   }
 }
 
-// Funkcja serializująca argumenty dla initialize_seating_section:
+// Serialize arguments for initialize_seating_section:
 // (section_name: string, section_type: u8, rows: u8, seats_per_row: u8, ticket_price: u64)
 function serializeInitializeSeatingSectionArgs({ section_name, section_type, rows, seats_per_row, ticket_price }) {
   const sectionNameBytes = serializeString(section_name);
@@ -150,6 +161,7 @@ function serializeInitializeSeatingSectionArgs({ section_name, section_type, row
   const rowsByte = new Uint8Array([rows]);
   const seatsByte = new Uint8Array([seats_per_row]);
   const ticketPriceBytes = serializeU64(new BN(ticket_price));
+
   const totalLen = sectionNameBytes.length + sectionTypeByte.length + rowsByte.length + seatsByte.length + ticketPriceBytes.length;
   const buffer = new Uint8Array(totalLen);
   let offset = 0;
@@ -158,55 +170,82 @@ function serializeInitializeSeatingSectionArgs({ section_name, section_type, row
   buffer.set(rowsByte, offset); offset += rowsByte.length;
   buffer.set(seatsByte, offset); offset += seatsByte.length;
   buffer.set(ticketPriceBytes, offset);
+
   return buffer;
 }
 
-    // Dekodowanie SeatingMap – zakładamy: event_id, vec<Pubkey>, total_seats
-    function decodeSeatingMap(data) {
-      let offset = 8; // pomijamy 8 bajtów dyskryminatora
-      const dv = new DataView(data.buffer, data.byteOffset, data.byteLength);
-      const eventIdLen = dv.getUint32(offset, true); 
-      offset += 4;
-      const eventIdBytes = data.slice(offset, offset + eventIdLen); 
-      offset += eventIdLen;
-      const event_id = new TextDecoder().decode(eventIdBytes);
-      const organizerBytes = data.slice(offset, offset + 32);
-      offset += 32;
-      const organizer = new solanaWeb3.PublicKey(organizerBytes).toBase58();
-      const active = dv.getUint8(offset) !== 0;
-      offset += 1;
-      const vecLen = dv.getUint32(offset, true);
-      offset += 4;
-      let sections = [];
-      for (let i = 0; i < vecLen; i++) {
-        const keyBytes = data.slice(offset, offset + 32);
-        sections.push(new solanaWeb3.PublicKey(keyBytes).toBase58());
-        offset += 32;
-      }
-      const total_seats = dv.getBigUint64(offset, true);
-      offset += 8;
-      return { event_id, organizer, active, sections, total_seats: total_seats.toString() };
-    }
+// Decode SeatingMap – expects: event_id, vec<Pubkey>, total_seats
+function decodeSeatingMap(data) {
+  let offset = 8; // skip 8-byte discriminator
+  const dv = new DataView(data.buffer, data.byteOffset, data.byteLength);
 
-    // Dekodowanie SeatingSectionAccount
-    function decodeSeatingSectionAccount(data) {
-      let offset = 8;
-      const dv = new DataView(data.buffer, data.byteOffset, data.byteLength);
-      const eventIdLen = dv.getUint32(offset, true); offset += 4;
-      const eventIdBytes = data.slice(offset, offset + eventIdLen); offset += eventIdLen;
-      const event_id = new TextDecoder().decode(eventIdBytes);
-      const sectionNameLen = dv.getUint32(offset, true); offset += 4;
-      const sectionNameBytes = data.slice(offset, offset + sectionNameLen); offset += sectionNameLen;
-      const section_name = new TextDecoder().decode(sectionNameBytes);
-      const section_type = dv.getUint8(offset); offset += 1;
-      const rows = dv.getUint8(offset); offset += 1;
-      const seats_per_row = dv.getUint8(offset); offset += 1;
-      const ticket_price = dv.getBigUint64(offset, true); offset += 8;
-      const vecLen = dv.getUint32(offset, true); offset += 4;
-      let seat_status = [];
-      for (let i = 0; i < vecLen; i++) {
-        seat_status.push(dv.getUint8(offset));
-        offset += 1;
-      }
-      return { event_id, section_name, section_type, rows, seats_per_row, ticket_price: ticket_price.toString(), seat_status };
-    }
+  const eventIdLen = dv.getUint32(offset, true); 
+  offset += 4;
+  const eventIdBytes = data.slice(offset, offset + eventIdLen); 
+  offset += eventIdLen;
+  const event_id = new TextDecoder().decode(eventIdBytes);
+
+  const organizerBytes = data.slice(offset, offset + 32);
+  offset += 32;
+  const organizer = new solanaWeb3.PublicKey(organizerBytes).toBase58();
+
+  const active = dv.getUint8(offset) !== 0;
+  offset += 1;
+
+  const vecLen = dv.getUint32(offset, true);
+  offset += 4;
+
+  let sections = [];
+  for (let i = 0; i < vecLen; i++) {
+    const keyBytes = data.slice(offset, offset + 32);
+    sections.push(new solanaWeb3.PublicKey(keyBytes).toBase58());
+    offset += 32;
+  }
+
+  const total_seats = dv.getBigUint64(offset, true);
+  offset += 8;
+
+  return {
+    event_id,
+    organizer,
+    active,
+    sections,
+    total_seats: total_seats.toString()
+  };
+}
+
+// Decode SeatingSectionAccount
+function decodeSeatingSectionAccount(data) {
+  let offset = 8; // skip discriminator
+  const dv = new DataView(data.buffer, data.byteOffset, data.byteLength);
+
+  const eventIdLen = dv.getUint32(offset, true); offset += 4;
+  const eventIdBytes = data.slice(offset, offset + eventIdLen); offset += eventIdLen;
+  const event_id = new TextDecoder().decode(eventIdBytes);
+
+  const sectionNameLen = dv.getUint32(offset, true); offset += 4;
+  const sectionNameBytes = data.slice(offset, offset + sectionNameLen); offset += sectionNameLen;
+  const section_name = new TextDecoder().decode(sectionNameBytes);
+
+  const section_type = dv.getUint8(offset); offset += 1;
+  const rows = dv.getUint8(offset); offset += 1;
+  const seats_per_row = dv.getUint8(offset); offset += 1;
+  const ticket_price = dv.getBigUint64(offset, true); offset += 8;
+
+  const vecLen = dv.getUint32(offset, true); offset += 4;
+  let seat_status = [];
+  for (let i = 0; i < vecLen; i++) {
+    seat_status.push(dv.getUint8(offset));
+    offset += 1;
+  }
+
+  return {
+    event_id,
+    section_name,
+    section_type,
+    rows,
+    seats_per_row,
+    ticket_price: ticket_price.toString(),
+    seat_status
+  };
+}
