@@ -234,9 +234,9 @@
 
 <script>
 
-let exchangeRate = fetchSolPrice();
+let exchangeRate = 0;
 
-function syncPrices(e) {
+async function syncPrices(e) {
   const solInput = document.getElementById('ticketPriceInput');
   const usdInput = document.getElementById('ticketPriceUSDInput');
 
@@ -250,13 +250,14 @@ function syncPrices(e) {
     if (!isNaN(usd)) solInput.value = Math.round((usd / exchangeRate) * 1e9);
   }
 }
+
 document.addEventListener("DOMContentLoaded", async () => {
-    await fetchSolPrice();
-    await loadEvent("{{ event_id }}");
-    await listValidators();
-    document.getElementById('ticketPriceInput').addEventListener('input', syncPrices);
-    document.getElementById('ticketPriceUSDInput').addEventListener('input', syncPrices);
-  });
+  exchangeRate = await fetchSolPrice();
+  await loadEvent("{{ event_id }}");
+  await listValidators();
+  document.getElementById('ticketPriceInput').addEventListener('input', syncPrices);
+  document.getElementById('ticketPriceUSDInput').addEventListener('input', syncPrices);
+});
 
 </script>
 {% endblock %}

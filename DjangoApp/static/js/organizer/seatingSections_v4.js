@@ -40,13 +40,15 @@ async function loadSeatingSections(eventId) {
   showSeatingSections(sections);
 }
 
-function showSeatingSections(sections) {
+async function showSeatingSections(sections) {
   const container = document.getElementById("sectionsTable");
 
   if (sections.length === 0) {
     container.innerHTML = "<p>No seating sections available.</p>";
     return;
   }
+
+  const exchangeRate = await fetchSolPrice();
 
   let html = `<table>
     <tr>
@@ -60,11 +62,9 @@ function showSeatingSections(sections) {
       <th>Actions</th>
     </tr>`;
 
-  sections.forEach(sec => {
+  for (const sec of sections) {
     const typeStr = sec.section_type === 1 ? "Numbered" : "Standing";
-
     const lamports = parseInt(sec.ticket_price);
-    exchangeRate = fetchSolPrice();
     const usd = exchangeRate
       ? `$${((lamports / 1e9) * exchangeRate).toFixed(2)}`
       : "N/A";
@@ -76,7 +76,6 @@ function showSeatingSections(sections) {
       const color = sec.seat_status[i] === 0 ? "#8fbc8f" : "#ff7f7f";
       previewHTML += `<div style="background-color:${color};"></div>`;
     }
-
     previewHTML += `</div>`;
 
     html += `<tr>
@@ -92,7 +91,7 @@ function showSeatingSections(sections) {
         <button onclick="deleteSection('${sec.section_name}')">Delete</button>
       </td>
     </tr>`;
-  });
+  }
 
   html += `</table>`;
   container.innerHTML = html;
