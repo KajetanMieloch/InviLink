@@ -1,54 +1,79 @@
 async function updateEvent() {
-    const eventPubkey = await getEventPubKey();
-    const constants = await getConstants();
-    const PROGRAM_ID = new solanaWeb3.PublicKey(constants.PROGRAM_ID);
-    const NETWORK = constants.NETWORK;
-    const connection = new solanaWeb3.Connection(NETWORK, "confirmed");
-  
-    const UPDATE_EVENT_DISCRIMINATOR = new Uint8Array([70, 108, 211, 125, 171, 176, 25, 217]);
-  
-    console.log("Updating event: " + eventPubkey.toBase58());
-    const newName = prompt("Enter new event name (leave empty to keep current):");
-    const newDate = prompt("Enter new event date (leave empty to keep current):");
-    const newAvailableTickets = prompt("Enter new available tickets (leave empty to keep current):");
-  
-    const encodedName = encodeOptionString(newName);
-    const encodedDate = encodeOptionU64(newDate);
-    const encodedAvailable = encodeOptionU64(newAvailableTickets);
-  
-    const totalLength = UPDATE_EVENT_DISCRIMINATOR.length + encodedName.length + encodedDate.length + encodedAvailable.length;
-    const updateData = new Uint8Array(totalLength);
-    let offset = 0;
-    updateData.set(UPDATE_EVENT_DISCRIMINATOR, offset); offset += UPDATE_EVENT_DISCRIMINATOR.length;
-    updateData.set(encodedName, offset); offset += encodedName.length;
-    updateData.set(encodedDate, offset); offset += encodedDate.length;
-    updateData.set(encodedAvailable, offset);
-  
-    const instruction = new solanaWeb3.TransactionInstruction({
-      keys: [
-        { pubkey: eventPubkey, isWritable: true, isSigner: false },
-        { pubkey: walletPublicKey, isWritable: true, isSigner: true }
-      ],
-      programId: PROGRAM_ID,
-      data: updateData
-    });
-  
-    console.log("update_event instruction created.");
-    const transaction = new solanaWeb3.Transaction().add(instruction);
-    transaction.feePayer = walletPublicKey;
-    const { blockhash } = await connection.getLatestBlockhash();
-    transaction.recentBlockhash = blockhash;
-    console.log("Transaction prepared. Signing...");
-    const signedTx = await provider.signTransaction(transaction);
-    console.log("Transaction signed.");
-    const txSig = await connection.sendRawTransaction(signedTx.serialize());
-    console.log("Transaction sent. Signature: " + txSig);
-    console.log("Waiting for confirmation...");
-    await connection.confirmTransaction(txSig, "confirmed");
-    console.log("Transaction confirmed.");
-    alert("Event updated! Tx Sig: " + txSig);
-    location.reload();
+  const eventPubkey = await getEventPubKey();
+  const constants = await getConstants();
+  const PROGRAM_ID = new solanaWeb3.PublicKey(constants.PROGRAM_ID);
+  const NETWORK = constants.NETWORK;
+  const connection = new solanaWeb3.Connection(NETWORK, "confirmed");
+
+  const UPDATE_EVENT_DISCRIMINATOR = new Uint8Array([70, 108, 211, 125, 171, 176, 25, 217]);
+
+  console.log("Updating event: " + eventPubkey.toBase58());
+
+  const newNameInput = prompt("Enter new event name (leave empty to keep current):");
+  const newDateInput = prompt("Enter new event date as YYYY-MM-DD (leave empty to keep current):");
+  const newAvailableTicketsInput = prompt("Enter new available tickets (leave empty to keep current):");
+
+  // === Format + validation ===
+  const newName = newNameInput?.trim() || null;
+
+  let newDate = null;
+  if (newDateInput && newDateInput.trim() !== "") {
+    const parsedDate = Date.parse(newDateInput.trim()); // expects yyyy-mm-dd or any valid format
+    if (!isNaN(parsedDate)) {
+      newDate = Math.floor(parsedDate / 1000); // convert ms -> s
+    } else {
+      alert("Invalid date format. Use YYYY-MM-DD.");
+      return;
+    }
   }
+
+  const newAvailableTickets = newAvailableTicketsInput ? parseInt(newAvailableTicketsInput) : null;
+
+  // === Encoding ===
+  const encodedName = encodeOptionString(newName);
+  const encodedDate = encodeOptionU64(newDate);
+  const encodedAvailable = encodeOptionU64(newAvailableTickets);
+
+  const totalLength =
+    UPDATE_EVENT_DISCRIMINATOR.length +
+    encodedName.length +
+    encodedDate.length +
+    encodedAvailable.length;
+
+  const updateData = new Uint8Array(totalLength);
+  let offset = 0;
+  updateData.set(UPDATE_EVENT_DISCRIMINATOR, offset); offset += UPDATE_EVENT_DISCRIMINATOR.length;
+  updateData.set(encodedName, offset); offset += encodedName.length;
+  updateData.set(encodedDate, offset); offset += encodedDate.length;
+  updateData.set(encodedAvailable, offset);
+
+  const instruction = new solanaWeb3.TransactionInstruction({
+    keys: [
+      { pubkey: eventPubkey, isWritable: true, isSigner: false },
+      { pubkey: walletPublicKey, isWritable: true, isSigner: true }
+    ],
+    programId: PROGRAM_ID,
+    data: updateData
+  });
+
+  console.log("update_event instruction created.");
+  const transaction = new solanaWeb3.Transaction().add(instruction);
+  transaction.feePayer = walletPublicKey;
+  const { blockhash } = await connection.getLatestBlockhash();
+  transaction.recentBlockhash = blockhash;
+  console.log("Transaction prepared. Signing...");
+  const signedTx = await provider.signTransaction(transaction);
+  console.log("Transaction signed.");
+  const txSig = await connection.sendRawTransaction(signedTx.serialize());
+  console.log("Transaction sent. Signature: " + txSig);
+  console.log("Waiting for confirmation...");
+  await connection.confirmTransaction(txSig, "confirmed");
+  console.log("Transaction confirmed.");
+  alert("Event updated! Tx Sig: " + txSig);
+  location.reload();
+}
+
+
   
   async function activateEvent()
   {
