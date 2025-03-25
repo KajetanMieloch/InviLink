@@ -204,6 +204,13 @@
     }
 
     async function getEventPDA(eventId) {
+
+      const constants = await getConstants();
+      const PROGRAM_ID = new solanaWeb3.PublicKey(constants.PROGRAM_ID);
+      const NETWORK = constants.NETWORK;
+      const connection = new solanaWeb3.Connection(NETWORK, "confirmed");
+      await initConnection();
+
       const seed1 = new TextEncoder().encode("event");
       const seed2 = new TextEncoder().encode(eventId);
       const [eventPDA] = await solanaWeb3.PublicKey.findProgramAddress([seed1, seed2], PROGRAM_ID);
