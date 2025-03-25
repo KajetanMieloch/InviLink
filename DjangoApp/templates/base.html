@@ -77,19 +77,7 @@
       opacity: 0;
       transition: opacity 0.4s ease, transform 0.4s ease;
     }
-
-        /* Po pokazaniu */
-    .custom-alert.show {
-      visibility: visible;
-      opacity: 1;
-      transform: translate(-50%, -50%);
-    }
-
-    /* Przy zamykaniu */
-    .custom-alert.fade-out {
-      opacity: 0;
-      transform: translate(-50%, -60%);
-    }
+    
 
     .custom-alert.fade-out {
       animation: fadeOut 0.4s ease forwards;
@@ -152,29 +140,33 @@
   <script>
     function showSuccessAlert(message) {
       const box = document.getElementById('customAlert');
-      box.className = 'custom-alert success show';
+      box.className = 'custom-alert success';
       box.innerHTML = `<div class="alert-icon">✅</div><h4>Success</h4><p class="alert-text">${message}</p><button onclick="hideAlert()">OK</button>`;
+      box.style.display = 'block';
     }
 
     function showErrorAlert(rawMsg) {
       const msgMatch = rawMsg.match(/Error Message: (.*?)(\.|$)/);
       const extracted = msgMatch ? msgMatch[1] : "Unknown error occurred.";
       const box = document.getElementById('customAlert');
-      box.className = 'custom-alert error show';
+      box.className = 'custom-alert error';
       box.innerHTML = `<div class="alert-icon">❌</div><h4>Error</h4><p class="alert-text">${extracted}</p><button onclick="hideAlert()">OK</button>`;
+      box.style.display = 'block';
     }
-
 
     function showErrorAlertwithMSG(msg) {
       const box = document.getElementById('customAlert');
-      box.className = 'custom-alert error show';
+      box.className = 'custom-alert error';
       box.innerHTML = `<div class="alert-icon">❌</div><h4>Error</h4><p class="alert-text">${msg}</p><button onclick="hideAlert()">OK</button>`;
+      box.style.display = 'block';
     }
+
     function hideAlert() {
       const box = document.getElementById('customAlert');
       box.classList.add('fade-out');
       setTimeout(() => {
-        box.className = 'custom-alert';
+        box.style.display = 'none';
+        box.classList.remove('fade-out');
         if (typeof startScanner === 'function') {
           startScanner();
         }
