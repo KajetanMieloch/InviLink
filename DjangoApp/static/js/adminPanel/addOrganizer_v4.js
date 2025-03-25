@@ -68,6 +68,10 @@ async function addOrganizer() {
 
     console.log("Organizer added! Tx Sig: " + txSignature);
     showSuccessAlert("Organizer added! Tx Sig: " + txSignature);
+
+    organizerAddressID = document.getElementById("organizerAddress");
+    organizerAddressID.value = "";
+
   } catch (err) {
     showErrorAlertwithMSG("Error: " + err.message);
     console.log("Error: " + err.message);
