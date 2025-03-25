@@ -60,4 +60,38 @@ async function addValidator() {
       console.error(err);
     }
   }
-  
+
+async function listValidators() {
+  const constants = await getConstants();
+  const PROGRAM_ID = new solanaWeb3.PublicKey(constants.PROGRAM_ID);
+  const NETWORK = constants.NETWORK;
+  const connection = new solanaWeb3.Connection(NETWORK, "confirmed");
+
+  await initConnection();
+
+  const eventId = window.currentEvent.event_id;
+
+  const [eventPDA] = await solanaWeb3.PublicKey.findProgramAddress(
+    [new TextEncoder().encode("event"), new TextEncoder().encode(eventId)],
+    PROGRAM_ID
+  );
+  console.log("Computed Event PDA: " + eventPDA.toBase58());
+
+  const accountInfo = await connection.getAccountInfo(eventPDA);
+  if (!accountInfo) {
+    console.error("Event account not found.");
+    return;
+  }
+
+  const eventData = decodeEventWithValidators(accountInfo.data);
+  console.log("Event data decoded: ", eventData);
+
+  if (!eventData.validators || eventData.validators.length === 0) {
+    console.log("No validators found.");
+  } else {
+    console.log("Validators:");
+    eventData.validators.forEach((validator, index) => {
+      console.log(`${index + 1}: ${validator}`);
+    });
+  }
+}

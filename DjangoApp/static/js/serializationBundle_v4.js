@@ -130,6 +130,89 @@ function decodeEvent(data) {
   };
 }
 
+// Extended decode function for event account, including validators
+function decodeEventWithValidators(data) {
+  let offset = 8;
+  const dv = new DataView(data.buffer, data.byteOffset, data.byteLength);
+
+  function readString() {
+    if (offset + 4 > data.byteLength) return "";
+    const len = dv.getUint32(offset, true);
+    offset += 4;
+    if (offset + len > data.byteLength) return "";
+    const strBytes = data.slice(offset, offset + len);
+    offset += len;
+    return new TextDecoder().decode(strBytes);
+  }
+
+  const event_id = readString();
+
+  let organizer = "";
+  if (offset + 32 <= data.byteLength) {
+    const orgBytes = data.slice(offset, offset + 32);
+    organizer = new solanaWeb3.PublicKey(orgBytes).toBase58();
+    offset += 32;
+  }
+
+  const name = readString();
+
+  let event_date = 0;
+  if (offset + 8 <= data.byteLength) {
+    event_date = Number(dv.getBigUint64(offset, true));
+    offset += 8;
+  }
+
+  let available_tickets = "0";
+  if (offset + 8 <= data.byteLength) {
+    available_tickets = dv.getBigUint64(offset, true).toString();
+    offset += 8;
+  }
+
+  let sold_tickets = "0";
+  if (offset + 8 <= data.byteLength) {
+    sold_tickets = dv.getBigUint64(offset, true).toString();
+    offset += 8;
+  }
+
+  let seating_type = 0;
+  if (offset + 1 <= data.byteLength) {
+    seating_type = dv.getUint8(offset);
+    offset += 1;
+  }
+
+  let active = false;
+  if (offset + 1 <= data.byteLength) {
+    active = dv.getUint8(offset) !== 0;
+    offset += 1;
+  }
+
+  // Read validators length (u32) and list of Pubkeys
+  let validators = [];
+  if (offset + 4 <= data.byteLength) {
+    const validatorsLen = dv.getUint32(offset, true);
+    offset += 4;
+    for (let i = 0; i < validatorsLen; i++) {
+      if (offset + 32 > data.byteLength) break;
+      const validatorBytes = data.slice(offset, offset + 32);
+      const validator = new solanaWeb3.PublicKey(validatorBytes).toBase58();
+      validators.push(validator);
+      offset += 32;
+    }
+  }
+
+  return {
+    event_id,
+    organizer,
+    name,
+    event_date,
+    available_tickets,
+    sold_tickets,
+    seating_type,
+    active,
+    validators
+  };
+}
+
 // Helper function for serializing optional u8 values
 function serializeOptionU8(value) {
   if (value === null || isNaN(value)) {
