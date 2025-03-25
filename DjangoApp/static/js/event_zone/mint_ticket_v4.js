@@ -62,7 +62,7 @@
     }
 
     // Ładowanie eventu – pobieramy event oraz seating_map
-    async function loadEvent() {
+    async function loadEvent(currentEventID) {
       try {
         if (!currentEventID) {
           console.log("Event ID nie został podany.");
