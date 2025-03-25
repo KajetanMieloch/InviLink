@@ -1,5 +1,10 @@
 async function loadSeatingSections(eventId) {
-    try {
+
+  const constants = await getConstants();
+  const PROGRAM_ID = new solanaWeb3.PublicKey(constants.PROGRAM_ID);
+  const NETWORK = constants.NETWORK;
+  const connection = new solanaWeb3.Connection(NETWORK, "confirmed");
+
       const seed1 = new TextEncoder().encode("seating_map");
       const seed2 = new TextEncoder().encode(eventId);
       const [seatingMapPDA] = await solanaWeb3.PublicKey.findProgramAddress(
@@ -31,10 +36,7 @@ async function loadSeatingSections(eventId) {
         }
       }
       showSeatingSections(sections);
-    } catch (err) {
-      console.log("Błąd ładowania sekcji: " + err.message);
-    }
-  }
+    } 
 
   function showSeatingSections(sections) {
     const container = document.getElementById("sectionsTable");

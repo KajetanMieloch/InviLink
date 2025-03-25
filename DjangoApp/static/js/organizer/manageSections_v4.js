@@ -1,4 +1,10 @@
 async function addSeatingSection() {
+  
+    const constants = await getConstants();
+    const PROGRAM_ID = new solanaWeb3.PublicKey(constants.PROGRAM_ID);
+    const NETWORK = constants.NETWORK;
+    const connection = new solanaWeb3.Connection(NETWORK, "confirmed");  
+  
     const sectionName = document.getElementById("sectionNameInput").value.trim();
     const rows = parseInt(document.getElementById("rowsInput").value);
     const seatsPerRow = parseInt(document.getElementById("seatsPerRowInput").value);
@@ -87,6 +93,12 @@ async function addSeatingSection() {
   }
 
 async function editSection(sectionName) {
+
+    const constants = await getConstants();
+    const PROGRAM_ID = new solanaWeb3.PublicKey(constants.PROGRAM_ID);
+    const NETWORK = constants.NETWORK;
+    const connection = new solanaWeb3.Connection(NETWORK, "confirmed");
+
     if (!window.currentEvent) {
       alert("Najpierw wczytaj event!");
       return;
@@ -169,6 +181,12 @@ async function editSection(sectionName) {
   }
   
   async function deleteSection(sectionName) {
+
+    const constants = await getConstants();
+    const PROGRAM_ID = new solanaWeb3.PublicKey(constants.PROGRAM_ID);
+    const NETWORK = constants.NETWORK;
+    const connection = new solanaWeb3.Connection(NETWORK, "confirmed");
+
     if (!window.currentEvent) {
       alert("Najpierw wczytaj event!");
       return;
