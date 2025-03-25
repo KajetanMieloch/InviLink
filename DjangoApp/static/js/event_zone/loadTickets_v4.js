@@ -105,17 +105,17 @@ async function loadNFTs() {
     nftDiv.className = "card"; // ważne – to włącza stylizację
     nftDiv.innerHTML = `
       <img src="${imageUrl}" alt="${metadataJSON.name || metadata.name}">
+      ${attributesHtml}
       <div class="card-body">
         <p class="gradient-text"><strong>Nazwa:</strong> ${metadataJSON.name || metadata.name}</p>
         <p class="gradient-text"><strong>Symbol:</strong> ${metadataJSON.symbol || metadata.symbol}</p>
         <p class="gradient-text"><strong>Opis:</strong> ${metadataJSON.description || "Brak opisu"}</p>
         <p class="gradient-text"><strong>URI:</strong> <a href="${fixIpfsUri(metadata.uri)}" target="_blank" style="color:#1e90ff">${fixIpfsUri(metadata.uri).slice(0, 35)}...</a></p>
-        ${attributesHtml}
+
         <button class="btn btn-invilink mt-3" onclick='activateNFT("${eventIdFromName}", "${sectionValue}", ${rowValue}, ${seatValue})'>Aktywuj NFT</button>
       </div>
     `;
     
-    <p style="color: #f1c40f; font-size: 1rem; font-weight: bold;"><strong>Date of the event:</strong> ${dateValue}</p>
     
     nftContainer.appendChild(nftDiv);
   }
