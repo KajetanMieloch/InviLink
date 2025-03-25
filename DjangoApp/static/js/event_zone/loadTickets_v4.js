@@ -105,7 +105,10 @@ async function loadNFTs() {
     nftDiv.className = "card"; // ważne – to włącza stylizację
     nftDiv.innerHTML = `
       <img src="${imageUrl}" alt="${metadataJSON.name || metadata.name}">
-      ${attributesHtml}
+      <div class="highlighted-attributes">
+        ${attributesHtml}
+      </div>
+
       <div class="card-body">
         <p class="gradient-text"><strong>Nazwa:</strong> ${metadataJSON.name || metadata.name}</p>
         <p class="gradient-text"><strong>Symbol:</strong> ${metadataJSON.symbol || metadata.symbol}</p>
