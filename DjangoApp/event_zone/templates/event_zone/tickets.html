@@ -54,7 +54,7 @@
       padding-left: 20px;
       font-size: 0.9rem;
     }
-    #log {
+    #console.log {
       margin-top: 30px;
       white-space: pre-wrap;
       font-size: 14px;
@@ -77,12 +77,6 @@
     let walletPublicKey = null;
     const TOKEN_PROGRAM_ID = new solanaWeb3.PublicKey("TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA");
     const METADATA_PROGRAM_ID = new solanaWeb3.PublicKey("metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s");
-
-    const logEl = document.getElementById("log");
-    function log(message) {
-      logEl.innerText += message + "\n";
-      console.log(message);
-    }
 
     // Funkcje serializujące
     function serializeString(str) {
@@ -159,22 +153,22 @@
         const provider = window.phantom.solana;
         await provider.connect();
         walletPublicKey = provider.publicKey;
-        log("Wallet: " + walletPublicKey.toBase58());
+        console.log("Wallet: " + walletPublicKey.toBase58());
         loadNFTs();
       } catch (err) {
-        log("Błąd łączenia: " + err);
+        console.log("Błąd łączenia: " + err);
       }
     });
 
     async function loadNFTs() {
       try {
         const tokenAccounts = await connection.getParsedTokenAccountsByOwner(walletPublicKey, { programId: TOKEN_PROGRAM_ID });
-        log("Znaleziono " + tokenAccounts.value.length + " token accounts.");
+        console.log("Znaleziono " + tokenAccounts.value.length + " token accounts.");
         const nftAccounts = tokenAccounts.value.filter(acc => {
           const info = acc.account.data.parsed.info;
           return info.tokenAmount.decimals === 0 && info.tokenAmount.uiAmount === 1;
         });
-        log("Znaleziono " + nftAccounts.length + " NFT.");
+        console.log("Znaleziono " + nftAccounts.length + " NFT.");
         const nftContainer = document.getElementById("nftContainer");
         nftContainer.innerHTML = "";
     
@@ -188,25 +182,25 @@
             [seed1, seed2, seed3],
             METADATA_PROGRAM_ID
           );
-          log("Mint: " + mintAddress + " | Metadata PDA: " + metadataPDA.toBase58());
+          console.log("Mint: " + mintAddress + " | Metadata PDA: " + metadataPDA.toBase58());
           const metadataAccount = await connection.getAccountInfo(metadataPDA);
           if (!metadataAccount) {
-            log("Brak metadanych dla mint: " + mintAddress);
+            console.log("Brak metadanych dla mint: " + mintAddress);
             continue;
           }
           if (metadataAccount.data.byteLength < 315) {
-            log("Niewystarczająca długość danych dla mint: " + mintAddress);
+            console.log("Niewystarczająca długość danych dla mint: " + mintAddress);
             continue;
           }
           const metadata = customDeserializeMetadata(metadataAccount.data);
-          log("Odczytano metadane: " + JSON.stringify(metadata));
+          console.log("Odczytano metadane: " + JSON.stringify(metadata));
     
           let metadataJSON = {};
           try {
             const response = await fetch(fixIpfsUri(metadata.uri));
             metadataJSON = await response.json();
           } catch (err) {
-            log("Błąd pobierania JSON dla mint: " + mintAddress);
+            console.log("Błąd pobierania JSON dla mint: " + mintAddress);
           }
     
           // Wyciągamy dane z JSON
@@ -261,7 +255,7 @@
           nftContainer.appendChild(nftDiv);
         }
       } catch (err) {
-        log("Błąd ładowania NFT: " + err);
+        console.log("Błąd ładowania NFT: " + err);
       }
     }
 
@@ -305,7 +299,7 @@
         await window.phantom.solana.connect();
         walletPublicKey = window.phantom.solana.publicKey;
         const ticketStatusPDA = await getTicketStatusPDA(eventId, section, row, seat);
-        log("TicketStatus PDA do aktywacji: " + ticketStatusPDA.toBase58());
+        console.log("TicketStatus PDA do aktywacji: " + ticketStatusPDA.toBase58());
     
         const data = buildActivateTicketData(eventId, section, row, seat);
     
@@ -326,10 +320,10 @@
         const signedTx = await window.phantom.solana.signTransaction(transaction);
         const txSignature = await connection.sendRawTransaction(signedTx.serialize());
         await connection.confirmTransaction(txSignature, "confirmed");
-        log("NFT aktywowane! Tx Sig: " + txSignature);
+        console.log("NFT aktywowane! Tx Sig: " + txSignature);
         alert("NFT aktywowane! Tx Sig: " + txSignature);
       } catch (err) {
-        log("Błąd aktywacji NFT: " + err.message);
+        console.log("Błąd aktywacji NFT: " + err.message);
         alert("Błąd aktywacji NFT: " + err.message);
       }
     }
