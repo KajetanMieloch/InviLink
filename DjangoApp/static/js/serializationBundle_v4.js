@@ -249,3 +249,28 @@ function decodeSeatingSectionAccount(data) {
     seat_status
   };
 }
+
+function encodeOptionString(str) {
+  if (!str || str.trim() === "") {
+    return new Uint8Array([0]); // opcja "None"
+  }
+  const encoder = new TextEncoder();
+  const strBytes = encoder.encode(str);
+  const len = strBytes.length;
+  
+  const result = new Uint8Array(1 + 4 + len);
+  result[0] = 1; // opcja "Some"
+  result[1] = len & 0xff;
+  result[2] = (len >> 8) & 0xff;
+  result[3] = (len >> 16) & 0xff;
+  result[4] = (len >> 24) & 0xff;
+  result.set(strBytes, 5);
+  return result;
+}
+
+function encodeOptionU8(value) {
+  if (value === null || isNaN(value)) {
+    return new Uint8Array([0]); // opcja None
+  }
+  return new Uint8Array([1, value & 0xff]); // opcja Some + wartość
+}
