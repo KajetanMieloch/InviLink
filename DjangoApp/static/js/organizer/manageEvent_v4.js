@@ -50,7 +50,9 @@ async function updateEvent() {
     location.reload();
   }
   
-  async function activateEvent(eventPubkey) {
+  async function activateEvent()
+  {
+    const eventPubkey = window.currentEvent.event_pubkey;
     const constants = await getConstants();
     const PROGRAM_ID = new solanaWeb3.PublicKey(constants.PROGRAM_ID);
     const NETWORK = constants.NETWORK;
