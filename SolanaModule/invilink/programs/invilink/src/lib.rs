@@ -117,6 +117,20 @@ pub mod invilink {
         event.validators.push(validator);
         Ok(())
     }
+
+    pub fn remove_validator(ctx: Context<RemoveValidator>, validator: Pubkey) -> Result<()> {
+        let event = &mut ctx.accounts.event;
+        require!(event.organizer == *ctx.accounts.organizer.key, ErrorCode::Unauthorized);
+    
+        // Sprawdź, czy validator istnieje
+        if let Some(pos) = event.validators.iter().position(|v| *v == validator) {
+            event.validators.remove(pos);
+            Ok(())
+        } else {
+            Err(ErrorCode::ValidatorNotFound.into())
+        }
+    }
+    
     
     // Usunięcie organizatora
     pub fn remove_organizer(ctx: Context<RemoveOrganizer>, organizer_to_remove: Pubkey) -> Result<()> {
@@ -771,6 +785,15 @@ pub struct AddValidator<'info> {
 }
 
 #[derive(Accounts)]
+pub struct RemoveValidator<'info> {
+    #[account(mut)]
+    pub event: Account<'info, EventNFT>,
+    #[account(signer)]
+    /// CHECK: Organizer account – key is compared with event.organizer
+    pub organizer: Signer<'info>,
+}
+
+#[derive(Accounts)]
 pub struct DeleteEvent<'info> {
     #[account(mut, close = organizer)]
     pub event: Account<'info, EventNFT>,
@@ -1062,4 +1085,6 @@ pub enum ErrorCode {
     TicketActivationExpired,
     #[msg("Cannot create event with past date.")]
     InvalidEventDate,
+    #[msg("Validator not found in the list.")]
+    ValidatorNotFound
 }

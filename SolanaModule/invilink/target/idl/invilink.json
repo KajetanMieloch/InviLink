@@ -903,6 +903,35 @@
       "args": []
     },
     {
+      "name": "remove_validator",
+      "discriminator": [
+        25,
+        96,
+        211,
+        155,
+        161,
+        14,
+        168,
+        188
+      ],
+      "accounts": [
+        {
+          "name": "event",
+          "writable": true
+        },
+        {
+          "name": "organizer",
+          "signer": true
+        }
+      ],
+      "args": [
+        {
+          "name": "validator",
+          "type": "pubkey"
+        }
+      ]
+    },
+    {
       "name": "update_event",
       "discriminator": [
         70,
@@ -1352,6 +1381,11 @@
       "code": 6025,
       "name": "InvalidEventDate",
       "msg": "Cannot create event with past date."
+    },
+    {
+      "code": 6026,
+      "name": "ValidatorNotFound",
+      "msg": "Validator not found in the list."
     }
   ],
   "types": [
