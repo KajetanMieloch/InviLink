@@ -1,5 +1,5 @@
 async function updateEvent() {
-    const eventPubkey = window.currentEvent.event_pubkey;
+    const eventPubkey = getEventPubKey();
     const constants = await getConstants();
     const PROGRAM_ID = new solanaWeb3.PublicKey(constants.PROGRAM_ID);
     const NETWORK = constants.NETWORK;
@@ -52,7 +52,7 @@ async function updateEvent() {
   
   async function activateEvent()
   {
-    console.log(window.currentEvent);
+    const eventPubkey = getEventPubKey();
     const constants = await getConstants();
     const PROGRAM_ID = new solanaWeb3.PublicKey(constants.PROGRAM_ID);
     const NETWORK = constants.NETWORK;
@@ -88,7 +88,7 @@ async function updateEvent() {
   }
   
   async function deactivateEvent() {
-    const eventPubkey = window.currentEvent.event_pubkey;
+    const eventPubkey = getEventPubKey();
     const constants = await getConstants();
     const PROGRAM_ID = new solanaWeb3.PublicKey(constants.PROGRAM_ID);
     const NETWORK = constants.NETWORK;
@@ -124,7 +124,7 @@ async function updateEvent() {
   }
   
   async function deleteEvent() {
-    const eventPubkey = window.currentEvent.event_pubkey;
+    const eventPubkey = getEventPubKey();
     const constants = await getConstants();
     const PROGRAM_ID = new solanaWeb3.PublicKey(constants.PROGRAM_ID);
     const NETWORK = constants.NETWORK;
@@ -165,4 +165,34 @@ async function updateEvent() {
     alert("Event deleted! Tx Sig: " + txSig);
     window.location.href = "/";
   }
+
+ async function getEventPubKey(){
+  const eventId = window.currentEvent.event_id;
+  const constants = await getConstants();
+  const PROGRAM_ID = new solanaWeb3.PublicKey(constants.PROGRAM_ID);
+  const NETWORK = constants.NETWORK;
+  const connection = new solanaWeb3.Connection(NETWORK, "confirmed");
+  await initConnection();
+
+
+  const [registryPDA] = await solanaWeb3.PublicKey.findProgramAddress(
+    [new TextEncoder().encode(REGISTRY_SEED)],
+    PROGRAM_ID
+  );
   
+  const regAccount = await connection.getAccountInfo(registryPDA);
+  const registry = decodeRegistry(regAccount.data);
+
+  for (let pubkeyStr of registry.events) {
+    const eventPubkey = new solanaWeb3.PublicKey(pubkeyStr);
+    const eventAcc = await connection.getAccountInfo(eventPubkey);
+
+    if (eventAcc) {
+      const eventData = decodeEvent(eventAcc.data);
+      if(eventData.event_id === eventId){
+        return eventPubkey;
+      }
+    }
+  }
+
+ }
