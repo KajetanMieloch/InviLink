@@ -11,6 +11,15 @@
   <link rel="stylesheet" href="{% static 'css/styles.css' %}">
   <link rel="icon" href="{% static 'images/favicon.ico' %}">
   <style>
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(-20px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes fadeOut {
+      from { opacity: 1; transform: translateY(0); }
+      to { opacity: 0; transform: translateY(-20px); }
+    }
+
     body {
       background-color: #000000;
       color: #ffffff;
@@ -25,7 +34,6 @@
     }
 
     .navbar {
-      transition: background-color 0.3s ease, box-shadow 0.3s ease;
       position: fixed;
       top: 0;
       width: 100%;
@@ -52,52 +60,74 @@
       margin-right: 25px;
     }
 
-    /* Custom Alert Styles */
     .custom-alert {
-    position: fixed;
-    top: 20%;
-    left: 50%;
-    transform: translateX(-50%);
-    z-index: 9999;
-    background-color: #111;
-    padding: 30px;
-    border-radius: 12px;
-    max-width: 90vw;
-    text-align: center;
-    box-shadow: 0 0 20px rgba(0,0,0,0.5);
-    transition: all 0.3s ease;
-    word-wrap: break-word;
-  }
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      z-index: 9999;
+      background-color: #111;
+      padding: 30px;
+      border-radius: 12px;
+      width: 90vw;
+      max-width: 400px;
+      text-align: center;
+      box-shadow: 0 0 20px rgba(0,0,0,0.5);
+      opacity: 0;
+      visibility: hidden;
+      transition: opacity 0.3s ease, transform 0.3s ease;
+    }
 
-  .alert-text {
-    max-width: 90vw;
-    word-break: break-word;
-    overflow-wrap: break-word;
-    margin-bottom: 10px;
-  }
+    .custom-alert.show {
+      opacity: 1;
+      visibility: visible;
+      transform: translate(-50%, -50%);
+    }
 
-  .success-alert {
-    border: 2px solid #2ecc71;
-    color: #2ecc71;
-  }
+    .custom-alert.fade-out {
+      opacity: 0;
+      visibility: hidden;
+      transform: translate(-50%, -45%);
+    }
 
-  .error-alert {
-    border: 2px solid #e74c3c;
-    color: #e74c3c;
-  }
 
-  .custom-alert button {
-    background-color: transparent;
-    border: 1px solid currentColor;
-    color: inherit;
-  }
+    .custom-alert.fade-out {
+      animation: fadeOut 0.4s ease forwards;
+    }
+    .custom-alert.success {
+      border: 2px solid #2ecc71;
+      color: #2ecc71;
+    }
+    .custom-alert.error {
+      border: 2px solid #e74c3c;
+      color: #e74c3c;
+    }
+    .custom-alert button {
+      background-color: transparent;
+      border: 1px solid currentColor;
+      color: inherit;
+      padding: 5px 12px;
+      margin-top: 10px;
+      border-radius: 6px;
+      cursor: pointer;
+    }
+    .alert-icon {
+      font-size: 2.2rem;
+      margin-bottom: 10px;
+      display: block;
+    }
+    .alert-text {
+      max-width: 90vw;
+      word-break: break-word;
+      overflow-wrap: break-word;
+      margin-bottom: 10px;
+    }
   </style>
 </head>
 <body>
   <nav class="navbar navbar-expand-lg">
     <a class="navbar-brand" href="{% url 'home' %}">InviLink</a>
-    <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarNav" 
-      aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+    <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarNav">
       <span class="navbar-toggler-icon"></span>
     </button>
     <div class="collapse navbar-collapse" id="navbarNav">
@@ -115,48 +145,40 @@
     </div>
   </nav>
 
-  <div>
-    {% block content %}{% endblock %}
-  </div>
+  <div>{% block content %}{% endblock %}</div>
 
-  <div id="customAlert" class="custom-alert" style="display: none;"></div>
+  <div id="customAlert" class="custom-alert"></div>
 
   <script>
     function showSuccessAlert(message) {
       const box = document.getElementById('customAlert');
-      box.className = 'custom-alert success';
-      box.innerHTML = `<h4>Succes!</h4><p>${message}</p><button onclick="hideAlert()">OK</button>`;
-      box.style.display = 'block';
-      document.body.addEventListener('click', hideAlertOnce);
+      box.className = 'custom-alert success show';
+      box.innerHTML = `<div class="alert-icon">✅</div><h4>Success</h4><p class="alert-text">${message}</p><button onclick="hideAlert()">OK</button>`;
     }
 
     function showErrorAlert(rawMsg) {
       const msgMatch = rawMsg.match(/Error Message: (.*?)(\.|$)/);
       const extracted = msgMatch ? msgMatch[1] : "Unknown error occurred.";
       const box = document.getElementById('customAlert');
-      box.className = 'custom-alert error';
-      box.innerHTML = `<h4>Error</h4><p>${extracted}</p><button onclick="hideAlert()">OK</button>`;
-      box.style.display = 'block';
+      box.className = 'custom-alert error show';
+      box.innerHTML = `<div class="alert-icon">❌</div><h4>Error</h4><p class="alert-text">${extracted}</p><button onclick="hideAlert()">OK</button>`;
     }
 
-    function showErrorAlertwithMSG(Msg){
-      const extracted = Msg;
+
+    function showErrorAlertwithMSG(msg) {
       const box = document.getElementById('customAlert');
-      box.className = 'custom-alert error';
-      box.innerHTML = `<h4>Error</h4><p>${extracted}</p><button onclick="hideAlert()">OK</button>`;
-      box.style.display = 'block';
+      box.className = 'custom-alert error show';
+      box.innerHTML = `<div class="alert-icon">❌</div><h4>Error</h4><p class="alert-text">${msg}</p><button onclick="hideAlert()">OK</button>`;
     }
-
     function hideAlert() {
       const box = document.getElementById('customAlert');
-      box.style.display = 'none';
-      document.body.removeEventListener('click', hideAlertOnce);
-    }
-
-    function hideAlertOnce(e) {
-      if (!e.target.closest('#customAlert')) {
-        hideAlert();
-      }
+      box.classList.add('fade-out');
+      setTimeout(() => {
+        box.className = 'custom-alert';
+        if (typeof startScanner === 'function') {
+          startScanner();
+        }
+      }, 400);
     }
   </script>
 
