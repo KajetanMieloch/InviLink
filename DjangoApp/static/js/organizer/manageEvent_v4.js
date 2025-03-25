@@ -1,5 +1,5 @@
 async function updateEvent() {
-    const eventPubkey = getEventPubKey();
+    const eventPubkey = await getEventPubKey();
     const constants = await getConstants();
     const PROGRAM_ID = new solanaWeb3.PublicKey(constants.PROGRAM_ID);
     const NETWORK = constants.NETWORK;
@@ -52,7 +52,7 @@ async function updateEvent() {
   
   async function activateEvent()
   {
-    const eventPubkey = getEventPubKey();
+    const eventPubkey = await getEventPubKey();
     const constants = await getConstants();
     const PROGRAM_ID = new solanaWeb3.PublicKey(constants.PROGRAM_ID);
     const NETWORK = constants.NETWORK;
@@ -88,7 +88,7 @@ async function updateEvent() {
   }
   
   async function deactivateEvent() {
-    const eventPubkey = getEventPubKey();
+    const eventPubkey = await getEventPubKey();
     const constants = await getConstants();
     const PROGRAM_ID = new solanaWeb3.PublicKey(constants.PROGRAM_ID);
     const NETWORK = constants.NETWORK;
@@ -124,7 +124,7 @@ async function updateEvent() {
   }
   
   async function deleteEvent() {
-    const eventPubkey = getEventPubKey();
+    const eventPubkey = await getEventPubKey();
     const constants = await getConstants();
     const PROGRAM_ID = new solanaWeb3.PublicKey(constants.PROGRAM_ID);
     const NETWORK = constants.NETWORK;
