@@ -7,7 +7,7 @@ async function updateEvent() {
   
     const UPDATE_EVENT_DISCRIMINATOR = new Uint8Array([70, 108, 211, 125, 171, 176, 25, 217]);
   
-    console.log("Updating event: " + eventPubkey);
+    console.log("Updating event: " + eventPubkey.toBase58());
     const newName = prompt("Enter new event name (leave empty to keep current):");
     const newDate = prompt("Enter new event date (leave empty to keep current):");
     const newAvailableTickets = prompt("Enter new available tickets (leave empty to keep current):");
@@ -60,7 +60,7 @@ async function updateEvent() {
   
     const ACTIVATE_EVENT_DISCRIMINATOR = new Uint8Array([231, 184, 218, 110, 194, 0, 39, 115]);
   
-    console.log("Activating event: " + eventPubkey);
+    console.log("Activating event: " + eventPubkey.toBase58());
     const instruction = new solanaWeb3.TransactionInstruction({
       keys: [
         { pubkey: eventPubkey, isWritable: true, isSigner: false },
@@ -96,7 +96,7 @@ async function updateEvent() {
   
     const DEACTIVATE_EVENT_DISCRIMINATOR = new Uint8Array([222, 84, 182, 86, 46, 110, 215, 19]);
   
-    console.log("Deactivating event: " + eventPubkey);
+    console.log("Deactivating event: " + eventPubkey.toBase58());
     const instruction = new solanaWeb3.TransactionInstruction({
       keys: [
         { pubkey: eventPubkey, isWritable: true, isSigner: false },
@@ -132,7 +132,7 @@ async function updateEvent() {
   
     const DELETE_EVENT_DISCRIMINATOR = new Uint8Array([103, 111, 95, 106, 232, 24, 190, 84]);
   
-    console.log("Deleting event: " + eventPubkey);
+    console.log("Deleting event: " + eventPubkey.toBase58());
     const [registryPDA] = await solanaWeb3.PublicKey.findProgramAddress(
       [new TextEncoder().encode(REGISTRY_SEED)],
       PROGRAM_ID
@@ -190,6 +190,7 @@ async function updateEvent() {
     if (eventAcc) {
       const eventData = decodeEvent(eventAcc.data);
       if(eventData.event_id === eventId){
+        console.log("Event found: " + eventPubkey.toBase58());
         return eventPubkey;
       }
     }
