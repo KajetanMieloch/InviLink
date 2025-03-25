@@ -440,3 +440,58 @@ function buildValidateTicketData(eventId, section, row, seat) {
       active
     };
   }
+
+
+  // Własna funkcja deserializująca metadane NFT – zakładamy stały format pól
+function customDeserializeMetadata(buffer) {
+  let offset = 8; // pomijamy 8 bajtów dyskryminatora
+  const dv = new DataView(buffer.buffer, buffer.byteOffset, buffer.byteLength);
+  
+  const key = dv.getUint8(offset);
+  offset += 1;
+  
+  const updateAuthorityBytes = buffer.slice(offset, offset + 32);
+  const updateAuthority = new solanaWeb3.PublicKey(updateAuthorityBytes).toBase58();
+  offset += 32;
+  
+  const mintBytes = buffer.slice(offset, offset + 32);
+  const mint = new solanaWeb3.PublicKey(mintBytes).toBase58();
+  offset += 32;
+  
+  const nameBytes = buffer.slice(offset, offset + 32);
+  let name = new TextDecoder().decode(nameBytes);
+  name = name.replace(/\0/g, "").trim();
+  offset += 32;
+  
+  const symbolBytes = buffer.slice(offset, offset + 10);
+  let symbol = new TextDecoder().decode(symbolBytes);
+  symbol = symbol.replace(/\0/g, "").trim();
+  offset += 10;
+  
+  const uriBytes = buffer.slice(offset, offset + 200);
+  let uri = new TextDecoder().decode(uriBytes);
+  uri = uri.replace(/\0/g, "").trim();
+  offset += 200;
+  
+  return { key, updateAuthority, mint, name, symbol, uri };
+}
+
+
+// Funkcja budująca dane dla instrukcji activate_ticket:
+// Format: [discriminator (8 bajtów)] || [serializeString(event_id)] || [serializeString(section)] || [serializeU8(row)] || [serializeU8(seat)]
+function buildActivateTicketData(eventId, section, row, seat) {
+  const eventIdBytes = serializeString(eventId);
+  const sectionBytes = serializeString(section);
+  const rowBytes = serializeU8(row);
+  const seatBytes = serializeU8(seat);
+  const totalLength = ACTIVATE_TICKET_DISCRIMINATOR.length + eventIdBytes.length + sectionBytes.length + rowBytes.length + seatBytes.length;
+  const data = new Uint8Array(totalLength);
+  let offset = 0;
+  data.set(ACTIVATE_TICKET_DISCRIMINATOR, offset);
+  offset += ACTIVATE_TICKET_DISCRIMINATOR.length;
+  data.set(eventIdBytes, offset); offset += eventIdBytes.length;
+  data.set(sectionBytes, offset); offset += sectionBytes.length;
+  data.set(rowBytes, offset); offset += rowBytes.length;
+  data.set(seatBytes, offset);
+  return data;
+}
