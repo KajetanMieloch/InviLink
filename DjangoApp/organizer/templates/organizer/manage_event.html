@@ -186,6 +186,16 @@
   </div>
   
   <div id="seatingCounter" class="info-box"></div>
+
+  <div id="validatorBox" class="info-box">
+    <h3>Add Validator to Event</h3>
+    <label>
+      Validator PublicKey:
+      <input type="text" id="validatorInput" placeholder="Enter validator's PublicKey">
+    </label>
+    <button id="addValidatorBtn" onclick="addValidator()">Add Validator</button>
+  </div>
+  
   <div id="sectionsTable" class="info-box"></div>
 </div>
 
@@ -196,6 +206,7 @@
 <script src="{% static 'js/organizer/manageSections_v4.js' %}"></script>
 <script src="{% static 'js/organizer/seatingSections_v4.js' %}"></script>
 <script src="{% static 'js/organizer/manageEvent_v4.js' %}"></script>
+<script src="{% static 'js/organizer/addValidator_v4.js' %}"></script>
 
 <script>
   let exchangeRate = 0;

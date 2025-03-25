@@ -73,7 +73,6 @@ async function updateEvent() {
   location.reload();
 }
 
-
   
   async function activateEvent()
   {
