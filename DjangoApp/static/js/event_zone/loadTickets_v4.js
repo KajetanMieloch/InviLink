@@ -179,9 +179,9 @@ async function activateNFT(eventId, section, row, seat) {
     const txSignature = await connection.sendRawTransaction(signedTx.serialize());
     await connection.confirmTransaction(txSignature, "confirmed");
     console.log("NFT aktywowane! Tx Sig: " + txSignature);
-    alert("NFT aktywowane! Tx Sig: " + txSignature);
+    showSuccessAlert("NFT aktywowane! Tx Sig: " + txSignature);
   } catch (err) {
     console.log("Błąd aktywacji NFT: " + err.message);
-    alert("Błąd aktywacji NFT: " + err.message);
+    showErrorAlertwithMSG("Błąd aktywacji NFT: " + err.message);
   }
 }

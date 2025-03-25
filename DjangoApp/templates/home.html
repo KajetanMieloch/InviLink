@@ -7,6 +7,7 @@
     --secondary-color: #f1c40f;
     --accent-color: #8e44ad;
   }
+
   html, body {
     margin: 0;
     padding: 0;
@@ -35,6 +36,7 @@
     transition: opacity var(--transition-speed) ease-in-out;
     filter: blur(4px) brightness(0.5);
   }
+
   .bg-image.active {
     opacity: 1;
   }
@@ -45,18 +47,21 @@
     justify-content: center;
     align-items: center;
     position: relative;
-    padding: 20px;
+    padding: 40px 20px;
     text-align: center;
+    box-sizing: border-box;
   }
+
   .section h1 {
-    font-size: 3rem;
+    font-size: clamp(2rem, 5vw, 3rem);
     color: var(--secondary-color);
     margin-bottom: 10px;
   }
+
   .section p {
-    font-size: 1.5rem;
+    font-size: clamp(1rem, 2.5vw, 1.5rem);
     color: #ffffff;
-    max-width: 600px;
+    max-width: 700px;
     margin: 0 auto 20px auto;
     line-height: 1.6;
   }
@@ -65,14 +70,31 @@
     color: var(--secondary-color);
     text-decoration: none;
   }
+
   a:hover {
     text-decoration: underline;
   }
 
   .text-box {
-    background: rgba(0, 0, 0, 0.3);
-    padding: 20px 40px;
-    border-radius: 8px;
+    background: rgba(0, 0, 0, 0.4);
+    padding: 20px;
+    border-radius: 10px;
+    max-width: 95%;
+    box-sizing: border-box;
+  }
+
+  @media (max-width: 480px) {
+    .section {
+      padding: 30px 15px;
+    }
+
+    .section p {
+      font-size: 1rem;
+    }
+
+    .section h1 {
+      font-size: 1.8rem;
+    }
   }
 </style>
 

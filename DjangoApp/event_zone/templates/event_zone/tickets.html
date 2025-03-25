@@ -2,11 +2,27 @@
 {% block content %}
 {% load static %}
   <style>
-    body {
-      background-color: #0d0d0d;
-      color: white;
-      font-family: 'Segoe UI', sans-serif;
-      padding: 20px;
+    html, body {
+      margin: 0;
+      padding: 0;
+      overflow-x: hidden;
+      font-family: sans-serif;
+      width: 100vw;
+      height: 100vh;
+      position: relative;
+      z-index: 1;
+    }
+
+    body::before {
+      content: "";
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      background: url("https://static.vecteezy.com/system/resources/thumbnails/021/699/172/original/purple-and-blue-abstract-geometric-background-motion-design-video.jpg") center/cover no-repeat;
+      filter: blur(8px) brightness(0.3);
+      z-index: -1;
     }
     .nft-container {
       display: flex;

@@ -13,6 +13,8 @@ function parseQRParams(qrData) {
 
 async function validateTicketFromQR(decodedText) {
 
+  try {
+
 const constants = await getConstants();
 const PROGRAM_ID = new solanaWeb3.PublicKey(constants.PROGRAM_ID);
 const NETWORK = constants.NETWORK;
@@ -27,7 +29,7 @@ await initConnection();
   const seat = parseInt(params.seat);
 
   if (!eventId || !section || isNaN(row) || isNaN(seat)) {
-    console.log("Invalid QR code content.");
+    showErrorAlertwithMSG("Invalid QR code content.");
     return;
   }
 
@@ -73,7 +75,10 @@ await initConnection();
   const txSig = await connection.sendRawTransaction(signedTx.serialize());
   console.log("Transaction sent: " + txSig);
   await connection.confirmTransaction(txSig, "confirmed");
-  console.log("Ticket validated successfully!");
+  showSuccessAlert("Ticket validated successfully!");
+} catch (err) {
+  console.error(err);
+  showErrorAlert("Error: " + err.message);
 }
 
 const scanner = new Html5QrcodeScanner("reader", { fps: 10, qrbox: 250 });

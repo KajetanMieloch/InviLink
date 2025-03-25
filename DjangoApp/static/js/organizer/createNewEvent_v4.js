@@ -1,5 +1,5 @@
 async function createNewEvent() {
-
+  try {
     const constants = await getConstants();
     const PROGRAM_ID = new solanaWeb3.PublicKey(constants.PROGRAM_ID);
     const NETWORK = constants.NETWORK;
@@ -12,7 +12,7 @@ async function createNewEvent() {
     const availableTickets = parseInt(document.getElementById("availableTickets").value);
 
     if (!eventName || !eventDateInput || isNaN(availableTickets)) {
-      alert("All fields must be filled!");
+      showErrorAlertwithMSG("All fields must be filled!");
       return;
     }
 
@@ -92,6 +92,8 @@ async function createNewEvent() {
     console.log("Transaction sent, signature: " + txSignature);
     await connection.confirmTransaction(txSignature, "confirmed");
     console.log("Event created! Tx Sig: " + txSignature);
-    alert("Event created! Tx Sig: " + txSignature);
-    
+    showSuccessAlert("Event created! Tx Sig: " + txSignature);
+  } catch (err) {
+    console.log("Error: " + err.message);
+    showErrorAlert("Error: " + err.message);
 }

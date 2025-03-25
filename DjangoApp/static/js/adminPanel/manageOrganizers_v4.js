@@ -86,7 +86,7 @@ const NETWORK = constants.NETWORK;
   console.log("Removing organizer: " + organizerAddress + "...");
 
   if (!window.phantom || !window.phantom.solana) {
-    alert("Phantom Wallet is required!");
+    showErrorAlertwithMSG("Phantom Wallet is required!");
     return;
   }
 
@@ -144,11 +144,11 @@ const NETWORK = constants.NETWORK;
     }
 
     console.log("Organizer removed! Tx Sig: " + txSignature);
-    alert("Organizer removed! Tx Sig: " + txSignature);
+    showSuccessAlert("Organizer removed! Tx Sig: " + txSignature);
 
     fetchOrganizers(); // Refresh the list
   } catch (err) {
     console.log("Error: " + err.message);
-    alert("Error: " + err.message);
+    showErrorAlert("Error: " + err.message);
   }
 }

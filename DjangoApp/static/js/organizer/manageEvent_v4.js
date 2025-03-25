@@ -1,4 +1,5 @@
 async function updateEvent() {
+  try {
   const eventPubkey = await getEventPubKey();
   const constants = await getConstants();
   const PROGRAM_ID = new solanaWeb3.PublicKey(constants.PROGRAM_ID);
@@ -22,7 +23,7 @@ async function updateEvent() {
     if (!isNaN(parsedDate)) {
       newDate = Math.floor(parsedDate / 1000); // convert ms -> s
     } else {
-      alert("Invalid date format. Use YYYY-MM-DD.");
+      showErrorAlertwithMSG("Invalid date format. Use YYYY-MM-DD.");
       return;
     }
   }
@@ -69,13 +70,18 @@ async function updateEvent() {
   console.log("Waiting for confirmation...");
   await connection.confirmTransaction(txSig, "confirmed");
   console.log("Transaction confirmed.");
-  alert("Event updated! Tx Sig: " + txSig);
+  showSuccessAlert("Event updated! Tx Sig: " + txSig);
   location.reload();
+} catch (err) {
+  console.error(err);
+  showErrorAlert("Error: " + err.message);
+}
 }
 
   
   async function activateEvent()
   {
+    try {
     const eventPubkey = await getEventPubKey();
     const constants = await getConstants();
     const PROGRAM_ID = new solanaWeb3.PublicKey(constants.PROGRAM_ID);
@@ -107,11 +113,16 @@ async function updateEvent() {
     console.log("Waiting for confirmation...");
     await connection.confirmTransaction(txSig, "confirmed");
     console.log("Transaction confirmed.");
-    alert("Event activated! Tx Sig: " + txSig);
+    showSuccessAlert("Event activated! Tx Sig: " + txSig);
     location.reload();
+  } catch (err) {
+    console.error(err);
+    showErrorAlert("Error: " + err.message);
+  }
   }
   
   async function deactivateEvent() {
+    try{
     const eventPubkey = await getEventPubKey();
     const constants = await getConstants();
     const PROGRAM_ID = new solanaWeb3.PublicKey(constants.PROGRAM_ID);
@@ -143,11 +154,18 @@ async function updateEvent() {
     console.log("Waiting for confirmation...");
     await connection.confirmTransaction(txSig, "confirmed");
     console.log("Transaction confirmed.");
-    alert("Event deactivated! Tx Sig: " + txSig);
+    showSuccessAlert("Event deactivated! Tx Sig: " + txSig);
     location.reload();
+  } catch (err) {
+    console.error(err);
+    showErrorAlert("Error: " + err.message);
+  }
   }
   
   async function deleteEvent() {
+
+    try{
+
     const eventPubkey = await getEventPubKey();
     const constants = await getConstants();
     const PROGRAM_ID = new solanaWeb3.PublicKey(constants.PROGRAM_ID);
@@ -186,9 +204,13 @@ async function updateEvent() {
     console.log("Waiting for confirmation...");
     await connection.confirmTransaction(txSig, "confirmed");
     console.log("Transaction confirmed.");
-    alert("Event deleted! Tx Sig: " + txSig);
+    showSuccessAlert("Event deleted! Tx Sig: " + txSig);
     window.location.href = "/";
+  } catch (err) {
+    console.error(err);
+    showErrorAlert("Error: " + err.message);
   }
+}
 
  async function getEventPubKey(){
   const eventId = window.currentEvent.event_id;

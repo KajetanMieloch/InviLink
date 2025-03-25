@@ -1,6 +1,6 @@
 async function initConnection() {
     if (!window.phantom || !window.phantom.solana) {
-        alert("Phantom Wallet is required!");
+        showErrorAlertwithMSG("Phantom Wallet is required!");
         return;
     }
     provider = window.phantom.solana;

@@ -9,7 +9,7 @@ async function addOrganizer() {
 
   const newOrganizerAddress = document.getElementById("organizerAddress").value.trim();
   if (!newOrganizerAddress) {
-    alert("Please provide a valid organizer public address.");
+    showErrorAlertwithMSG("Please provide a valid organizer public address.");
     return;
   }
 
@@ -17,7 +17,7 @@ async function addOrganizer() {
   try {
     newOrganizerPubkey = new solanaWeb3.PublicKey(newOrganizerAddress);
   } catch (err) {
-    alert("Invalid public key format.");
+    showErrorAlertwithMSG("Invalid public key format.");
     return;
   }
 
@@ -67,9 +67,9 @@ async function addOrganizer() {
     }
 
     console.log("Organizer added! Tx Sig: " + txSignature);
-    alert("Organizer added! Tx Sig: " + txSignature);
+    showSuccessAlert("Organizer added! Tx Sig: " + txSignature);
   } catch (err) {
-    alert("Error: " + err.message);
+    showErrorAlertwithMSG("Error: " + err.message);
     console.log("Error: " + err.message);
   }
 }

@@ -72,9 +72,9 @@ async function initializeAdmin() {
         }
 
         console.log("Organizers Pool and Event Registry initialized! Tx Sig: " + txSignature);
-        alert("Organizers Pool and Event Registry initialized! Tx Sig: " + txSignature);
+        showSuccessAlert("Organizers Pool and Event Registry initialized! Tx Sig: " + txSignature);
     } catch (err) {
         console.log("Error: " + err);
-        alert("Error: " + err);
+        showErrorAlertwithMSG("Error: " + err);
     }
 }

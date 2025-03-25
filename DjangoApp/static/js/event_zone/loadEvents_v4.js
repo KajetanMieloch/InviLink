@@ -12,7 +12,7 @@ async function loadEvents() {
 
   const regAccount = await connection.getAccountInfo(registryPDA);
   if (!regAccount) {
-    alert("No events found.");
+    showErrorAlertwithMSG("No events found.");
     return;
   }
 

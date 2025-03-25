@@ -11,12 +11,12 @@ async function addSeatingSection() {
   const ticketPrice = parseInt(document.getElementById("ticketPriceInput").value);
 
   if (!sectionName || isNaN(rows) || isNaN(seatsPerRow) || isNaN(sectionType) || isNaN(ticketPrice)) {
-    alert("All fields must be filled!");
+    showErrorAlertwithMSG("All fields must be filled!");
     return;
   }
 
   if (!window.currentEvent) {
-    alert("Event must be loaded first!");
+    showErrorAlertwithMSG("Event must be loaded first!");
     return;
   }
 
@@ -83,11 +83,11 @@ async function addSeatingSection() {
     console.log("Section creation transaction sent. Signature: " + txSignature);
     await connection.confirmTransaction(txSignature, "confirmed");
     console.log("Section successfully added! Tx Sig: " + txSignature);
-    alert("Section successfully added! Tx Sig: " + txSignature);
+    showSuccessAlert("Section successfully added! Tx Sig: " + txSignature);
     await loadSeatingSections(eventId);
   } catch (err) {
     console.log("Error while adding section: " + err.message);
-    alert("Error while adding section: " + err.message);
+    showErrorAlert("Error while adding section: " + err.message);
   }
 }
 
@@ -99,7 +99,7 @@ async function editSection(sectionName) {
   const connection = new solanaWeb3.Connection(NETWORK, "confirmed");
 
   if (!window.currentEvent) {
-    alert("Event must be loaded first!");
+    showErrorAlertwithMSG("Event must be loaded first!");
     return;
   }
 
@@ -173,11 +173,11 @@ async function editSection(sectionName) {
     console.log("Section update transaction sent. Signature: " + txSignature);
     await connection.confirmTransaction(txSignature, "confirmed");
     console.log("Section successfully updated! Tx Sig: " + txSignature);
-    alert("Section successfully updated! Tx Sig: " + txSignature);
+    showSuccessAlert("Section successfully updated! Tx Sig: " + txSignature);
     await loadSeatingSections(eventId);
   } catch (err) {
     console.log("Error while updating section: " + err.message);
-    alert("Error while updating section: " + err.message);
+    showErrorAlert("Error while updating section: " + err.message);
   }
 }
 async function deleteSection(sectionName) {
@@ -187,7 +187,7 @@ async function deleteSection(sectionName) {
   const connection = new solanaWeb3.Connection(NETWORK, "confirmed");
 
   if (!window.currentEvent) {
-    alert("Event must be loaded first!");
+    showErrorAlert("Event must be loaded first!");
     return;
   }
 
@@ -237,10 +237,10 @@ async function deleteSection(sectionName) {
     console.log("Section deletion transaction sent. Signature: " + txSignature);
     await connection.confirmTransaction(txSignature, "confirmed");
     console.log("Section successfully deleted! Tx Sig: " + txSignature);
-    alert("Section successfully deleted! Tx Sig: " + txSignature);
+    showSuccessAlert("Section successfully deleted! Tx Sig: " + txSignature);
     await loadSeatingSections(eventId);
   } catch (err) {
     console.log("Error while deleting section: " + err.message);
-    alert("Error while deleting section: " + err.message);
+    showErrorAlert("Error while deleting section: " + err.message);
   }
 }

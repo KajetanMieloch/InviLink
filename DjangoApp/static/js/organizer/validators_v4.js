@@ -12,7 +12,7 @@ async function addValidator() {
     const ADD_VALIDATOR_DISCRIMINATOR = new Uint8Array([250, 113, 53, 54, 141, 117, 215, 185]);
   
     if (!validatorStr) {
-      alert("Please enter a validator PublicKey.");
+      showErrorAlertwithMSG("Please enter a validator PublicKey.");
       return;
     }
   
@@ -20,7 +20,7 @@ async function addValidator() {
     try {
       validatorPubkey = new solanaWeb3.PublicKey(validatorStr);
     } catch (err) {
-      alert("Invalid validator PublicKey format!");
+      showErrorAlertwithMSG("Invalid validator PublicKey format!");
       return;
     }
   
@@ -54,11 +54,12 @@ async function addValidator() {
       const signedTx = await provider.signTransaction(transaction);
       const txSig = await connection.sendRawTransaction(signedTx.serialize());
       await connection.confirmTransaction(txSig, "confirmed");
-      alert("Validator added successfully! Tx Signature: " + txSig);
+      showSuccessAlert("Validator added successfully! Tx Signature: " + txSig);
     } catch (err) {
-      alert("Error adding validator: " + err.message);
+      showErrorAlert("Error adding validator: " + err.message);
       console.error(err);
     }
+    window.location.reload();
   }
 
   async function listValidators() {
@@ -125,7 +126,7 @@ async function addValidator() {
     try {
       validatorPubkey = new solanaWeb3.PublicKey(pubkeyStr);
     } catch (err) {
-      alert("Invalid PublicKey format.");
+      showErrorAlert("Invalid PublicKey format.");
       return;
     }
   
@@ -157,10 +158,10 @@ async function addValidator() {
       const signedTx = await provider.signTransaction(transaction);
       const txSig = await connection.sendRawTransaction(signedTx.serialize());
       await connection.confirmTransaction(txSig, "confirmed");
-      alert("Validator removed! Tx Sig: " + txSig);
+      showSuccessAlert("Validator removed! Tx Sig: " + txSig);
       await listValidators(); // Refresh table
     } catch (err) {
-      alert("Error removing validator: " + err.message);
+      showErrorAlert("Error removing validator: " + err.message);
       console.error(err);
     }
   }

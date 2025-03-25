@@ -18,7 +18,7 @@
       padding: 0;
       font-family: 'Arial', sans-serif;
     }
-    
+
     .navbar-toggler {
       border-color: #f1c40f;
       background-color: #f1c40f;
@@ -35,6 +35,7 @@
     .navbar-brand {
       color: #f1c40f !important;
       font-weight: bold;
+      margin-left: 30px;
     }
     .navbar-brand:hover {
       color: #8e44ad !important;
@@ -49,6 +50,42 @@
     }
     .nav-item {
       margin-right: 25px;
+    }
+
+    /* Custom Alert Styles */
+    .custom-alert {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background-color: #000;
+      color: white;
+      border: 3px solid;
+      padding: 20px;
+      border-radius: 10px;
+      z-index: 9999;
+      text-align: center;
+      max-width: 400px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.6);
+    }
+
+    .custom-alert.success {
+      border-color: #2ecc71;
+    }
+
+    .custom-alert.error {
+      border-color: #e74c3c;
+    }
+
+    .custom-alert button {
+      margin-top: 15px;
+      background: linear-gradient(45deg, #1e90ff, #8e44ad);
+      border: none;
+      color: white;
+      padding: 8px 16px;
+      font-weight: bold;
+      border-radius: 6px;
+      cursor: pointer;
     }
   </style>
 </head>
@@ -77,6 +114,47 @@
   <div>
     {% block content %}{% endblock %}
   </div>
+
+  <div id="customAlert" class="custom-alert" style="display: none;"></div>
+
+  <script>
+    function showSuccessAlert(message) {
+      const box = document.getElementById('customAlert');
+      box.className = 'custom-alert success';
+      box.innerHTML = `<h4>Succes!</h4><p>${message}</p><button onclick="hideAlert()">OK</button>`;
+      box.style.display = 'block';
+      document.body.addEventListener('click', hideAlertOnce);
+    }
+
+    function showErrorAlert(rawMsg) {
+      const msgMatch = rawMsg.match(/Error Message: (.*?)(\.|$)/);
+      const extracted = msgMatch ? msgMatch[1] : "Unknown error occurred.";
+      const box = document.getElementById('customAlert');
+      box.className = 'custom-alert error';
+      box.innerHTML = `<h4>Error</h4><p>${extracted}</p><button onclick="hideAlert()">OK</button>`;
+      box.style.display = 'block';
+    }
+
+    function showErrorAlertwithMSG(Msg){
+      const extracted = Msg;
+      const box = document.getElementById('customAlert');
+      box.className = 'custom-alert error';
+      box.innerHTML = `<h4>Error</h4><p>${extracted}</p><button onclick="hideAlert()">OK</button>`;
+      box.style.display = 'block';
+    }
+
+    function hideAlert() {
+      const box = document.getElementById('customAlert');
+      box.style.display = 'none';
+      document.body.removeEventListener('click', hideAlertOnce);
+    }
+
+    function hideAlertOnce(e) {
+      if (!e.target.closest('#customAlert')) {
+        hideAlert();
+      }
+    }
+  </script>
 
   <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/popper.js@1.16.1/dist/umd/popper.min.js"></script>

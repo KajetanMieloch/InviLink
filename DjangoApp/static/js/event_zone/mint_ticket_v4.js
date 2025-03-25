@@ -205,7 +205,7 @@ async function buyStandingTicket(sectionName) {
   const freeIndices = [];
   sectionData.seat_status.forEach((status, index) => { if (status === 0) freeIndices.push(index); });
   if (freeIndices.length === 0) {
-    alert("No free seats in section " + sectionName);
+    showErrorAlertwithMSG("No free seats in section " + sectionName);
     return;
   }
   const randomIndex = freeIndices[Math.floor(Math.random() * freeIndices.length)];
@@ -348,107 +348,106 @@ function buildInitTicketStatusData(event_id, section, row, seat, eventPubkey) {
 
 // Function that executes the NFT mint
 async function processMintTicketNFT(sectionName, row, seat) {
-  const constants = await getConstants();
-  const PROGRAM_ID = new solanaWeb3.PublicKey(constants.PROGRAM_ID);
-  const NETWORK = constants.NETWORK;
-  const connection = new solanaWeb3.Connection(NETWORK, "confirmed");
-  await initConnection();
+  try{
+    const constants = await getConstants();
+    const PROGRAM_ID = new solanaWeb3.PublicKey(constants.PROGRAM_ID);
+    const NETWORK = constants.NETWORK;
+    const connection = new solanaWeb3.Connection(NETWORK, "confirmed");
+    await initConnection();
 
-  if (!eventData) { 
-    console.log("No event data!"); 
-    return; 
-  }
-  const event_id = eventData.event_id;
-  const event_name = eventData.name;
-  console.log(`Mint NFT: event_id=${event_id}, event_name=${event_name}, section=${sectionName}, row=${row}, seat=${seat}`);
+    if (!eventData) { 
+      console.log("No event data!"); 
+      return; 
+    }
+    const event_id = eventData.event_id;
+    const event_name = eventData.name;
+    console.log(`Mint NFT: event_id=${event_id}, event_name=${event_name}, section=${sectionName}, row=${row}, seat=${seat}`);
 
-  if (!eventData.active) { 
-    console.log("Event is not active!"); 
-    alert("Event is not active. Minting is impossible."); 
-    return; 
-  }
+    // Fetch metadata URI (backend generates metadata and uploads it to IPFS)
+    const metadataURI = await fetchMetadataUri(event_id, sectionName, row, seat, eventData.event_date, eventData.name);
+    console.log("Generated metadata URI (IPFS): " + metadataURI);
 
-  // Fetch metadata URI (backend generates metadata and uploads it to IPFS)
-  const metadataURI = await fetchMetadataUri(event_id, sectionName, row, seat, eventData.event_date, eventData.name);
-  console.log("Generated metadata URI (IPFS): " + metadataURI);
+    // Calculate necessary PDA addresses
+    const eventPDA = await getEventPDA(event_id);
+    console.log("Calculated Event PDA: " + eventPDA.toBase58());
 
-  // Calculate necessary PDA addresses
-  const eventPDA = await getEventPDA(event_id);
-  console.log("Calculated Event PDA: " + eventPDA.toBase58());
+    const seatingSeed1 = new TextEncoder().encode("seating_map");
+    const seatingSeed2 = new TextEncoder().encode(event_id);
+    const [seatingMapPDA] = await solanaWeb3.PublicKey.findProgramAddress(
+      [seatingSeed1, seatingSeed2],
+      PROGRAM_ID
+    );
+    console.log("Calculated Seating Map PDA: " + seatingMapPDA.toBase58());
+    
+    const seatingSectionPDA = await getSeatingSectionPDA(eventPDA, sectionName);
+    const { mintPDA } = await getTestMintPDA(event_id, event_name, sectionName, row, seat);
+    const tokenAccount = await getAssociatedTokenAddress(walletPublicKey, mintPDA);
+    console.log("Calculated ATA: " + tokenAccount.toBase58());
+    const metadataPDA = await getMetadataPDA(mintPDA);
+    console.log("Calculated metadata PDA: " + metadataPDA.toBase58());
 
-  const seatingSeed1 = new TextEncoder().encode("seating_map");
-  const seatingSeed2 = new TextEncoder().encode(event_id);
-  const [seatingMapPDA] = await solanaWeb3.PublicKey.findProgramAddress(
-    [seatingSeed1, seatingSeed2],
-    PROGRAM_ID
-  );
-  console.log("Calculated Seating Map PDA: " + seatingMapPDA.toBase58());
-  
-  const seatingSectionPDA = await getSeatingSectionPDA(eventPDA, sectionName);
-  const { mintPDA } = await getTestMintPDA(event_id, event_name, sectionName, row, seat);
-  const tokenAccount = await getAssociatedTokenAddress(walletPublicKey, mintPDA);
-  console.log("Calculated ATA: " + tokenAccount.toBase58());
-  const metadataPDA = await getMetadataPDA(mintPDA);
-  console.log("Calculated metadata PDA: " + metadataPDA.toBase58());
+    // Build the instruction data for mint NFT
+    const ixDataMint = buildInstructionData(event_id, event_name, sectionName, row, seat, metadataURI);
 
-  // Build the instruction data for mint NFT
-  const ixDataMint = buildInstructionData(event_id, event_name, sectionName, row, seat, metadataURI);
+    // Calculate PDA for TicketStatus (as already implemented)
+    const ticketStatusPDA = await getTicketStatusPDA(event_id, sectionName, row, seat);
 
-  // Calculate PDA for TicketStatus (as already implemented)
-  const ticketStatusPDA = await getTicketStatusPDA(event_id, sectionName, row, seat);
+    // Build instruction – passing event_id, sectionName, row, seat and eventPDA (as the event's Pubkey)
+    const ixDataInit = buildInitTicketStatusData(event_id, sectionName, row, seat, eventPDA);
 
-  // Build instruction – passing event_id, sectionName, row, seat and eventPDA (as the event's Pubkey)
-  const ixDataInit = buildInitTicketStatusData(event_id, sectionName, row, seat, eventPDA);
+    // Create the instruction for initialize_ticket_status
+    const initTicketStatusIx = new solanaWeb3.TransactionInstruction({
+      keys: [
+        { pubkey: ticketStatusPDA, isSigner: false, isWritable: true },
+        { pubkey: walletPublicKey, isSigner: true, isWritable: true },
+        { pubkey: solanaWeb3.SystemProgram.programId, isSigner: false, isWritable: false }
+      ],
+      programId: PROGRAM_ID,
+      data: ixDataInit,
+    });
 
-  // Create the instruction for initialize_ticket_status
-  const initTicketStatusIx = new solanaWeb3.TransactionInstruction({
-    keys: [
-      { pubkey: ticketStatusPDA, isSigner: false, isWritable: true },
+    // Build the instruction for mint NFT
+    const mintKeys = [
+      { pubkey: eventPDA, isSigner: false, isWritable: true },
       { pubkey: walletPublicKey, isSigner: true, isWritable: true },
-      { pubkey: solanaWeb3.SystemProgram.programId, isSigner: false, isWritable: false }
-    ],
-    programId: PROGRAM_ID,
-    data: ixDataInit,
-  });
+      { pubkey: seatingMapPDA, isSigner: false, isWritable: true },
+      { pubkey: seatingSectionPDA, isSigner: false, isWritable: true },
+      { pubkey: mintPDA, isSigner: false, isWritable: true },
+      { pubkey: tokenAccount, isSigner: false, isWritable: true },
+      { pubkey: metadataPDA, isSigner: false, isWritable: true },
+      { pubkey: MASTER_ACCOUNT, isSigner: false, isWritable: true },
+      { pubkey: eventData.organizer ? new solanaWeb3.PublicKey(eventData.organizer) : walletPublicKey, isSigner: false, isWritable: true },
+      { pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false },
+      { pubkey: ASSOCIATED_TOKEN_PROGRAM_ID, isSigner: false, isWritable: false },
+      { pubkey: METADATA_PROGRAM_ID, isSigner: false, isWritable: false },
+      { pubkey: solanaWeb3.SystemProgram.programId, isSigner: false, isWritable: false },
+      { pubkey: solanaWeb3.SYSVAR_RENT_PUBKEY, isSigner: false, isWritable: false }
+    ];
+    
+    const mintTicketIx = new solanaWeb3.TransactionInstruction({
+      keys: mintKeys,
+      programId: PROGRAM_ID,
+      data: ixDataMint,
+    });
 
-  // Build the instruction for mint NFT
-  const mintKeys = [
-    { pubkey: eventPDA, isSigner: false, isWritable: true },
-    { pubkey: walletPublicKey, isSigner: true, isWritable: true },
-    { pubkey: seatingMapPDA, isSigner: false, isWritable: true },
-    { pubkey: seatingSectionPDA, isSigner: false, isWritable: true },
-    { pubkey: mintPDA, isSigner: false, isWritable: true },
-    { pubkey: tokenAccount, isSigner: false, isWritable: true },
-    { pubkey: metadataPDA, isSigner: false, isWritable: true },
-    { pubkey: MASTER_ACCOUNT, isSigner: false, isWritable: true },
-    { pubkey: eventData.organizer ? new solanaWeb3.PublicKey(eventData.organizer) : walletPublicKey, isSigner: false, isWritable: true },
-    { pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false },
-    { pubkey: ASSOCIATED_TOKEN_PROGRAM_ID, isSigner: false, isWritable: false },
-    { pubkey: METADATA_PROGRAM_ID, isSigner: false, isWritable: false },
-    { pubkey: solanaWeb3.SystemProgram.programId, isSigner: false, isWritable: false },
-    { pubkey: solanaWeb3.SYSVAR_RENT_PUBKEY, isSigner: false, isWritable: false }
-  ];
-  
-  const mintTicketIx = new solanaWeb3.TransactionInstruction({
-    keys: mintKeys,
-    programId: PROGRAM_ID,
-    data: ixDataMint,
-  });
-
-  // Combine both instructions into one transaction
-  let transaction = new solanaWeb3.Transaction();
-  transaction.add(initTicketStatusIx).add(mintTicketIx);
-  transaction.feePayer = walletPublicKey;
-  const { blockhash } = await connection.getLatestBlockhash();
-  transaction.recentBlockhash = blockhash;
-  
-  console.log("Combined transaction - signing...");
-  const signedTx = await provider.signTransaction(transaction);
-  console.log("Transaction signed, sending...");
-  const txSignature = await connection.sendRawTransaction(signedTx.serialize());
-  console.log("Transaction sent. Signature: " + txSignature);
-  await connection.confirmTransaction(txSignature, "confirmed");
-  console.log("Combined transaction confirmed. NFT minted!");
-  alert("NFT minted! Tx Sig: " + txSignature);
-  loadEvent(window.currentEventID);
+    // Combine both instructions into one transaction
+    let transaction = new solanaWeb3.Transaction();
+    transaction.add(initTicketStatusIx).add(mintTicketIx);
+    transaction.feePayer = walletPublicKey;
+    const { blockhash } = await connection.getLatestBlockhash();
+    transaction.recentBlockhash = blockhash;
+    
+    console.log("Combined transaction - signing...");
+    const signedTx = await provider.signTransaction(transaction);
+    console.log("Transaction signed, sending...");
+    const txSignature = await connection.sendRawTransaction(signedTx.serialize());
+    console.log("Transaction sent. Signature: " + txSignature);
+    await connection.confirmTransaction(txSignature, "confirmed");
+    console.log("Combined transaction confirmed. NFT minted!");
+    showSuccessAlert("NFT minted! Tx Sig: " + txSignature);
+    loadEvent(window.currentEventID);
+  } catch (error) {
+    console.log("Error processing mint ticket NFT: " + error.message);
+    showErrorAlertwithMSG("Error: " + error.message);
+  }
 }

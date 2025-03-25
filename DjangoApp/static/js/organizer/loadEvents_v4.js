@@ -15,7 +15,7 @@ async function loadEvents() {
   
     const regAccount = await connection.getAccountInfo(registryPDA);
     if (!regAccount) {
-      alert("Event registry account not found.");
+      showErrorAlertWithMSG("Event registry account not found!");
       return;
     }
   
