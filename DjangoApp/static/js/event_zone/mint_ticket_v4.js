@@ -260,37 +260,30 @@ function buildInstructionData(event_id, event_name, section_name, row, seat, ipf
 
 async function fetchMetadataUri(eventId, section, row, seat, date, name) {
   try {
-    const payload = {
-      eventId: eventId,
-      section: section,
-      row: row,
-      seat: seat,
-      date: date,
-      name: name
-    };
-
-    console.log("🔍 Sending metadata POST:", payload);
-
     const apiEndpoint = "https://invilink.bieda.it/explore/generate_metadata/";
     const response = await fetch(apiEndpoint, {
       method: "POST",
       headers: {
         "Content-Type": "application/json"
       },
-      body: JSON.stringify(payload)
+      body: JSON.stringify({
+        eventId: eventId,
+        section: section,
+        row: row,
+        seat: seat,
+        date: date,
+        name: name
+      })
     });
 
     if (!response.ok) {
-      const text = await response.text(); // <-- pozwala odczytać szczegóły błędu z backendu
-      console.error("🧨 Metadata POST failed with status", response.status, "Response:", text);
       throw new Error("Error generating metadata");
     }
 
     const data = await response.json();
-    console.log("✅ Metadata URI received:", data.uri);
     return data.uri; // e.g. "ipfs://Qm..."
   } catch (error) {
-    console.log("🚨 Error fetching metadata URI:", error.message);
+    console.log("Error fetching metadata URI: " + error.message);
     throw error;
   }
 }
