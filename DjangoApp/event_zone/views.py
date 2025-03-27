@@ -36,13 +36,17 @@ def generate_metadata(request):
             name = data.get("name")
             raw_date = data.get("date")
 
+            # Sprawdzenie, czy wszystkie wymagane dane są obecne
+            if None in [event_id, section, row, seat, name]:
+                return JsonResponse({"error": "Brak wymaganych danych"}, status=400)
+
             if raw_date is not None:
                 event_date = datetime.utcfromtimestamp(raw_date)
                 human_readable_date = event_date.strftime("%Y-%m-%d")
             else:
                 human_readable_date = "Unknown"
 
-            # 1. Generate QR code with ticket data
+            # 1. Generowanie kodu QR
             qr_data = (
                 f"eventId={urllib.parse.quote(str(event_id))}"
                 f"&section={section.replace(' ', '!(_)!')}"
@@ -53,25 +57,25 @@ def generate_metadata(request):
 
             base_dir = os.path.dirname(os.path.abspath(__file__))
             background_path = os.path.join(base_dir, "BiletInvilink.png")
+            if not os.path.exists(background_path):
+                return JsonResponse({"error": "Plik tła nie został znaleziony"}, status=500)
             background = Image.open(background_path).convert("RGBA")
 
-            # Transparent area for QR code
+            # Definicja obszaru, w którym umieszczany będzie kod QR
             rect_min_x = 136
             rect_min_y = 24
             rect_width = 754 
             rect_height = 677
 
-            # Scale QR code to fit the rectangle
+            # Skalowanie kodu QR, aby pasował do wyznaczonego obszaru
             qr_resized = qr_img.resize((rect_width, rect_height))
-
-            # Paste QR code to the background
             background.paste(qr_resized, (rect_min_x, rect_min_y), qr_resized)
 
-            # Save the ticket to a file
+            # Zapis biletu do pliku
             ticket_filename = f"ticket_{event_id}_{row}_{seat}.png"
             background.save(ticket_filename)
 
-            # Add the ticket to IPFS
+            # Dodanie biletu do IPFS
             result_ticket = subprocess.run(["ipfs", "add", ticket_filename], capture_output=True, text=True)
             if result_ticket.returncode != 0:
                 os.remove(ticket_filename)
@@ -82,7 +86,7 @@ def generate_metadata(request):
             os.remove(ticket_filename)
             ticket_ipfs_link = f"ipfs://{cid_ticket}"
 
-            # 2. Generate metadata
+            # 2. Generowanie metadanych
             metadata = {
                 "name": f"InviLink Ticket - {event_id}",
                 "symbol": "INVI",
@@ -103,19 +107,20 @@ def generate_metadata(request):
                 ]
             }
 
-            # Save metadata to a file
+            # Zapis metadanych do pliku
             metadata_filename = f"metadata_{event_id}_{row}_{seat}.json"
             with open(metadata_filename, "w") as f:
                 json.dump(metadata, f)
 
-            # Add metadata to IPFS
+            # Dodanie metadanych do IPFS
             result_metadata = subprocess.run(["ipfs", "add", metadata_filename], capture_output=True, text=True)
             os.remove(metadata_filename)
-            if result_metadata.returncode == 0:
-                parts = result_metadata.stdout.split()
-                cid_metadata = parts[1] if len(parts) >= 2 else ""
-                uri = f"ipfs://{cid_metadata}"
-                return JsonResponse({"uri": uri}, status=200)
+            if result_metadata.returncode != 0:
+                return JsonResponse({"error": "Nie udało się dodać metadanych do IPFS"}, status=500)
+            parts = result_metadata.stdout.split()
+            cid_metadata = parts[1] if len(parts) >= 2 else ""
+            uri = f"ipfs://{cid_metadata}"
+            return JsonResponse({"uri": uri}, status=200)
         except Exception as e:
             return JsonResponse({"error": str(e)}, status=500)
-    
+    return JsonResponse({"error": "Metoda niedozwolona"}, status=405)
