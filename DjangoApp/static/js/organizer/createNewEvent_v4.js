@@ -97,3 +97,4 @@ async function createNewEvent() {
     console.log("Error: " + err.message);
     showErrorAlert("Error: " + err.message);
 }
+}
