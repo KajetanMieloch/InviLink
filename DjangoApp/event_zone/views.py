@@ -1,27 +1,12 @@
-from django.shortcuts import render
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 import json
-import subprocess
 import os
+import subprocess
+import urllib.parse
 from datetime import datetime
 import qrcode
-import urllib.parse
 from PIL import Image
-from django.http import JsonResponse
-
-
-def home(request):
-    return render(request, "event_zone/home.html")
-
-def events(request):
-    return render(request, "event_zone/events.html")
-
-def buy_ticket(request, event_id):
-    return render(request, "event_zone/buy_ticket.html", {"event_id": event_id})
-
-def tickets(request):
-    return render(request, "event_zone/tickets.html")
 
 @csrf_exempt
 def generate_metadata(request):
@@ -72,13 +57,20 @@ def generate_metadata(request):
             background.save(ticket_filename)
 
             # Add the ticket to IPFS
-            result_ticket = subprocess.run(["ipfs", "add", ticket_filename], capture_output=True, text=True)
+            result_ticket = subprocess.run(
+                ["ipfs", "add", ticket_filename],
+                capture_output=True, text=True
+            )
             if result_ticket.returncode != 0:
                 os.remove(ticket_filename)
                 return JsonResponse({"error": "Nie udało się dodać biletu do IPFS"}, status=500)
 
             parts_ticket = result_ticket.stdout.split()
             cid_ticket = parts_ticket[1] if len(parts_ticket) >= 2 else ""
+
+            # Announce ticket CID to DHT
+            subprocess.run(["ipfs", "routing", "provide", cid_ticket])
+
             os.remove(ticket_filename)
             ticket_ipfs_link = f"ipfs://{cid_ticket}"
 
@@ -103,19 +95,28 @@ def generate_metadata(request):
                 ]
             }
 
-            # Save metadata to a file
             metadata_filename = f"metadata_{event_id}_{row}_{seat}.json"
             with open(metadata_filename, "w") as f:
                 json.dump(metadata, f)
 
             # Add metadata to IPFS
-            result_metadata = subprocess.run(["ipfs", "add", metadata_filename], capture_output=True, text=True)
+            result_metadata = subprocess.run(
+                ["ipfs", "add", metadata_filename],
+                capture_output=True, text=True
+            )
             os.remove(metadata_filename)
+
             if result_metadata.returncode == 0:
                 parts = result_metadata.stdout.split()
                 cid_metadata = parts[1] if len(parts) >= 2 else ""
+
+                # Announce metadata CID to DHT
+                subprocess.run(["ipfs", "routing", "provide", cid_metadata])
+
                 uri = f"ipfs://{cid_metadata}"
                 return JsonResponse({"uri": uri}, status=200)
+            else:
+                return JsonResponse({"error": "Nie udało się dodać metadanych do IPFS"}, status=500)
+
         except Exception as e:
             return JsonResponse({"error": str(e)}, status=500)
-    
