@@ -1,12 +1,27 @@
+from django.shortcuts import render
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 import json
-import os
 import subprocess
-import urllib.parse
+import os
 from datetime import datetime
 import qrcode
+import urllib.parse
 from PIL import Image
+from django.http import JsonResponse
+
+
+def home(request):
+    return render(request, "event_zone/home.html")
+
+def events(request):
+    return render(request, "event_zone/events.html")
+
+def buy_ticket(request, event_id):
+    return render(request, "event_zone/buy_ticket.html", {"event_id": event_id})
+
+def tickets(request):
+    return render(request, "event_zone/tickets.html")
 
 @csrf_exempt
 def generate_metadata(request):
