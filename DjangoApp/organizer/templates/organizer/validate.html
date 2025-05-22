@@ -6,6 +6,7 @@
   :root {
     --gradient-start: #1e90ff;
     --gradient-end: #8e44ad;
+    --success-green: #2ecc71;
   }
 
   html, body {
@@ -30,42 +31,62 @@
     z-index: -1;
   }
 
-  #scanner-container {
+  #confirmation-container {
     display: flex;
     flex-direction: column;
-    justify-content: center;
+    justify-content: flex-start;
     align-items: center;
     height: 100vh;
-    padding: 20px;
+    padding: 40px 20px;
+    text-align: center;
+  }
+
+  .checkmark {
+    font-size: 5rem;
+    color: var(--success-green);
+    margin-bottom: 20px;
   }
 
   h1 {
+    font-size: 2.2rem;
+    margin-bottom: 10px;
     background: linear-gradient(45deg, var(--gradient-start), var(--gradient-end));
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
-    font-size: 2.5rem;
-    margin-bottom: 30px;
   }
 
-  #reader {
+  .ticket-details {
+    background-color: rgba(255, 255, 255, 0.05);
+    padding: 20px 30px;
+    border-radius: 15px;
+    box-shadow: 0 0 15px rgba(0,0,0,0.4);
+    max-width: 600px;
     width: 100%;
-    max-width: 500px;
-    border-radius: 10px;
-    box-shadow: 0 0 12px rgba(0,0,0,0.6);
-    overflow: hidden;
+    margin-top: 20px;
+    font-size: 1rem;
+    line-height: 1.6;
+    text-align: left;
+  }
+
+  .ticket-details b {
+    color: var(--gradient-start);
   }
 </style>
 
-<div id="scanner-container">
-  <h1>Scan Your Ticket</h1>
-  <div id="reader"></div>
-</div>
+<div id="confirmation-container">
+  <div class="checkmark">✅</div>
+  <h1>Successfully validated ticket for:</h1>
+  <h2 style="margin-top: 0; font-weight: normal;">‘24 urodziny Kajetana Mielocha’</h2>
 
-<script src="https://unpkg.com/html5-qrcode"></script>
-<script src="{% static 'js/getConstants_v4.js' %}"></script>
-<script src="{% static 'js/initConnection_v4.js' %}"></script>
-<script src="{% static 'js/serializationBundle_v4.js' %}"></script>
-<script src="{% static 'js/getUSDRate_v4.js' %}"></script>
-<script src="{% static 'js/organizer/QRScan_v4.js' %}"></script>
+  <div class="ticket-details">
+    <p><b>Event ID:</b> F0EL0QM3KnBH</p>
+    <p><b>Row:</b> 1</p>
+    <p><b>Seat:</b> 7</p>
+    <p><b>Date of the event:</b> Today</p>
+    <p><b>Activated:</b> &lt;1 min ago</p>
+    <p><b>First owner:</b> 8FWj9rsPQZtJ8YckNT8q6iMmXm4G9CCv15EkgPH9gVHv</p>
+    <p><b>Actual owner:</b> 8FWj9rsPQZtJ8YckNT8q6iMmXm4G9CCv15EkgPH9gVHv</p>
+  </div>
+</div>
 
 {% endblock %}
