@@ -6,7 +6,7 @@ def home(request):
     return render(request, "home.html")
 
 def generate_400(request):
-    return HttpResponseBadRequest("To jest błąd 400: Niepoprawne żądanie")
+    return render(request, '400.html', status=400)
 
 def generate_500(request):
     raise Exception("To jest błąd 500: Symulowany wyjątek")
