@@ -14,8 +14,8 @@ urlpatterns = [
     path('admin_panel/', include('admin_panel.urls')),
     path('explore/', include('event_zone.urls')),
     path('organizer/', include('organizer.urls')),
-    path('test400/', test_views.generate_400),
-    path('test500/', test_views.generate_500),
+    path('test400/', views.generate_400, name='test400'),
+    path('test500/', views.generate_500, name='test500'),
 ]
 
 def custom_404(request, exception):
