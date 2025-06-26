@@ -260,7 +260,7 @@ function buildInstructionData(event_id, event_name, section_name, row, seat, ipf
 
 async function fetchMetadataUri(eventId, section, row, seat, date, name) {
   try {
-    const apiEndpoint = "https://invilink.bieda.it/explore/generate_metadata/";
+    const apiEndpoint = "https://invilink.pl/explore/generate_metadata/";
     const response = await fetch(apiEndpoint, {
       method: "POST",
       headers: {
