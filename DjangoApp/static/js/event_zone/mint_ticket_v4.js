@@ -3,7 +3,7 @@ const METADATA_PROGRAM_ID = new solanaWeb3.PublicKey("metaqbxxUerdq28cj1RbAWkYQm
 const TOKEN_PROGRAM_ID = new solanaWeb3.PublicKey("TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA");
 const ASSOCIATED_TOKEN_PROGRAM_ID = new solanaWeb3.PublicKey("ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL");
 // Constant MASTER_ACCOUNT
-const MASTER_ACCOUNT = new solanaWeb3.PublicKey("ErwJPZrGJpyGyEtqJ3CGuwZ1JEn4uFiMTj6F4TYPbjqF");
+const MASTER_ACCOUNT = new solanaWeb3.PublicKey("8FWj9rsPQZtJ8YckNT8q6iMmXm4G9CCv15EkgPH9gVHv");
 
 let provider, walletPublicKey;
 let currentEventID = null; // set when EventID is provided
